@@ -1,6 +1,6 @@
 use hashbrown::HashMap;
 use rand::{seq::SliceRandom, thread_rng};
-use std::{cmp::min, ops::Deref};
+use std::{cmp::{min, max}, ops::Deref};
 
 #[derive(Debug, Clone)]
 pub enum Node {
@@ -44,6 +44,7 @@ pub struct DecisionTree {
     max_depth: usize,
     min_samples_split: usize,
     max_features: usize,
+    tree_depth: usize,
 }
 
 struct Sample<'a> {
@@ -62,10 +63,11 @@ impl DecisionTree {
             max_depth,
             min_samples_split,
             max_features,
+            tree_depth: 0,
         }
     }
 
-    pub fn fit(&mut self, x: &Vec<Vec<f64>>, y: &Vec<usize>) {
+    pub fn fit(&mut self, x: &Vec<&Vec<f64>>, y: &Vec<usize>) {
         // Start the iterative tree-building process
         let mut data = x
             .iter()
@@ -85,10 +87,15 @@ impl DecisionTree {
         max_depth: usize,
         min_samples_split: usize,
     ) -> Node {
+        let current_depth = max(1, self.max_depth - max_depth);
+        if self.tree_depth < current_depth {
+            self.tree_depth = current_depth;
+        }
+
         if samples.len() < min_samples_split || max_depth == 0 {
             return Node::Leaf {
                 class: get_most_common_class(samples),
-                depth: self.max_depth - max_depth,
+                depth: current_depth,
                 impurity: 0.0,
             };
         }
@@ -98,7 +105,7 @@ impl DecisionTree {
         if best_gini == 0.0 {
             return Node::Leaf {
                 class: samples[0].target,
-                depth: self.max_depth - max_depth,
+                depth: current_depth,
                 impurity: 0.0,
             };
         }
@@ -113,7 +120,7 @@ impl DecisionTree {
             threshold: best_threshold,
             left: Box::new(left_subtree),
             right: Box::new(right_subtree),
-            depth: self.max_depth - max_depth,
+            depth: current_depth,
             impurity: best_gini,
         }
     }
@@ -243,19 +250,30 @@ impl DecisionTree {
     //         - 2 * self.lca(&x1, &x2).get_depth();
     // }
 
-    pub fn compute_distances(&self, node: &Node) -> HashMap<*const Node, usize> {
+    pub fn compute_ancestor(&self, node: &Node) -> HashMap<*const Node, f64> {
         let mut distances = HashMap::new();
-        compute_distances_rec(&self.root, node, None, &mut distances);
-        distances.insert(node as *const Node, 0);
+        compute_ancestor_rec(&self.root, node, None, &mut distances);
+        distances.insert(node as *const Node, 0.0);
+        distances
+            .iter_mut()
+            .for_each(|(_, v)| *v = *v / (2 * self.tree_depth) as f64);
+        assert!(self.tree_depth > 0);
         distances
     }
+
+    // pub fn compute_zhu(&self, node: &Node) -> HashMap<*const Node, usize> {
+    //     let mut distances = HashMap::new();
+    //     compute_zhou_rec(&self.root, node, None, &mut distances);
+    //     distances.insert(node as *const Node, 0);
+    //     distances
+    // }
 }
 
-pub fn compute_distances_rec<'a>(
+fn compute_ancestor_rec<'a>(
     current: &'a Node,
     target: &'a Node,
     found_dist: Option<usize>,
-    distances: &mut HashMap<*const Node, usize>,
+    distances: &mut HashMap<*const Node, f64>,
 ) -> Option<usize> {
     if (current as *const Node) == (target as *const Node) {
         return Some(1);
@@ -264,23 +282,19 @@ pub fn compute_distances_rec<'a>(
     match current {
         Node::Leaf { .. } => {
             if let Some(found_dist) = found_dist {
-                distances.insert(current as *const Node, found_dist);
+                distances.insert(current as *const Node, found_dist as f64);
             }
             None
         }
-        Node::Split {
-            left,
-            right,
-            ..
-        } => {
+        Node::Split { left, right, .. } => {
             if let Some(found_dist) = found_dist {
-                compute_distances_rec(left.deref(), target, Some(found_dist + 1), distances);
-                compute_distances_rec(right.deref(), target, Some(found_dist + 1), distances);
+                compute_ancestor_rec(left.deref(), target, Some(found_dist + 1), distances);
+                compute_ancestor_rec(right.deref(), target, Some(found_dist + 1), distances);
                 None
             } else {
-                let left_dist = compute_distances_rec(left.deref(), target, None, distances);
+                let left_dist = compute_ancestor_rec(left.deref(), target, None, distances);
                 if left_dist.is_some() {
-                    compute_distances_rec(
+                    compute_ancestor_rec(
                         right.deref(),
                         target,
                         left_dist.map(|l| l + 1),
@@ -288,9 +302,9 @@ pub fn compute_distances_rec<'a>(
                     );
                     left_dist.map(|l| l + 1)
                 } else {
-                    let right_dist = compute_distances_rec(right, target, None, distances);
+                    let right_dist = compute_ancestor_rec(right, target, None, distances);
                     if right_dist.is_some() {
-                        compute_distances_rec(
+                        compute_ancestor_rec(
                             left.deref(),
                             target,
                             right_dist.map(|l| l + 1),

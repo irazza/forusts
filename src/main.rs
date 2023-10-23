@@ -1,19 +1,22 @@
 use csv::ReaderBuilder;
 use std::error::Error;
+use std::fs;
 use std::fs::File;
 use std::io::BufReader;
+use std::path::Path;
 
 use crate::random_forest::MaxFeatures;
 mod decision_tree;
-mod random_forest;
 mod nearest_neighbour;
+mod random_forest;
+mod time_series_forest;
 
 struct Dataset {
     targets: Vec<usize>,
     data: Vec<Vec<f64>>,
 }
 
-fn read_csv(path: &str) -> Result<Dataset, Box<dyn Error>> {
+fn read_csv(path: impl AsRef<Path>) -> Result<Dataset, Box<dyn Error>> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
     let mut reader = ReaderBuilder::new()
@@ -30,7 +33,15 @@ fn read_csv(path: &str) -> Result<Dataset, Box<dyn Error>> {
 
         // Assuming the first column is the target and the rest are data
         if let Some(target) = record.get(0) {
-            targets.push(target.parse()?);
+            let class = target.parse::<isize>()?;
+            let class = if class < 0 {
+                -class * 2
+            }
+            else
+            {
+                class * 2 + 1
+            };
+            targets.push(class as usize);
         }
 
         for value in record.iter().skip(1) {
@@ -44,47 +55,97 @@ fn read_csv(path: &str) -> Result<Dataset, Box<dyn Error>> {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let ds_train = read_csv("UCRArchive_2018/Adiac/Adiac_TEST.tsv")?;
-    let ds_test = read_csv("UCRArchive_2018/Adiac/Adiac_TRAIN.tsv")?;
+    let paths = fs::read_dir("UCRArchive_2018/")?;
+    let mut datasets: Vec<_> = Vec::new();
 
-    // Train the model
+    for entry in paths {
+        // Unwrap the entry or handle the error, if any.
+        let entry = entry?;
+        if entry.file_type()?.is_dir() {
+            datasets.push(entry);
+        }
+    }
+    datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
+    let mut predictions: Vec<Vec<f64>> = Vec::new();
 
-    let mut clf = random_forest::RandomForest::new(1000, MaxFeatures::Sqrt, Some(1000));
-    // check fitting time
-    let start = std::time::Instant::now();
-    clf.fit(&ds_train.data, &ds_train.targets);
-    let duration = start.elapsed();
-    println!("Time elapsed in training is: {:?}", duration);
-    let y_pred = clf.predict(&ds_test.data);
-    let accuracy = (y_pred
-        .iter()
-        .zip(ds_test.targets.iter())
-        .filter(|&(a, b)| a == b)
-        .count() as f32)
-        / (ds_test.targets.len() as f32);
+    for path in &datasets {
+        println!("Processing {}", path.file_name().to_string_lossy());
 
-    println!("Accuracy: {}", accuracy);
-    let start = std::time::Instant::now();
-    let breiman_distance = clf.pairwise_breiman(ds_test.data.clone(), ds_train.data.clone());
-    let duration = start.elapsed();
-    println!("Time elapsed in training is: {:?}", duration);
-    let prediction_breiman = nearest_neighbour::k_nearest_neighbour(1, &ds_train.targets, &breiman_distance);
-    let accuracy = (prediction_breiman
-        .iter()
-        .zip(ds_test.targets.iter())
-        .filter(|&(a, b)| a == b)
-        .count() as f32)
-        / (ds_test.targets.len() as f32);
-    println!("Accuracy: {}", accuracy);
-    let ancestor_distance = clf.pairwise_ancestor(ds_test.data, ds_train.data);
-    println!("Time elapsed in training is: {:?}", duration);
-    let prediction_ancestor = nearest_neighbour::k_nearest_neighbour(1, &ds_train.targets, &ancestor_distance);
-    let accuracy = (prediction_ancestor
-        .iter()
-        .zip(ds_test.targets.iter())
-        .filter(|&(a, b)| a == b)
-        .count() as f32)
-        / (ds_test.targets.len() as f32);
-    println!("Accuracy: {}", accuracy);
+        let train_path = path
+            .path()
+            .join(format!("{}_TRAIN.tsv", path.file_name().to_string_lossy()));
+        let test_path = path
+            .path()
+            .join(format!("{}_TEST.tsv", path.file_name().to_string_lossy()));
+
+        let ds_train = &read_csv(train_path)?;
+        let ds_test = &read_csv(test_path)?;
+
+        if [&ds_train, &ds_test]
+            .into_iter()
+            .any(|d| d.data.iter().any(|row| row.iter().any(|v| !v.is_finite())))
+        {
+            println!("NaN in training data");
+            continue;
+        }
+
+        // Train the model
+        let n_repetitions = 50;
+        for _i in 0..n_repetitions{
+
+            let mut clf = time_series_forest::TimeSeriesForest::new(
+                100,
+                (ds_train.data[0].len() as f64).sqrt() as usize,
+                MaxFeatures::Sqrt,
+                Some(1000),
+            );
+            // check fitting time
+            clf.fit(&ds_train.data, &ds_train.targets);
+            let y_pred = clf.predict(&ds_test.data);
+            let accuracy_rf = (y_pred
+                .iter()
+                .zip(ds_test.targets.iter())
+                .filter(|&(a, b)| a == b)
+                .count() as f64)
+                / (ds_test.targets.len() as f64);
+            let breiman_distance = clf.pairwise_breiman(ds_test.data.clone(), ds_train.data.clone());
+            let prediction_breiman =
+                nearest_neighbour::k_nearest_neighbour(1, &ds_train.targets, &breiman_distance);
+            let accuracy_breiman = (prediction_breiman
+                .iter()
+                .zip(ds_test.targets.iter())
+                .filter(|&(a, b)| a == b)
+                .count() as f64)
+                / (ds_test.targets.len() as f64);
+            let ancestor_distance = clf.pairwise_ancestor(ds_test.data.clone(), ds_train.data.clone());
+            let prediction_ancestor =
+                nearest_neighbour::k_nearest_neighbour(1, &ds_train.targets, &ancestor_distance);
+            let accuracy_ancestor = (prediction_ancestor
+                .iter()
+                .zip(ds_test.targets.iter())
+                .filter(|&(a, b)| a == b)
+                .count() as f64)
+                / (ds_test.targets.len() as f64);
+
+            predictions.push([accuracy_rf, accuracy_breiman, accuracy_ancestor].to_vec());
+        }
+}
+
+    let mut csv_writer = csv::Writer::from_path("results.csv")?;
+    csv_writer.write_record(&[
+        "dataset",
+        "accuracy_rf",
+        "accuracy_breiman",
+        "accuracy_ancestor",
+    ])?;
+    for (i, prediction) in predictions.iter().enumerate() {
+        csv_writer.write_record(
+            [datasets[i].file_name().to_string_lossy().into_owned()]
+                .into_iter()
+                .chain(prediction.iter().map(|f| f.to_string())),
+        )?;
+    }
+    csv_writer.flush()?;
+
     Ok(())
 }

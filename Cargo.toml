@@ -10,6 +10,7 @@ rand = "0.8.5"
 csv = "1.3.0"
 rayon = "1.8.0"
 hashbrown = "0.14.1"
+parking_lot = "0.12.1"
 
 [profile.release]
 debug = true

@@ -2,7 +2,7 @@ import pandas as pd
 
 if __name__ == "__main__":
     # Read the results
-    results = pd.read_csv("results_100.csv", index_col=0, header=0)
+    results = pd.read_csv("results_200.csv", index_col=0, header=0)
     # Groub by index and get the mean of the results
     results = results.groupby(results.index).mean()
     results = results.applymap(lambda x: 1 - x)

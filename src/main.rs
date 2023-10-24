@@ -62,6 +62,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
     let mut predictions: Vec<Vec<f64>> = Vec::new();
     let n_repetitions = 50;
+    let n_trees = 200;
     for path in &datasets {
         println!("Processing {}", path.file_name().to_string_lossy());
 
@@ -86,7 +87,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         // Train the model
         for _i in 0..n_repetitions {
             let mut clf = time_series_forest::TimeSeriesForest::new(
-                100,
+                n_trees,
                 (ds_train.data[0].len() as f64).sqrt() as usize,
                 MaxFeatures::Sqrt,
                 Some(1000),
@@ -134,7 +135,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let mut csv_writer = csv::Writer::from_path("results.csv")?;
+    let mut csv_writer = csv::Writer::from_path(format!("results_{}.csv", n_trees))?;
     csv_writer.write_record(&[
         "dataset",
         "accuracy_rf",

@@ -62,7 +62,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
     let mut predictions: Vec<Vec<f64>> = Vec::new();
     let n_repetitions = 50;
-    let n_trees = 200;
+    let n_trees = 500;
     for path in &datasets {
         println!("Processing {}", path.file_name().to_string_lossy());
 

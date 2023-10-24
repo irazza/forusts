@@ -40,6 +40,24 @@ impl Node {
             } => return *depth,
         }
     }
+
+    pub fn get_class(&self) -> usize {
+        match self {
+            Node::Leaf {
+                class,
+                depth: _,
+                impurity: _,
+            } => return *class,
+            Node::Split {
+                feature: _,
+                threshold: _,
+                left: _,
+                right: _,
+                depth: _,
+                impurity: _,
+            } => panic!("Cannot get class of a split node"),
+        }
+    }
 }
 
 pub struct DecisionTree {
@@ -51,7 +69,7 @@ pub struct DecisionTree {
 }
 
 struct Sample<'a> {
-    features: &'a [f64],
+    data: &'a [f64],
     target: usize,
 }
 
@@ -76,13 +94,14 @@ impl DecisionTree {
             .iter()
             .zip(y.iter())
             .map(|(x, y)| Sample {
-                features: &x,
+                data: &x,
                 target: *y,
             })
             .collect::<Vec<_>>();
 
         self.root = self.build_tree(&mut data, self.max_depth, self.min_samples_split);
     }
+    
 
     fn build_tree(
         &mut self,
@@ -128,36 +147,9 @@ impl DecisionTree {
         }
     }
 
-    // pub fn lca(&self, x1: &Vec<f64>, x2: &Vec<f64>) -> &Node {
-    //     let mut node = &self.root;
-    //     // Traverse the tree to make a prediction
-    //     while let Node::Split {
-    //         feature,
-    //         threshold,
-    //         left,
-    //         right,
-    //         depth: _,
-    //         impurity: _,
-    //     } = node
-    //     {
-    //         let x1_test = x1[*feature] <= *threshold;
-    //         let x2_test = x2[*feature] <= *threshold;
-    //         if x1_test != x2_test {
-    //             return node;
-    //         }
-    //         if x1_test {
-    //             node = left;
-    //         } else {
-    //             node = right;
-    //         }
-    //     }
-    //     node
-    // }
-
     pub fn predict_leaf(&self, x: &Vec<f64>) -> &Node {
         let mut node = &self.root;
 
-        // Traverse the tree to make a prediction
         while let Node::Split {
             feature,
             threshold,
@@ -177,23 +169,7 @@ impl DecisionTree {
     }
 
     pub fn predict(&self, x: &Vec<Vec<f64>>) -> Vec<usize> {
-        let n_samples = x.len();
-        let mut predictions = vec![0; n_samples];
-
-        for (i, sample) in x.iter().enumerate() {
-            let node = self.predict_leaf(sample);
-
-            if let Node::Leaf {
-                class,
-                depth: _,
-                impurity: _,
-            } = node
-            {
-                predictions[i] = *class;
-            }
-        }
-
-        predictions
+        x.iter().map(|sample| self.predict_leaf(sample).get_class()).collect()
     }
 
     fn get_best_split(&self, samples: &[Sample<'_>]) -> (usize, f64, f64) {
@@ -201,20 +177,11 @@ impl DecisionTree {
         let mut best_threshold = f64::MAX;
         let mut best_gini = f64::MAX;
 
-        let mut selected_features: Vec<_> = (0..samples[0].features.len()).collect();
+        let mut selected_features: Vec<_> = (0..samples[0].data.len()).collect();
         selected_features.shuffle(&mut thread_rng());
 
-        for &feature in &selected_features[0..min(samples[0].features.len(), self.max_features)] {
-            let mut features = Vec::new();
-
-            for Sample {
-                features: sample,
-                target,
-            } in samples
-            {
-                features.push((sample[feature], target));
-            }
-
+        for &feature in &selected_features[0..min(samples[0].data.len(), self.max_features)] {
+            let mut features: Vec<(f64, usize)> = samples.iter().map(|Sample { data: sample, target }| (sample[feature], *target)).collect();
             features.sort_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap());
             let mut left_class_counts = HashMap::new();
             let mut right_class_counts = HashMap::new();
@@ -222,7 +189,7 @@ impl DecisionTree {
                 *right_class_counts.entry(*v).or_insert(0) += 1;
             }
 
-            for (idx, &(v, &target)) in features.iter().enumerate() {
+            for (idx, &(v, target)) in features.iter().enumerate() {
                 right_class_counts.entry(target).and_modify(|e| *e -= 1);
                 *left_class_counts.entry(target).or_insert(0) += 1;
 
@@ -246,26 +213,12 @@ impl DecisionTree {
         (best_feature, best_threshold, best_gini)
     }
 
-    // fn minimal_cost_complexity_pruning(&self, ccp_alpha: &f64) { }
-
-    // pub fn ancestor(&self, x1: &Vec<f64>, x2: &Vec<f64>) -> usize {
-    //     return (self.predict_leaf(&x1).get_depth() + self.predict_leaf(&x2).get_depth())
-    //         - 2 * self.lca(&x1, &x2).get_depth();
-    // }
-
     pub fn compute_ancestor<'a>(&'a self, node: &'a Node) -> HashMap<*const Node, &'a Node> {
         let mut ancestors = HashMap::new();
         compute_ancestor_rec(&self.root, node, None, &mut ancestors);
         ancestors.insert(node as *const Node, node);
         ancestors
     }
-
-    // pub fn compute_zhu(&self, node: &Node) -> HashMap<*const Node, usize> {
-    //     let mut distances = HashMap::new();
-    //     compute_zhou_rec(&self.root, node, None, &mut distances);
-    //     distances.insert(node as *const Node, 0);
-    //     distances
-    // }
 }
 
 fn compute_ancestor_rec<'a>(
@@ -318,7 +271,7 @@ fn split<'a, 'b>(
     let mut last = samples.len();
 
     while idx < last {
-        if samples[idx].features[feature] <= threshold {
+        if samples[idx].data[feature] <= threshold {
             idx += 1;
         } else {
             samples.swap(idx, last - 1);

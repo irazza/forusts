@@ -80,11 +80,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             .into_iter()
             .any(|d| d.data.iter().any(|row| row.iter().any(|v| !v.is_finite())))
         {
-            println!("NaN in training data");
+            println!("NaN in training and/or testing data");
             continue;
         }
 
-        // Train the model
         for _i in 0..n_repetitions {
             let mut clf = time_series_forest::TimeSeriesForest::new(
                 n_trees,
@@ -92,15 +91,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 MaxFeatures::Sqrt,
                 Some(1000),
             );
-            // check fitting time
+
             clf.fit(&ds_train.data, &ds_train.targets);
-            let y_pred = clf.predict(&ds_test.data);
-            let accuracy_rf = (y_pred
-                .iter()
-                .zip(ds_test.targets.iter())
-                .filter(|&(a, b)| a == b)
-                .count() as f64)
-                / (ds_test.targets.len() as f64);
+
             let breiman_distance =
                 clf.pairwise_breiman(ds_test.data.clone(), ds_train.data.clone());
             let prediction_breiman =
@@ -111,6 +104,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .filter(|&(a, b)| a == b)
                 .count() as f64)
                 / (ds_test.targets.len() as f64);
+
             let ancestor_distance =
                 clf.pairwise_ancestor(ds_test.data.clone(), ds_train.data.clone());
             let prediction_ancestor =
@@ -121,6 +115,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .filter(|&(a, b)| a == b)
                 .count() as f64)
                 / (ds_test.targets.len() as f64);
+
             let zhu_distance = clf.pairwise_zhu(ds_test.data.clone(), ds_train.data.clone());
             let prediction_zhu =
                 nearest_neighbour::k_nearest_neighbour(1, &ds_train.targets, &zhu_distance);
@@ -131,23 +126,32 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .count() as f64)
                 / (ds_test.targets.len() as f64);
 
-            predictions.push([accuracy_rf, accuracy_breiman, accuracy_ancestor, accuracy_zhu].to_vec());
+            predictions.push(
+                [
+                    accuracy_breiman,
+                    accuracy_ancestor,
+                    accuracy_zhu,
+                ]
+                .to_vec(),
+            );
         }
     }
 
     let mut csv_writer = csv::Writer::from_path(format!("results_{}.csv", n_trees))?;
     csv_writer.write_record(&[
         "dataset",
-        "accuracy_rf",
         "accuracy_breiman",
         "accuracy_ancestor",
         "accuracy_zhu",
     ])?;
     for (i, prediction) in predictions.iter().enumerate() {
         csv_writer.write_record(
-            [datasets[i/n_repetitions].file_name().to_string_lossy().into_owned()]
-                .into_iter()
-                .chain(prediction.iter().map(|f| f.to_string())),
+            [datasets[i / n_repetitions]
+                .file_name()
+                .to_string_lossy()
+                .into_owned()]
+            .into_iter()
+            .chain(prediction.iter().map(|f| f.to_string())),
         )?;
     }
     csv_writer.flush()?;

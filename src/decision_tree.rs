@@ -101,7 +101,6 @@ impl DecisionTree {
 
         self.root = self.build_tree(&mut data, self.max_depth, self.min_samples_split);
     }
-    
 
     fn build_tree(
         &mut self,
@@ -169,7 +168,9 @@ impl DecisionTree {
     }
 
     pub fn predict(&self, x: &Vec<Vec<f64>>) -> Vec<usize> {
-        x.iter().map(|sample| self.predict_leaf(sample).get_class()).collect()
+        x.iter()
+            .map(|sample| self.predict_leaf(sample).get_class())
+            .collect()
     }
 
     fn get_best_split(&self, samples: &[Sample<'_>]) -> (usize, f64, f64) {
@@ -181,7 +182,15 @@ impl DecisionTree {
         selected_features.shuffle(&mut thread_rng());
 
         for &feature in &selected_features[0..min(samples[0].data.len(), self.max_features)] {
-            let mut features: Vec<(f64, usize)> = samples.iter().map(|Sample { data: sample, target }| (sample[feature], *target)).collect();
+            let mut features: Vec<(f64, usize)> = samples
+                .iter()
+                .map(
+                    |Sample {
+                         data: sample,
+                         target,
+                     }| (sample[feature], *target),
+                )
+                .collect();
             features.sort_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap());
             let mut left_class_counts = HashMap::new();
             let mut right_class_counts = HashMap::new();

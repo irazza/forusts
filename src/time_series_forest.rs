@@ -147,6 +147,7 @@ impl TimeSeriesForest {
             .collect()
     }
 
+    // TODO - Normalize a distance dividing it by the maximum depth of lowest leaf
     pub fn pairwise_ancestor(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
         let distance_matrix: Vec<Vec<_>> = (0..x1.len())
             .map(|_| (0..x2.len()).map(|_| Mutex::new(0.0)).collect())
@@ -169,7 +170,8 @@ impl TimeSeriesForest {
                 for (j, &x2_node) in x2_nodes.iter().enumerate() {
                     *distance_matrix[i][j].lock() += (x1_node.get_depth() + x2_node.get_depth()
                         - 2 * distances[&(x2_node as *const Node)].get_depth())
-                        as f64;
+                        as f64
+                        / max(x1_node.get_depth(), x2_node.get_depth()) as f64;
                 }
             }
         });

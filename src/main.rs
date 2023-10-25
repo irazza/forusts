@@ -61,11 +61,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
     let mut predictions: Vec<Vec<f64>> = Vec::new();
-    let n_repetitions = 50;
-    let n_trees = 500;
+    let n_repetitions = 10;
+    let n_trees = 200;
     for path in &datasets {
         println!("Processing {}", path.file_name().to_string_lossy());
-
         let train_path = path
             .path()
             .join(format!("{}_TRAIN.tsv", path.file_name().to_string_lossy()));
@@ -126,35 +125,27 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .count() as f64)
                 / (ds_test.targets.len() as f64);
 
-            predictions.push(
-                [
-                    accuracy_breiman,
-                    accuracy_ancestor,
-                    accuracy_zhu,
-                ]
-                .to_vec(),
-            );
+            predictions.push([accuracy_breiman, accuracy_ancestor, accuracy_zhu].to_vec());
         }
     }
-
     let mut csv_writer = csv::Writer::from_path(format!("results_{}.csv", n_trees))?;
-    csv_writer.write_record(&[
-        "dataset",
-        "accuracy_breiman",
-        "accuracy_ancestor",
-        "accuracy_zhu",
-    ])?;
-    for (i, prediction) in predictions.iter().enumerate() {
-        csv_writer.write_record(
-            [datasets[i / n_repetitions]
-                .file_name()
-                .to_string_lossy()
-                .into_owned()]
-            .into_iter()
-            .chain(prediction.iter().map(|f| f.to_string())),
-        )?;
-    }
-    csv_writer.flush()?;
+        csv_writer.write_record(&[
+            "dataset",
+            "accuracy_breiman",
+            "accuracy_ancestor",
+            "accuracy_zhu",
+        ])?;
+        for (i, prediction) in predictions.iter().enumerate() {
+            csv_writer.write_record(
+                [datasets[i / n_repetitions]
+                    .file_name()
+                    .to_string_lossy()
+                    .into_owned()]
+                .into_iter()
+                .chain(prediction.iter().map(|f| f.to_string())),
+            )?;
+        }
+        csv_writer.flush()?;
 
     Ok(())
 }

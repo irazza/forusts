@@ -75,6 +75,7 @@ impl TimeSeriesForest {
             }));
     }
 
+    #[allow(dead_code)]
     pub fn predict(&self, x: &Vec<Vec<f64>>) -> Vec<usize> {
         let n_samples = x.len();
         let mut predictions = Vec::new();

@@ -12,5 +12,11 @@ rayon = "1.8.0"
 hashbrown = "0.14.1"
 parking_lot = "0.12.1"
 
+[build]
+rustflags = ["-C", "target-cpu=native"]
+
 [profile.release]
 debug = true
+codegen-units = 1
+lto = "fat"
+panic = "abort"

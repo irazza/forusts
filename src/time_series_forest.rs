@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::decision_tree::{DecisionTree, Node};
 use crate::random_forest::MaxFeatures;
 use hashbrown::HashMap;

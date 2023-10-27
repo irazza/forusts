@@ -3,7 +3,7 @@ import  matplotlib.pyplot as plt
 
 if __name__ == "__main__":
     # Read the results
-    results = pd.read_csv(f"results_500.csv", index_col=0, header=0)
+    results = pd.read_csv(f"tsf_200.csv", index_col=0, header=0)
     # Group by index and take the mean
     results = results.groupby(results.index).mean()
     # Rename the columns

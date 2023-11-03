@@ -1,15 +1,16 @@
 use crate::forest::random_forest::MaxFeatures;
 use crate::forest::time_series_forest;
 use crate::metrics::classification::accuracy_score;
-use crate::utils::utils::read_csv;
+use crate::utils::csv_reader::read_csv;
 use hashbrown::HashMap;
 use std::error::Error;
 use std::fs;
 
 mod forest;
-mod utils;
 mod metrics;
 mod nearest_neighbour;
+mod tree;
+mod utils;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let paths = fs::read_dir("UCRArchive_2018/")?;
@@ -39,7 +40,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let mut mapping = HashMap::new();
         let ds_train = read_csv(train_path, &mut mapping)?;
         let ds_test = read_csv(test_path, &mut mapping)?;
-        
+
         let n_features = ds_train.get_data()[0].len() as f64;
         for _i in 0..n_repetitions {
             let mut clf = time_series_forest::TimeSeriesForest::new(
@@ -79,7 +80,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             println!(
                 "Breiman: {}, Ancestor: {}, Zhu: {}",
-                accuracy_breiman, accuracy_ancestor, accuracy_zhu);
+                accuracy_breiman, accuracy_ancestor, accuracy_zhu
+            );
             predictions.push([accuracy_breiman, accuracy_ancestor, accuracy_zhu].to_vec());
         }
     }

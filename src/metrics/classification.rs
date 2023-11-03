@@ -9,8 +9,7 @@ pub fn accuracy_score(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
         / (y_true.len() as f64)
 }
 
-pub fn precision_score(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64
-{
+pub fn precision_score(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
     let confusion_matrix = confusion_matrix(y_pred, y_true);
     let mut precision = 0.0;
 
@@ -26,8 +25,7 @@ pub fn precision_score(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64
     precision / confusion_matrix.len() as f64
 }
 
-pub fn recall_score(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64
-{
+pub fn recall_score(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
     let confusion_matrix = confusion_matrix(y_pred, y_true);
     let mut recall = 0.0;
 
@@ -41,7 +39,6 @@ pub fn recall_score(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64
     }
 
     recall / confusion_matrix.len() as f64
-
 }
 
 pub fn confusion_matrix(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> Vec<Vec<usize>> {

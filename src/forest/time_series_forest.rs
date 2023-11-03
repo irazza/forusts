@@ -1,6 +1,6 @@
 #![allow(dead_code)]
-use crate::forest::tree::decision_tree::{DecisionTree, Node};
 use crate::forest::random_forest::MaxFeatures;
+use crate::tree::decision_tree::{DecisionTree, Node};
 use hashbrown::HashMap;
 use parking_lot::Mutex;
 use rand::{thread_rng, Rng};

@@ -94,14 +94,10 @@ impl DecisionTree {
             })
             .collect::<Vec<_>>();
 
-        self.root = self.build_tree(&mut data, self.max_depth,);
+        self.root = self.build_tree(&mut data, self.max_depth);
     }
 
-    fn build_tree(
-        &mut self,
-        samples: &mut [Sample<'_>],
-        max_depth: usize,
-    ) -> Node {
+    fn build_tree(&mut self, samples: &mut [Sample<'_>], max_depth: usize) -> Node {
         let current_depth = max(1, self.max_depth - max_depth);
 
         // Base case: not enough samples or max depth reached

@@ -21,7 +21,10 @@ impl Dataset {
     }
 }
 
-pub fn read_csv(path: impl AsRef<Path>, mapping: &mut HashMap<isize, i32>) -> Result<Dataset, Box<dyn Error>> {
+pub fn read_csv(
+    path: impl AsRef<Path>,
+    mapping: &mut HashMap<isize, i32>,
+) -> Result<Dataset, Box<dyn Error>> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
     let mut reader = ReaderBuilder::new()

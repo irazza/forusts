@@ -77,11 +77,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             let prediction_zhu =
                 nearest_neighbour::k_nearest_neighbour(1, &ds_train.get_targets(), &zhu_distance);
             let accuracy_zhu = accuracy_score(&prediction_zhu, &y_true);
-
-            println!(
-                "Breiman: {}, Ancestor: {}, Zhu: {}",
-                accuracy_breiman, accuracy_ancestor, accuracy_zhu
-            );
             predictions.push([accuracy_breiman, accuracy_ancestor, accuracy_zhu].to_vec());
         }
     }

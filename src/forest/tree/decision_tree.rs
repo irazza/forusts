@@ -1,9 +1,6 @@
 use hashbrown::HashMap;
 use rand::{seq::SliceRandom, thread_rng};
-use std::{
-    cmp::{max, min},
-    ops::Deref,
-};
+use std::{cmp::max, ops::Deref};
 
 #[derive(Debug, Clone)]
 pub enum Node {
@@ -65,7 +62,6 @@ pub struct DecisionTree {
     max_depth: usize,
     min_samples_split: usize,
     max_features: usize,
-    tree_depth: usize,
 }
 
 struct Sample<'a> {
@@ -84,7 +80,6 @@ impl DecisionTree {
             max_depth,
             min_samples_split,
             max_features,
-            tree_depth: 0,
         }
     }
 
@@ -99,21 +94,18 @@ impl DecisionTree {
             })
             .collect::<Vec<_>>();
 
-        self.root = self.build_tree(&mut data, self.max_depth, self.min_samples_split);
+        self.root = self.build_tree(&mut data, self.max_depth,);
     }
 
     fn build_tree(
         &mut self,
         samples: &mut [Sample<'_>],
         max_depth: usize,
-        min_samples_split: usize,
     ) -> Node {
         let current_depth = max(1, self.max_depth - max_depth);
-        if self.tree_depth < current_depth {
-            self.tree_depth = current_depth;
-        }
 
-        if samples.len() < min_samples_split || max_depth == 0 {
+        // Base case: not enough samples or max depth reached
+        if samples.len() < self.min_samples_split || max_depth == 0 {
             return Node::Leaf {
                 class: get_most_common_class(samples),
                 depth: current_depth,
@@ -123,18 +115,26 @@ impl DecisionTree {
 
         let (best_feature, best_threshold, best_gini) = self.get_best_split(samples);
 
-        if best_gini == 0.0 {
+        if best_gini <= f64::EPSILON {
             return Node::Leaf {
-                class: samples[0].target,
+                class: get_most_common_class(samples),
                 depth: current_depth,
-                impurity: 0.0,
+                impurity: best_gini,
             };
         }
 
         let (left_data, right_data) = split(samples, best_feature, best_threshold);
 
-        let left_subtree = self.build_tree(left_data, max_depth - 1, min_samples_split);
-        let right_subtree = self.build_tree(right_data, max_depth - 1, min_samples_split);
+        if left_data.len() == 0 || right_data.len() == 0 {
+            return Node::Leaf {
+                class: get_most_common_class(samples),
+                depth: current_depth,
+                impurity: best_gini,
+            };
+        }
+        // Split the data and recursively build the left and right subtrees
+        let left_subtree = self.build_tree(left_data, max_depth - 1);
+        let right_subtree = self.build_tree(right_data, max_depth - 1);
 
         Node::Split {
             feature: best_feature,
@@ -181,7 +181,7 @@ impl DecisionTree {
         let mut selected_features: Vec<_> = (0..samples[0].data.len()).collect();
         selected_features.shuffle(&mut thread_rng());
 
-        for &feature in &selected_features[0..min(samples[0].data.len(), self.max_features)] {
+        for &feature in &selected_features[0..self.max_features] {
             let mut features: Vec<(f64, usize)> = samples
                 .iter()
                 .map(

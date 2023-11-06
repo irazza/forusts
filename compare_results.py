@@ -2,8 +2,9 @@ import pandas as pd
 import  matplotlib.pyplot as plt
 
 if __name__ == "__main__":
+    n_trees = 500
     # Read the results
-    results = pd.read_csv(f"tsf_200.csv", index_col=0, header=0)
+    results = pd.read_csv(f"UCR_tsf_{n_trees}.csv", index_col=0, header=0)
     # Group by index and take the mean
     results = results.groupby(results.index).mean()
     # Rename the columns
@@ -25,5 +26,5 @@ if __name__ == "__main__":
     plt.xlabel("Distance metrics")
     plt.ylabel("Accuracy")
     plt.title("Comparison of the accuracies over all UCRArchive2018")
-    plt.savefig("distances.png", dpi=300)
+    plt.savefig(f"distances_{n_trees}.png", dpi=300)
     

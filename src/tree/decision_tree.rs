@@ -95,6 +95,7 @@ impl DecisionTree {
             .collect::<Vec<_>>();
 
         self.root = self.build_tree(&mut data, self.max_depth);
+        //self.root = self.build(&mut data);
     }
 
     fn build_tree(&mut self, samples: &mut [Sample<'_>], max_depth: usize) -> Node {

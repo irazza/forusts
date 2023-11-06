@@ -1,5 +1,6 @@
 use crate::forest::random_forest::MaxFeatures;
 use crate::forest::time_series_forest;
+use crate::neighbors::nearest_neighbor::k_nearest_neighbor;
 use crate::metrics::classification::accuracy_score;
 use crate::utils::csv_reader::read_csv;
 use hashbrown::HashMap;
@@ -8,7 +9,7 @@ use std::fs;
 
 mod forest;
 mod metrics;
-mod nearest_neighbour;
+mod neighbors;
 mod tree;
 mod utils;
 
@@ -59,7 +60,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let breiman_distance =
                 clf.pairwise_breiman(ds_test.get_data().clone(), ds_train.get_data().clone());
-            let prediction_breiman = nearest_neighbour::k_nearest_neighbour(
+            let prediction_breiman = k_nearest_neighbor(
                 1,
                 &ds_train.get_targets(),
                 &breiman_distance,
@@ -68,7 +69,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let ancestor_distance =
                 clf.pairwise_ancestor(ds_test.get_data().clone(), ds_train.get_data().clone());
-            let prediction_ancestor = nearest_neighbour::k_nearest_neighbour(
+            let prediction_ancestor = k_nearest_neighbor(
                 1,
                 &ds_train.get_targets(),
                 &ancestor_distance,
@@ -78,7 +79,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let zhu_distance =
                 clf.pairwise_zhu(ds_test.get_data().clone(), ds_train.get_data().clone());
             let prediction_zhu =
-                nearest_neighbour::k_nearest_neighbour(1, &ds_train.get_targets(), &zhu_distance);
+                k_nearest_neighbor(1, &ds_train.get_targets(), &zhu_distance);
             let accuracy_zhu = accuracy_score(&prediction_zhu, &y_true);
             predictions.push([accuracy_breiman, accuracy_ancestor, accuracy_zhu].to_vec());
         }

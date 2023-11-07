@@ -12,14 +12,18 @@ use std::fs;
 mod forest;
 mod metrics;
 mod neighbors;
+mod neighbors;
 mod tree;
 mod utils;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let paths = fs::read_dir("UCRArchive_2018/")?;
     //let paths = fs::read_dir("UCRArchive_2018/")?;
-    let n_repetitions = 1;
-    let n_trees = 200;
+    let n_repetitions = 50;
+    let n_trees = 500;
+
+    println!("Number of trees: {}", n_trees);
+    
     let mut datasets: Vec<_> = Vec::new();
 
     for entry in paths {
@@ -97,7 +101,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             )
         }
     }
-    let mut csv_writer = csv::Writer::from_path(format!("ADMEP_tsf_{}.csv", n_trees))?;
+    let mut csv_writer = csv::Writer::from_path(format!("UCR_tsf_{}.csv", n_trees))?;
     csv_writer.write_record(&["dataset", "mcc_breiman", "mcc_ancestor", "mcc_zhu"])?;
     for (i, prediction) in predictions.iter().enumerate() {
         csv_writer.write_record(

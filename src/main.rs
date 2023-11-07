@@ -18,10 +18,8 @@ mod utils;
 fn main() -> Result<(), Box<dyn Error>> {
     let paths = fs::read_dir("UCRArchive_2018/")?;
     //let paths = fs::read_dir("UCRArchive_2018/")?;
-    let n_repetitions = 50;
-    let n_trees = 500;
-
-    println!("Number of trees: {}", n_trees);
+    let n_repetitions = 1;
+    let n_trees = 200;
     
     let mut datasets: Vec<_> = Vec::new();
 
@@ -52,8 +50,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         for _i in 0..n_repetitions {
             let mut clf = TimeSeriesForest::new(
                 n_trees,
-                Criterion::None,
-                Splitter::Random,
+                Criterion::Entropy,
+                Splitter::Best,
                 n_features.sqrt() as usize,
                 3,
                 MaxFeatures::Sqrt,

@@ -212,7 +212,7 @@ impl DecisionTree {
             for Sample { target: v, .. } in samples {
                 *right_class_counts.entry(*v).or_insert(0) += 1;
             }
-            for (i, &(v, target)) in samples_feature[self.min_samples_leaf..samples.len()]
+            for (i, &(v, target)) in samples_feature
                 .iter()
                 .enumerate()
             {

@@ -1,6 +1,9 @@
-use crate::forest::random_forest::MaxFeatures;
-use crate::forest::time_series_forest;
+#![allow(unused_imports)]
+use crate::forest::time_series_forest::TimeSeriesForest;
+use crate::forest::random_forest::RandomForest;
 use crate::metrics::classification::accuracy_score;
+use crate::neighbors::nearest_neighbor;
+use crate::tree::decision_tree::{Criterion, MaxFeatures, Splitter};
 use crate::utils::csv_reader::read_csv;
 use hashbrown::HashMap;
 use std::error::Error;
@@ -8,7 +11,7 @@ use std::fs;
 
 mod forest;
 mod metrics;
-mod nearest_neighbour;
+mod neighbors;
 mod tree;
 mod utils;
 
@@ -40,32 +43,38 @@ fn main() -> Result<(), Box<dyn Error>> {
         let mut mapping = HashMap::new();
         let ds_train = read_csv(train_path, &mut mapping)?;
         let ds_test = read_csv(test_path, &mut mapping)?;
+        let y_true = ds_test.get_targets().clone();
 
         let n_features = ds_train.get_data()[0].len() as f64;
         for _i in 0..n_repetitions {
-            let mut clf = time_series_forest::TimeSeriesForest::new(
+            let mut clf = TimeSeriesForest::new(
                 n_trees,
+                Criterion::None,
+                Splitter::Random,
                 n_features.sqrt() as usize,
+                3,
                 MaxFeatures::Sqrt,
                 None,
             );
+            // let mut clf = RandomForest::new(
+            //     n_trees,
+            //     Criterion::None,
+            //     Splitter::Random,
+            //     MaxFeatures::Sqrt,
+            //     None,
+            // );
 
             clf.fit(&ds_train.get_data(), &ds_train.get_targets());
 
-            let y_true = ds_test.get_targets().clone();
-
             let breiman_distance =
                 clf.pairwise_breiman(ds_test.get_data().clone(), ds_train.get_data().clone());
-            let prediction_breiman = nearest_neighbour::k_nearest_neighbour(
-                1,
-                &ds_train.get_targets(),
-                &breiman_distance,
-            );
+            let prediction_breiman =
+                nearest_neighbor::k_nearest_neighbor(1, &ds_train.get_targets(), &breiman_distance);
             let accuracy_breiman = accuracy_score(&prediction_breiman, &y_true);
 
             let ancestor_distance =
                 clf.pairwise_ancestor(ds_test.get_data().clone(), ds_train.get_data().clone());
-            let prediction_ancestor = nearest_neighbour::k_nearest_neighbour(
+            let prediction_ancestor = nearest_neighbor::k_nearest_neighbor(
                 1,
                 &ds_train.get_targets(),
                 &ancestor_distance,
@@ -75,9 +84,17 @@ fn main() -> Result<(), Box<dyn Error>> {
             let zhu_distance =
                 clf.pairwise_zhu(ds_test.get_data().clone(), ds_train.get_data().clone());
             let prediction_zhu =
-                nearest_neighbour::k_nearest_neighbour(1, &ds_train.get_targets(), &zhu_distance);
+                nearest_neighbor::k_nearest_neighbor(1, &ds_train.get_targets(), &zhu_distance);
             let accuracy_zhu = accuracy_score(&prediction_zhu, &y_true);
             predictions.push([accuracy_breiman, accuracy_ancestor, accuracy_zhu].to_vec());
+
+            println!(
+                "TSF:{}, Breiman: {}, Ancestor: {}, Zhu: {}",
+                accuracy_score(&clf.predict(ds_test.get_data()), &y_true),
+                accuracy_breiman,
+                accuracy_ancestor,
+                accuracy_zhu
+            )
         }
     }
     let mut csv_writer = csv::Writer::from_path(format!("ADMEP_tsf_{}.csv", n_trees))?;

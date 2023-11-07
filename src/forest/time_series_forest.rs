@@ -1,6 +1,6 @@
 #![allow(dead_code)]
-use crate::forest::random_forest::MaxFeatures;
-use crate::tree::decision_tree::{DecisionTree, Node};
+use crate::tree::decision_tree::{Criterion, DecisionTree, MaxFeatures, Splitter};
+use crate::tree::node::Node;
 use hashbrown::HashMap;
 use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
@@ -10,8 +10,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub struct TimeSeriesForest {
     trees: Vec<DecisionTree>,
+    criterion: Criterion,
+    splitter: Splitter,
     n_trees: usize,
     n_intervals: usize,
+    min_interval_length: usize,
     intervals: Vec<Vec<(usize, usize)>>,
     max_features: MaxFeatures,
     max_depth: Option<usize>,
@@ -20,14 +23,20 @@ pub struct TimeSeriesForest {
 impl TimeSeriesForest {
     pub fn new(
         n_trees: usize,
+        criterion: Criterion,
+        splitter: Splitter,
         n_intervals: usize,
+        min_interval_length: usize,
         max_features: MaxFeatures,
         max_depth: Option<usize>,
     ) -> Self {
         Self {
             trees: Vec::new(),
             n_trees,
+            criterion,
+            splitter,
             n_intervals,
+            min_interval_length,
             intervals: Vec::new(),
             max_features,
             max_depth,
@@ -42,8 +51,8 @@ impl TimeSeriesForest {
         for _i in 0..self.n_trees {
             let mut intervals = Vec::new();
             for _j in 0..self.n_intervals {
-                let start = thread_rng().gen_range(0..n_features - 1);
-                let end = thread_rng().gen_range(start + 1..n_features);
+                let start = thread_rng().gen_range(0..n_features - self.min_interval_length);
+                let end = thread_rng().gen_range(start + self.min_interval_length..n_features);
                 intervals.push((start, end));
             }
             self.intervals.push(intervals);
@@ -55,15 +64,13 @@ impl TimeSeriesForest {
                     .map(|_| thread_rng().gen_range(0..n_samples))
                     .collect();
                 let transformed_x = Self::transform(x, &self.intervals[i]);
-                let n_features = transformed_x[0].len();
                 let mut tree = DecisionTree::new(
+                    self.criterion,
+                    self.splitter,
                     self.max_depth.unwrap_or(usize::MAX),
                     2,
-                    match self.max_features {
-                        MaxFeatures::All => n_features,
-                        MaxFeatures::Sqrt => (n_features as f64).sqrt() as usize,
-                        MaxFeatures::Log2 => n_features.ilog2() as usize,
-                    },
+                    1,
+                    self.max_features,
                 );
                 tree.fit(
                     &bootstrap_indices
@@ -76,7 +83,6 @@ impl TimeSeriesForest {
             }));
     }
 
-    #[allow(dead_code)]
     pub fn predict(&self, x: &Vec<Vec<f64>>) -> Vec<usize> {
         let n_samples = x.len();
         let mut predictions = Vec::new();
@@ -237,7 +243,7 @@ impl TimeSeriesForest {
                     .sum::<f64>()
                     / (*end - *start) as f64)
                     .sqrt();
-                let slope = (x[j][*end - 1] - x[j][*start]) / (*end - *start) as f64;
+                let slope = Self::slope(x[j][*start..*end].to_vec());
                 assert!(mean.is_finite());
                 assert!(std.is_finite());
                 assert!(slope.is_finite());
@@ -246,5 +252,19 @@ impl TimeSeriesForest {
             transformed_x.push(sample);
         }
         transformed_x
+    }
+
+    fn slope(x: Vec<f64>) -> f64 {
+        let n = x.len();
+
+        let x_mean = x.iter().sum::<f64>() / n as f64;
+
+        let y = (1..n + 1).map(|x| x as f64).collect::<Vec<f64>>();
+        let y_mean = y.iter().sum::<f64>() / n as f64;
+
+        let xy_mean = x.iter().zip(y.iter()).map(|(x, y)| x * y).sum::<f64>() / n as f64;
+        let y2_mean = y.iter().map(|y| y.powi(2)).sum::<f64>() / n as f64;
+
+        (xy_mean - x_mean * y_mean) / (y2_mean - y_mean.powi(2))
     }
 }

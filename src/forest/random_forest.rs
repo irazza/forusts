@@ -1,28 +1,33 @@
-use crate::tree::decision_tree::DecisionTree;
+#![allow(dead_code)]
+use std::{sync::atomic::{AtomicUsize, Ordering}, cmp::max};
+use crate::tree::{decision_tree::{Criterion, DecisionTree, MaxFeatures, Splitter}, node::Node};
 use hashbrown::HashMap;
+use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
 use rayon::prelude::*;
 
-#[allow(dead_code)]
-pub enum MaxFeatures {
-    All,
-    Sqrt,
-    Log2,
-}
-
 pub struct RandomForest {
     trees: Vec<DecisionTree>,
+    criterion: Criterion,
+    splitter: Splitter,
     n_trees: usize,
     max_features: MaxFeatures,
     max_depth: Option<usize>,
 }
 
-#[allow(dead_code)]
 impl RandomForest {
-    pub fn new(n_trees: usize, max_features: MaxFeatures, max_depth: Option<usize>) -> Self {
+    pub fn new(
+        n_trees: usize,
+        criterion: Criterion,
+        splitter: Splitter,
+        max_features: MaxFeatures,
+        max_depth: Option<usize>,
+    ) -> Self {
         Self {
             trees: Vec::new(),
             n_trees,
+            criterion,
+            splitter,
             max_features,
             max_depth,
         }
@@ -36,15 +41,14 @@ impl RandomForest {
                 let bootstrap_indices: Vec<usize> = (0..n_samples)
                     .map(|_| thread_rng().gen_range(0..n_samples))
                     .collect();
-                let n_features = x[0].len();
+
                 let mut tree = DecisionTree::new(
+                    self.criterion,
+                    self.splitter,
                     self.max_depth.unwrap_or(usize::MAX),
                     2,
-                    match self.max_features {
-                        MaxFeatures::All => n_features,
-                        MaxFeatures::Sqrt => (n_features as f64).sqrt() as usize,
-                        MaxFeatures::Log2 => n_features.ilog2() as usize,
-                    },
+                    1,
+                    self.max_features,
                 );
                 tree.fit(
                     &bootstrap_indices.iter().map(|i| &x[*i]).collect(),
@@ -90,5 +94,111 @@ impl RandomForest {
         }
 
         final_predictions
+    }
+
+    pub fn pairwise_breiman(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+        let distance_matrix: Vec<Vec<_>> = (0..x1.len())
+            .map(|_| (0..x2.len()).map(|_| AtomicUsize::new(0)).collect())
+            .collect();
+
+        self.trees.par_iter().enumerate().for_each(|(_, tree)| {
+            let x1_nodes = x1
+                .iter()
+                .map(|x| tree.predict_leaf(x))
+                .collect::<Vec<_>>();
+            let x2_nodes = x2
+                .iter()
+                .map(|x| tree.predict_leaf(x))
+                .collect::<Vec<_>>();
+
+            for (i, &x1_node) in x1_nodes.iter().enumerate() {
+                for (j, &x2_node) in x2_nodes.iter().enumerate() {
+                    distance_matrix[i][j].fetch_add(
+                        ((x1_node as *const Node) != (x2_node as *const Node)) as usize,
+                        Ordering::Relaxed,
+                    );
+                }
+            }
+        });
+
+        distance_matrix
+            .into_iter()
+            .map(|d| {
+                d.into_iter()
+                    .map(|d| d.into_inner() as f64 / self.n_trees as f64)
+                    .collect()
+            })
+            .collect()
+    }
+
+    pub fn pairwise_ancestor(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+        let distance_matrix: Vec<Vec<_>> = (0..x1.len())
+            .map(|_| (0..x2.len()).map(|_| Mutex::new(0.0)).collect())
+            .collect();
+        self.trees.par_iter().enumerate().for_each(|(_, tree)| {
+            let x1_nodes = x1
+                .iter()
+                .map(|x| tree.predict_leaf(x))
+                .collect::<Vec<_>>();
+            let x2_nodes = x2
+                .iter()
+                .map(|x| tree.predict_leaf(x))
+                .collect::<Vec<_>>();
+
+            for (i, &x1_node) in x1_nodes.iter().enumerate() {
+                let distances = tree.compute_ancestor(x1_node);
+
+                for (j, &x2_node) in x2_nodes.iter().enumerate() {
+                    *distance_matrix[i][j].lock() += (x1_node.get_depth() + x2_node.get_depth()
+                        - 2 * distances[&(x2_node as *const Node)].get_depth())
+                        as f64
+                        / max(x1_node.get_depth(), x2_node.get_depth()) as f64;
+                }
+            }
+        });
+
+        distance_matrix
+            .into_iter()
+            .map(|d| {
+                d.into_iter()
+                    .map(|d| d.into_inner() as f64 / self.n_trees as f64)
+                    .collect()
+            })
+            .collect()
+    }
+
+    pub fn pairwise_zhu(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+        let distance_matrix: Vec<Vec<_>> = (0..x1.len())
+            .map(|_| (0..x2.len()).map(|_| Mutex::new(0.0)).collect())
+            .collect();
+        self.trees.par_iter().enumerate().for_each(|(_, tree)| {
+            let x1_nodes = x1
+                .iter()
+                .map(|x| tree.predict_leaf(x))
+                .collect::<Vec<_>>();
+            let x2_nodes = x2
+                .iter()
+                .map(|x| tree.predict_leaf(x))
+                .collect::<Vec<_>>();
+
+            for (i, &x1_node) in x1_nodes.iter().enumerate() {
+                let distances = tree.compute_ancestor(x1_node);
+
+                for (j, &x2_node) in x2_nodes.iter().enumerate() {
+                    *distance_matrix[i][j].lock() += distances[&(x2_node as *const Node)]
+                        .get_depth() as f64
+                        / max(x1_node.get_depth(), x2_node.get_depth()) as f64;
+                }
+            }
+        });
+
+        distance_matrix
+            .into_iter()
+            .map(|d| {
+                d.into_iter()
+                    .map(|d| 1.0 - (d.into_inner() as f64 / self.n_trees as f64))
+                    .collect()
+            })
+            .collect()
     }
 }

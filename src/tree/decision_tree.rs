@@ -1,67 +1,48 @@
+#![allow(dead_code)]
+use crate::tree::node::Node;
 use hashbrown::HashMap;
-use rand::{seq::SliceRandom, thread_rng};
+use rand::{seq::SliceRandom, thread_rng, Rng};
 use std::{cmp::max, ops::Deref};
 
-#[derive(Debug, Clone)]
-pub enum Node {
-    Leaf {
-        class: usize,
-        depth: usize,
-        impurity: f64,
-    },
-    Split {
-        feature: usize,
-        threshold: f64,
-        left: Box<Node>,
-        right: Box<Node>,
-        depth: usize,
-        impurity: f64,
-    },
+#[derive(Copy, Clone)]
+pub enum MaxFeatures {
+    All,
+    Sqrt,
+    Log2,
 }
 
-impl Node {
-    pub fn get_depth(&self) -> usize {
-        match self {
-            Node::Leaf {
-                class: _,
-                depth,
-                impurity: _,
-            } => return *depth,
-            Node::Split {
-                feature: _,
-                threshold: _,
-                left: _,
-                right: _,
-                depth,
-                impurity: _,
-            } => return *depth,
-        }
-    }
+#[derive(Copy, Clone)]
+pub enum Splitter {
+    Best,
+    Random,
+}
 
-    pub fn get_class(&self) -> usize {
+#[derive(Copy, Clone)]
+pub enum Criterion {
+    Gini,
+    Entropy,
+    None,
+}
+impl Criterion {
+    fn equals(&self, value: i32) -> bool {
         match self {
-            Node::Leaf {
-                class,
-                depth: _,
-                impurity: _,
-            } => return *class,
-            Node::Split {
-                feature: _,
-                threshold: _,
-                left: _,
-                right: _,
-                depth: _,
-                impurity: _,
-            } => panic!("Cannot get class of a split node"),
+            Criterion::Gini => value == 0,
+            Criterion::Entropy => value == 1,
+            Criterion::None => value == -1,
         }
     }
 }
 
 pub struct DecisionTree {
     root: Node,
+    criterion: Criterion,
+    splitter: Splitter,
+    impurity: fn(&HashMap<usize, usize>) -> f64,
     max_depth: usize,
     min_samples_split: usize,
-    max_features: usize,
+    min_samples_leaf: usize,
+    max_features: MaxFeatures,
+    _max_features: usize,
 }
 
 struct Sample<'a> {
@@ -70,16 +51,32 @@ struct Sample<'a> {
 }
 
 impl DecisionTree {
-    pub fn new(max_depth: usize, min_samples_split: usize, max_features: usize) -> Self {
+    pub fn new(
+        criterion: Criterion,
+        splitter: Splitter,
+        max_depth: usize,
+        min_samples_split: usize,
+        min_samples_leaf: usize,
+        max_features: MaxFeatures,
+    ) -> Self {
         Self {
             root: Node::Leaf {
                 class: 0,
                 depth: 0,
-                impurity: 0.0,
+                impurity: f64::MAX,
             },
+            criterion,
+            splitter,
             max_depth,
             min_samples_split,
+            min_samples_leaf,
             max_features,
+            impurity: match criterion {
+                Criterion::Gini => gini_impurity,
+                Criterion::Entropy => entropy_impurity,
+                Criterion::None => random_impurity,
+            },
+            _max_features: 0,
         }
     }
 
@@ -94,29 +91,32 @@ impl DecisionTree {
             })
             .collect::<Vec<_>>();
 
+        self._max_features = match self.max_features {
+            MaxFeatures::All => data[0].data.len(),
+            MaxFeatures::Sqrt => (data[0].data.len() as f64).sqrt() as usize,
+            MaxFeatures::Log2 => (data[0].data.len() as f64).log2() as usize
+        };
+
         self.root = self.build_tree(&mut data, self.max_depth);
-        //self.root = self.build(&mut data);
     }
 
     fn build_tree(&mut self, samples: &mut [Sample<'_>], max_depth: usize) -> Node {
         let current_depth = max(1, self.max_depth - max_depth);
 
-        // Base case: not enough samples or max depth reached
-        if samples.len() < self.min_samples_split || max_depth == 0 {
+        let (best_feature, best_threshold, best_impurity) = match self.splitter {
+            Splitter::Best => self.get_best_split(samples),
+            Splitter::Random => self.get_random_split(samples),
+        };
+
+        if self.stop_conditions(samples, current_depth, best_impurity) {
+            let mut class_counts = HashMap::new();
+            for Sample { target, .. } in &samples[0..samples.len()] {
+                *class_counts.entry(*target).or_insert(0) += 1;
+            }
             return Node::Leaf {
                 class: get_most_common_class(samples),
                 depth: current_depth,
-                impurity: 0.0,
-            };
-        }
-
-        let (best_feature, best_threshold, best_gini) = self.get_best_split(samples);
-
-        if best_gini <= f64::EPSILON {
-            return Node::Leaf {
-                class: get_most_common_class(samples),
-                depth: current_depth,
-                impurity: best_gini,
+                impurity: (self.impurity)(&class_counts),
             };
         }
 
@@ -126,7 +126,7 @@ impl DecisionTree {
             return Node::Leaf {
                 class: get_most_common_class(samples),
                 depth: current_depth,
-                impurity: best_gini,
+                impurity: best_impurity,
             };
         }
         // Split the data and recursively build the left and right subtrees
@@ -139,8 +139,106 @@ impl DecisionTree {
             left: Box::new(left_subtree),
             right: Box::new(right_subtree),
             depth: current_depth,
-            impurity: best_gini,
+            impurity: best_impurity,
         }
+    }
+
+    fn stop_conditions(&self, samples: &mut [Sample<'_>], current_depth: usize, impurity: f64) -> bool {
+        // Base case: not enough samples or max depth reached
+        if samples.len() <= self.min_samples_split || current_depth == self.max_depth {
+            return true;
+        }
+        // Base case: all samples have the same class
+        let first_class = samples[0].target;
+        for Sample { target, .. } in samples {
+            if *target != first_class {
+                return false;
+            }
+        }
+        // Base case: impurity is 0
+        if impurity <= f64::EPSILON {
+            return true;
+        }
+        true
+    }
+
+    fn get_random_split(&self, samples: &[Sample<'_>]) -> (usize, f64, f64) {
+        let best_feature = thread_rng().gen_range(0..samples[0].data.len());
+        let best_threshold = samples[thread_rng().gen_range(0..samples.len())].data[best_feature];
+        let best_impurity = 1.0;
+
+        (best_feature, best_threshold, best_impurity)
+    }
+
+    fn get_best_split(&self, samples: &[Sample<'_>]) -> (usize, f64, f64) {
+        let mut best_feature = usize::MAX;
+        let mut best_threshold = f64::MAX;
+        let mut best_impurity = f64::MAX;
+        let n_samples = samples.len() as f64;
+        let mut parent_entropy = 0.0;
+
+        if self.criterion.equals(1) {
+            // reset impurity
+            best_impurity = 0.0;
+            let mut class_counts = HashMap::new();
+            for Sample { target, .. } in samples {
+                *class_counts.entry(*target).or_insert(0) += 1;
+            }
+            parent_entropy = (self.impurity)(&class_counts);
+        }
+
+        let mut features_idxs: Vec<_> = (0..samples[0].data.len()).collect();
+        features_idxs.shuffle(&mut thread_rng());
+        for &idx in &features_idxs[0..self._max_features] {
+            let mut samples_feature: Vec<(f64, usize)> = samples
+                .iter()
+                .map(
+                    |Sample {
+                         data: sample,
+                         target,
+                     }| (sample[idx], *target),
+                )
+                .collect();
+            samples_feature.sort_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap());
+
+            let mut left_class_counts = HashMap::new();
+            let mut right_class_counts = HashMap::new();
+
+            for Sample { target: v, .. } in samples {
+                *right_class_counts.entry(*v).or_insert(0) += 1;
+            }
+            for (i, &(v, target)) in samples_feature[self.min_samples_leaf..samples.len()].iter().enumerate() {
+                right_class_counts.entry(target).and_modify(|e| *e -= 1);
+                *left_class_counts.entry(target).or_insert(0) += 1;
+
+                let left_impurity = (self.impurity)(&left_class_counts);
+                let right_impurity = (self.impurity)(&right_class_counts);
+
+                let left_size = (i + 1) as f64;
+                let right_size = n_samples - left_size;
+
+                let impurity = if self.criterion.equals(0) {
+                    (left_size / n_samples) * left_impurity
+                        + (right_size / n_samples) * right_impurity
+                } else if self.criterion.equals(1) {
+                    parent_entropy
+                        - ((left_size / n_samples) * left_impurity
+                            + (right_size / n_samples) * right_impurity)
+                } else {
+                    -1.0
+                };
+
+                if (impurity < best_impurity) && (self.criterion.equals(0))
+                    || (impurity > best_impurity) && (self.criterion.equals(1))
+                {
+                    best_impurity = impurity;
+                    best_feature = idx;
+                    best_threshold = v;
+                }
+            }
+        }
+
+        (best_feature, best_threshold, best_impurity)
     }
 
     pub fn predict_leaf(&self, x: &Vec<f64>) -> &Node {
@@ -168,55 +266,6 @@ impl DecisionTree {
         x.iter()
             .map(|sample| self.predict_leaf(sample).get_class())
             .collect()
-    }
-
-    fn get_best_split(&self, samples: &[Sample<'_>]) -> (usize, f64, f64) {
-        let mut best_feature = usize::MAX;
-        let mut best_threshold = f64::MAX;
-        let mut best_gini = f64::MAX;
-
-        let mut selected_features: Vec<_> = (0..samples[0].data.len()).collect();
-        selected_features.shuffle(&mut thread_rng());
-
-        for &feature in &selected_features[0..self.max_features] {
-            let mut features: Vec<(f64, usize)> = samples
-                .iter()
-                .map(
-                    |Sample {
-                         data: sample,
-                         target,
-                     }| (sample[feature], *target),
-                )
-                .collect();
-            features.sort_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap());
-            let mut left_class_counts = HashMap::new();
-            let mut right_class_counts = HashMap::new();
-            for Sample { target: v, .. } in samples {
-                *right_class_counts.entry(*v).or_insert(0) += 1;
-            }
-
-            for (idx, &(v, target)) in features.iter().enumerate() {
-                right_class_counts.entry(target).and_modify(|e| *e -= 1);
-                *left_class_counts.entry(target).or_insert(0) += 1;
-
-                let left_gini = get_gini_impurity(&left_class_counts);
-                let right_gini = get_gini_impurity(&right_class_counts);
-
-                let left_size = (idx + 1) as f64;
-                let right_size = samples.len() as f64 - left_size;
-
-                let gini = (left_size / samples.len() as f64) * left_gini
-                    + (right_size / samples.len() as f64) * right_gini;
-
-                if gini < best_gini {
-                    best_gini = gini;
-                    best_feature = feature;
-                    best_threshold = v;
-                }
-            }
-        }
-
-        (best_feature, best_threshold, best_gini)
     }
 
     pub fn compute_ancestor<'a>(&'a self, node: &'a Node) -> HashMap<*const Node, &'a Node> {
@@ -308,12 +357,31 @@ fn get_most_common_class(samples: &[Sample<'_>]) -> usize {
     most_common_class
 }
 
-fn get_gini_impurity(class_counts: &HashMap<usize, usize>) -> f64 {
+fn random_impurity(_class_counts: &HashMap<usize, usize>) -> f64 {
+    return thread_rng().gen_range(0.1..1.0);
+}
+
+fn entropy_impurity(class_counts: &HashMap<usize, usize>) -> f64 {
+    let mut impurity = 0.0;
+    let total_samples = class_counts.values().sum::<usize>() as f64;
+    for &count in class_counts.values() {
+        if count > 0 {
+            let p = count as f64 / total_samples;
+            impurity -= p * p.log2();
+        }
+    }
+
+    impurity
+}
+
+fn gini_impurity(class_counts: &HashMap<usize, usize>) -> f64 {
     let mut impurity = 1.0;
     let total_samples = class_counts.values().sum::<usize>() as f64;
-    for count in class_counts.values() {
-        let p = *count as f64 / total_samples;
-        impurity -= p * p;
+    for &count in class_counts.values() {
+        if count > 0 {
+            let p = count as f64 / total_samples;
+            impurity -= p * p;
+        }
     }
 
     impurity

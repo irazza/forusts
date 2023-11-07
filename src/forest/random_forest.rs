@@ -1,10 +1,16 @@
 #![allow(dead_code)]
-use std::{sync::atomic::{AtomicUsize, Ordering}, cmp::max};
-use crate::tree::{decision_tree::{Criterion, DecisionTree, MaxFeatures, Splitter}, node::Node};
+use crate::tree::{
+    decision_tree::{Criterion, DecisionTree, MaxFeatures, Splitter},
+    node::Node,
+};
 use hashbrown::HashMap;
 use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
 use rayon::prelude::*;
+use std::{
+    cmp::max,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 pub struct RandomForest {
     trees: Vec<DecisionTree>,
@@ -102,14 +108,8 @@ impl RandomForest {
             .collect();
 
         self.trees.par_iter().enumerate().for_each(|(_, tree)| {
-            let x1_nodes = x1
-                .iter()
-                .map(|x| tree.predict_leaf(x))
-                .collect::<Vec<_>>();
-            let x2_nodes = x2
-                .iter()
-                .map(|x| tree.predict_leaf(x))
-                .collect::<Vec<_>>();
+            let x1_nodes = x1.iter().map(|x| tree.predict_leaf(x)).collect::<Vec<_>>();
+            let x2_nodes = x2.iter().map(|x| tree.predict_leaf(x)).collect::<Vec<_>>();
 
             for (i, &x1_node) in x1_nodes.iter().enumerate() {
                 for (j, &x2_node) in x2_nodes.iter().enumerate() {
@@ -136,14 +136,8 @@ impl RandomForest {
             .map(|_| (0..x2.len()).map(|_| Mutex::new(0.0)).collect())
             .collect();
         self.trees.par_iter().enumerate().for_each(|(_, tree)| {
-            let x1_nodes = x1
-                .iter()
-                .map(|x| tree.predict_leaf(x))
-                .collect::<Vec<_>>();
-            let x2_nodes = x2
-                .iter()
-                .map(|x| tree.predict_leaf(x))
-                .collect::<Vec<_>>();
+            let x1_nodes = x1.iter().map(|x| tree.predict_leaf(x)).collect::<Vec<_>>();
+            let x2_nodes = x2.iter().map(|x| tree.predict_leaf(x)).collect::<Vec<_>>();
 
             for (i, &x1_node) in x1_nodes.iter().enumerate() {
                 let distances = tree.compute_ancestor(x1_node);
@@ -172,14 +166,8 @@ impl RandomForest {
             .map(|_| (0..x2.len()).map(|_| Mutex::new(0.0)).collect())
             .collect();
         self.trees.par_iter().enumerate().for_each(|(_, tree)| {
-            let x1_nodes = x1
-                .iter()
-                .map(|x| tree.predict_leaf(x))
-                .collect::<Vec<_>>();
-            let x2_nodes = x2
-                .iter()
-                .map(|x| tree.predict_leaf(x))
-                .collect::<Vec<_>>();
+            let x1_nodes = x1.iter().map(|x| tree.predict_leaf(x)).collect::<Vec<_>>();
+            let x2_nodes = x2.iter().map(|x| tree.predict_leaf(x)).collect::<Vec<_>>();
 
             for (i, &x1_node) in x1_nodes.iter().enumerate() {
                 let distances = tree.compute_ancestor(x1_node);

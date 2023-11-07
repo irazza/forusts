@@ -94,7 +94,7 @@ impl DecisionTree {
         self._max_features = match self.max_features {
             MaxFeatures::All => data[0].data.len(),
             MaxFeatures::Sqrt => (data[0].data.len() as f64).sqrt() as usize,
-            MaxFeatures::Log2 => (data[0].data.len() as f64).log2() as usize
+            MaxFeatures::Log2 => (data[0].data.len() as f64).log2() as usize,
         };
 
         self.root = self.build_tree(&mut data, self.max_depth);
@@ -143,7 +143,12 @@ impl DecisionTree {
         }
     }
 
-    fn stop_conditions(&self, samples: &mut [Sample<'_>], current_depth: usize, impurity: f64) -> bool {
+    fn stop_conditions(
+        &self,
+        samples: &mut [Sample<'_>],
+        current_depth: usize,
+        impurity: f64,
+    ) -> bool {
         // Base case: not enough samples or max depth reached
         if samples.len() <= self.min_samples_split || current_depth == self.max_depth {
             return true;
@@ -207,7 +212,10 @@ impl DecisionTree {
             for Sample { target: v, .. } in samples {
                 *right_class_counts.entry(*v).or_insert(0) += 1;
             }
-            for (i, &(v, target)) in samples_feature[self.min_samples_leaf..samples.len()].iter().enumerate() {
+            for (i, &(v, target)) in samples_feature[self.min_samples_leaf..samples.len()]
+                .iter()
+                .enumerate()
+            {
                 right_class_counts.entry(target).and_modify(|e| *e -= 1);
                 *left_class_counts.entry(target).or_insert(0) += 1;
 

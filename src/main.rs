@@ -1,6 +1,6 @@
 #![allow(unused_imports)]
-use crate::forest::time_series_forest::TimeSeriesForest;
 use crate::forest::random_forest::RandomForest;
+use crate::forest::time_series_forest::TimeSeriesForest;
 use crate::metrics::classification::accuracy_score;
 use crate::neighbors::nearest_neighbor;
 use crate::tree::decision_tree::{Criterion, MaxFeatures, Splitter};

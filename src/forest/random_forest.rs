@@ -22,8 +22,7 @@ pub struct RandomForest {
     max_features: MaxFeatures,
     max_depth: Option<usize>,
 }
-impl RandomForest
-{
+impl RandomForest {
     pub fn new(
         n_trees: usize,
         criterion: Criterion,
@@ -41,8 +40,8 @@ impl RandomForest
         }
     }
 }
-impl Forest for RandomForest{
-    fn fit(&mut self, x: &Vec<Vec<f64>>, y: &Vec<usize>){
+impl Forest for RandomForest {
+    fn fit(&mut self, x: &Vec<Vec<f64>>, y: &Vec<usize>) {
         let n_samples = x.len();
 
         self.trees

@@ -17,8 +17,7 @@ pub enum Splitter {
     Random,
 }
 impl Splitter {
-    pub fn to_string(&self) -> &str
-    {
+    pub fn to_string(&self) -> &str {
         match self {
             Splitter::Best => "B",
             Splitter::Random => "R",
@@ -33,8 +32,7 @@ pub enum Criterion {
     None,
 }
 impl Criterion {
-    pub fn to_string(&self) -> String
-    {
+    pub fn to_string(&self) -> String {
         match self {
             Criterion::Gini => String::from("gini"),
             Criterion::Entropy => String::from("entropy"),
@@ -192,7 +190,7 @@ impl DecisionTree {
         let n_samples = samples.len() as f64;
         let mut parent_entropy = 0.0;
 
-        if self.criterion.to_string() == "entropy"{
+        if self.criterion.to_string() == "entropy" {
             // reset impurity
             best_impurity = 0.0;
             let mut class_counts = HashMap::new();
@@ -222,10 +220,7 @@ impl DecisionTree {
             for Sample { target: v, .. } in samples {
                 *right_class_counts.entry(*v).or_insert(0) += 1;
             }
-            for (i, &(v, target)) in samples_feature
-                .iter()
-                .enumerate()
-            {
+            for (i, &(v, target)) in samples_feature.iter().enumerate() {
                 right_class_counts.entry(target).and_modify(|e| *e -= 1);
                 *left_class_counts.entry(target).or_insert(0) += 1;
 

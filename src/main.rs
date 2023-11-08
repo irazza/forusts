@@ -1,24 +1,23 @@
 #![allow(unused_imports)]
+use crate::forest::canonical_interval_forest::CanonicalIntervalForest;
 use crate::forest::forest::Forest;
 use crate::forest::random_forest::RandomForest;
 use crate::forest::time_series_forest::TimeSeriesForest;
-use crate::forest::canonical_interval_forest::CanonicalIntervalForest;
 use crate::metrics::classification::accuracy_score;
 use crate::neighbors::nearest_neighbor::k_nearest_neighbor;
 use crate::tree::decision_tree::{Criterion, MaxFeatures, Splitter};
 use crate::utils::csv_io::read_csv;
 use hashbrown::HashMap;
-use utils::csv_io::write_csv;
 use std::error::Error;
 use std::fs;
 use structopt::StructOpt;
+use utils::csv_io::write_csv;
 
 mod forest;
 mod metrics;
 mod neighbors;
 mod tree;
 mod utils;
-
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "FTSD", about = "Forest-based Time-Series Distances")]
@@ -69,7 +68,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "random" => Splitter::Random,
         _ => Splitter::Best,
     };
-    
+
     let mut datasets: Vec<_> = Vec::new();
 
     for entry in paths {
@@ -98,10 +97,40 @@ fn main() -> Result<(), Box<dyn Error>> {
         let n_features = ds_train.get_data()[0].len() as f64;
         for _i in 0..n_repetitions {
             let mut clf: Box<dyn Forest> = match opt.model.as_str() {
-                "tsf" => Box::new(TimeSeriesForest::new(n_trees, criterion, splitter, n_features.sqrt() as usize, 3, MaxFeatures::Sqrt, None)),
-                "rf" => Box::new(RandomForest::new(n_trees, criterion, splitter, MaxFeatures::Sqrt, None)),
-                "cif" => Box::new(CanonicalIntervalForest::new(n_trees, criterion, splitter, n_features.sqrt() as usize, 3, MaxFeatures::Sqrt, None)),
-                _ => Box::new(TimeSeriesForest::new(n_trees, criterion, splitter, n_features.sqrt() as usize, 3, MaxFeatures::Sqrt, None)),
+                "tsf" => Box::new(TimeSeriesForest::new(
+                    n_trees,
+                    criterion,
+                    splitter,
+                    n_features.sqrt() as usize,
+                    3,
+                    MaxFeatures::Sqrt,
+                    None,
+                )),
+                "rf" => Box::new(RandomForest::new(
+                    n_trees,
+                    criterion,
+                    splitter,
+                    MaxFeatures::Sqrt,
+                    None,
+                )),
+                "cif" => Box::new(CanonicalIntervalForest::new(
+                    n_trees,
+                    criterion,
+                    splitter,
+                    n_features.sqrt() as usize,
+                    3,
+                    MaxFeatures::Sqrt,
+                    None,
+                )),
+                _ => Box::new(TimeSeriesForest::new(
+                    n_trees,
+                    criterion,
+                    splitter,
+                    n_features.sqrt() as usize,
+                    3,
+                    MaxFeatures::Sqrt,
+                    None,
+                )),
             };
 
             clf.fit(&ds_train.get_data(), &ds_train.get_targets());
@@ -114,17 +143,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let ancestor_distance =
                 clf.pairwise_ancestor(ds_test.get_data().clone(), ds_train.get_data().clone());
-            let prediction_ancestor = k_nearest_neighbor(
-                1,
-                &ds_train.get_targets(),
-                &ancestor_distance,
-            );
+            let prediction_ancestor =
+                k_nearest_neighbor(1, &ds_train.get_targets(), &ancestor_distance);
             let accuracy_ancestor = accuracy_score(&prediction_ancestor, &y_true);
 
             let zhu_distance =
                 clf.pairwise_zhu(ds_test.get_data().clone(), ds_train.get_data().clone());
-            let prediction_zhu =
-                k_nearest_neighbor(1, &ds_train.get_targets(), &zhu_distance);
+            let prediction_zhu = k_nearest_neighbor(1, &ds_train.get_targets(), &zhu_distance);
             let accuracy_zhu = accuracy_score(&prediction_zhu, &y_true);
             predictions.push([accuracy_breiman, accuracy_ancestor, accuracy_zhu].to_vec());
         }
@@ -136,7 +161,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             index.push(datasets[i].file_name().to_string_lossy().to_string());
         }
     }
-    let header = vec!["Dataset", "Breiman", "Ancestor", "Zhu"].iter().map(|s| s.to_string()).collect();
+    let header = vec!["Dataset", "Breiman", "Ancestor", "Zhu"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
     write_csv(opt.output_file, predictions, header, index)?;
 
     Ok(())

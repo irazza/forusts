@@ -22,8 +22,7 @@ pub struct TimeSeriesForest {
     max_depth: Option<usize>,
 }
 
-impl TimeSeriesForest
-{
+impl TimeSeriesForest {
     pub fn new(
         n_trees: usize,
         criterion: Criterion,
@@ -86,7 +85,6 @@ impl TimeSeriesForest
 }
 
 impl Forest for TimeSeriesForest {
-
     fn fit(&mut self, x: &Vec<Vec<f64>>, y: &Vec<usize>) {
         let n_samples = x.len();
 

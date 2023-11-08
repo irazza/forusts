@@ -1,4 +1,4 @@
-use crate::tree::decision_tree::{DecisionTree, Criterion, MaxFeatures, Splitter};
+use crate::tree::decision_tree::{Criterion, DecisionTree, MaxFeatures, Splitter};
 use crate::tree::node::Node;
 use hashbrown::HashMap;
 use parking_lot::Mutex;
@@ -21,8 +21,7 @@ pub struct CanonicalIntervalForest {
     max_depth: Option<usize>,
 }
 
-impl CanonicalIntervalForest
-{
+impl CanonicalIntervalForest {
     pub fn new(
         n_trees: usize,
         criterion: Criterion,
@@ -246,5 +245,5 @@ impl Forest for CanonicalIntervalForest {
                     .collect()
             })
             .collect()
-    }    
+    }
 }

@@ -75,8 +75,8 @@ pub fn write_csv(
     for (i, prediction) in data.iter().enumerate() {
         csv_writer.write_record(
             [index[i].clone()]
-            .into_iter()
-            .chain(prediction.iter().map(|f| f.to_string()))
+                .into_iter()
+                .chain(prediction.iter().map(|f| f.to_string())),
         )?;
     }
     csv_writer.flush()?;

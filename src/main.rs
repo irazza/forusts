@@ -1,4 +1,5 @@
 #![allow(unused_imports)]
+use crate::forest::forest::Forest;
 use crate::forest::random_forest::RandomForest;
 use crate::forest::time_series_forest::TimeSeriesForest;
 use crate::forest::canonical_interval_forest::CanonicalIntervalForest;
@@ -10,6 +11,7 @@ use hashbrown::HashMap;
 use utils::csv_io::write_csv;
 use std::error::Error;
 use std::fs;
+use structopt::StructOpt;
 
 mod forest;
 mod metrics;
@@ -17,13 +19,56 @@ mod neighbors;
 mod tree;
 mod utils;
 
+
+#[derive(Debug, StructOpt)]
+#[structopt(name = "FTSD", about = "Forest-based Time-Series Distances")]
+struct Opt {
+    // Select model
+    #[structopt(short, long, default_value = "tsf")]
+    model: String,
+
+    // Set number of trees
+    #[structopt(short, long, default_value = "200")]
+    trees: usize,
+
+    // Set criterion
+    #[structopt(short, long, default_value = "gini")]
+    criterion: String,
+
+    //Set splitter
+    #[structopt(short, long, default_value = "best")]
+    splitter: String,
+
+    // Inpur directory
+    #[structopt(short, long)]
+    input_dir: String,
+
+    // Number of repetitions
+    #[structopt(short, long, default_value = "1")]
+    repetitions: usize,
+
+    // Output file
+    #[structopt(short, long)]
+    output_file: String,
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    let paths = fs::read_dir("UCRArchive_2018/")?;
-    //let paths = fs::read_dir("UCRArchive_2018/")?;
-    let n_repetitions = 1;
-    let n_trees = 200;
-    let criterion = Criterion::None;
-    let splitter = Splitter::Random;
+    let opt = Opt::from_args();
+
+    let paths = fs::read_dir(opt.input_dir)?;
+    let n_repetitions = opt.repetitions;
+    let n_trees = opt.trees;
+    let criterion = match opt.criterion.as_str() {
+        "gini" => Criterion::Gini,
+        "entropy" => Criterion::Entropy,
+        "none" => Criterion::None,
+        _ => Criterion::Gini,
+    };
+    let splitter = match opt.splitter.as_str() {
+        "best" => Splitter::Best,
+        "random" => Splitter::Random,
+        _ => Splitter::Best,
+    };
     
     let mut datasets: Vec<_> = Vec::new();
 
@@ -52,22 +97,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         let n_features = ds_train.get_data()[0].len() as f64;
         for _i in 0..n_repetitions {
-            // let mut clf = TimeSeriesForest::new(
-            //     n_trees,
-            //     criterion,
-            //     splitter,
-            //     n_features.sqrt() as usize,
-            //     3,
-            //     MaxFeatures::Sqrt,
-            //     None,
-            // );
-            let mut clf = RandomForest::new(
-                n_trees,
-                Criterion::None,
-                Splitter::Random,
-                MaxFeatures::Sqrt,
-                None,
-            );
+            let mut clf: Box<dyn Forest> = match opt.model.as_str() {
+                "tsf" => Box::new(TimeSeriesForest::new(n_trees, criterion, splitter, n_features.sqrt() as usize, 3, MaxFeatures::Sqrt, None)),
+                "rf" => Box::new(RandomForest::new(n_trees, criterion, splitter, MaxFeatures::Sqrt, None)),
+                "cif" => Box::new(CanonicalIntervalForest::new(n_trees, criterion, splitter, n_features.sqrt() as usize, 3, MaxFeatures::Sqrt, None)),
+                _ => Box::new(TimeSeriesForest::new(n_trees, criterion, splitter, n_features.sqrt() as usize, 3, MaxFeatures::Sqrt, None)),
+            };
 
             clf.fit(&ds_train.get_data(), &ds_train.get_targets());
 
@@ -92,14 +127,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 k_nearest_neighbor(1, &ds_train.get_targets(), &zhu_distance);
             let accuracy_zhu = accuracy_score(&prediction_zhu, &y_true);
             predictions.push([accuracy_breiman, accuracy_ancestor, accuracy_zhu].to_vec());
-
-            // println!(
-            //     "TSF:{}, Breiman: {}, Ancestor: {}, Zhu: {}",
-            //     accuracy_score(&clf.predict(ds_test.get_data()), &y_true),
-            //     accuracy_breiman,
-            //     accuracy_ancestor,
-            //     accuracy_zhu
-            // )
         }
     }
     // Create index modifying datasets multiplyng by n_repetitions
@@ -110,7 +137,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
     let header = vec!["Dataset", "Breiman", "Ancestor", "Zhu"].iter().map(|s| s.to_string()).collect();
-    write_csv(format!("rf_{}_{}_T{}R{}.csv", criterion.to_string(), splitter.to_string(), n_trees, n_repetitions), predictions, header, index)?;
+    write_csv(opt.output_file, predictions, header, index)?;
 
     Ok(())
 }

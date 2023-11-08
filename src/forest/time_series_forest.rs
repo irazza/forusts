@@ -8,6 +8,8 @@ use rayon::prelude::*;
 use std::cmp::max;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use super::forest::Forest;
+
 pub struct TimeSeriesForest {
     trees: Vec<DecisionTree>,
     criterion: Criterion,
@@ -20,7 +22,8 @@ pub struct TimeSeriesForest {
     max_depth: Option<usize>,
 }
 
-impl TimeSeriesForest {
+impl TimeSeriesForest
+{
     pub fn new(
         n_trees: usize,
         criterion: Criterion,
@@ -43,7 +46,48 @@ impl TimeSeriesForest {
         }
     }
 
-    pub fn fit(&mut self, x: &Vec<Vec<f64>>, y: &Vec<usize>) {
+    pub fn transform(x: &Vec<Vec<f64>>, intervals: &Vec<(usize, usize)>) -> Vec<Vec<f64>> {
+        let n_samples = x.len();
+        let mut transformed_x: Vec<Vec<f64>> = Vec::new();
+        for j in 0..n_samples {
+            let mut sample = Vec::new();
+            for (start, end) in intervals {
+                let mean = x[j][*start..*end].iter().sum::<f64>() / (*end - *start) as f64;
+                let std = (x[j][*start..*end]
+                    .iter()
+                    .map(|x| (x - mean).powi(2))
+                    .sum::<f64>()
+                    / (*end - *start) as f64)
+                    .sqrt();
+                let slope = Self::slope(x[j][*start..*end].to_vec());
+                assert!(mean.is_finite());
+                assert!(std.is_finite());
+                assert!(slope.is_finite());
+                sample.extend([mean, std, slope].into_iter());
+            }
+            transformed_x.push(sample);
+        }
+        transformed_x
+    }
+
+    fn slope(x: Vec<f64>) -> f64 {
+        let n = x.len();
+
+        let x_mean = x.iter().sum::<f64>() / n as f64;
+
+        let y = (1..n + 1).map(|x| x as f64).collect::<Vec<f64>>();
+        let y_mean = y.iter().sum::<f64>() / n as f64;
+
+        let xy_mean = x.iter().zip(y.iter()).map(|(x, y)| x * y).sum::<f64>() / n as f64;
+        let y2_mean = y.iter().map(|y| y.powi(2)).sum::<f64>() / n as f64;
+
+        (xy_mean - x_mean * y_mean) / (y2_mean - y_mean.powi(2))
+    }
+}
+
+impl Forest for TimeSeriesForest {
+
+    fn fit(&mut self, x: &Vec<Vec<f64>>, y: &Vec<usize>) {
         let n_samples = x.len();
 
         // Generate n_intervals, with random start and end
@@ -83,7 +127,7 @@ impl TimeSeriesForest {
             }));
     }
 
-    pub fn predict(&self, x: &Vec<Vec<f64>>) -> Vec<usize> {
+    fn predict(&self, x: &Vec<Vec<f64>>) -> Vec<usize> {
         let n_samples = x.len();
         let mut predictions = Vec::new();
         // Make predictions for each sample using each tree in the forest
@@ -118,7 +162,7 @@ impl TimeSeriesForest {
         final_predictions
     }
 
-    pub fn pairwise_breiman(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+    fn pairwise_breiman(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
         let distance_matrix: Vec<Vec<_>> = (0..x1.len())
             .map(|_| (0..x2.len()).map(|_| AtomicUsize::new(0)).collect())
             .collect();
@@ -155,7 +199,7 @@ impl TimeSeriesForest {
             .collect()
     }
 
-    pub fn pairwise_ancestor(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+    fn pairwise_ancestor(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
         let distance_matrix: Vec<Vec<_>> = (0..x1.len())
             .map(|_| (0..x2.len()).map(|_| Mutex::new(0.0)).collect())
             .collect();
@@ -193,7 +237,7 @@ impl TimeSeriesForest {
             .collect()
     }
 
-    pub fn pairwise_zhu(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+    fn pairwise_zhu(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
         let distance_matrix: Vec<Vec<_>> = (0..x1.len())
             .map(|_| (0..x2.len()).map(|_| Mutex::new(0.0)).collect())
             .collect();
@@ -228,43 +272,5 @@ impl TimeSeriesForest {
                     .collect()
             })
             .collect()
-    }
-
-    pub fn transform(x: &Vec<Vec<f64>>, intervals: &Vec<(usize, usize)>) -> Vec<Vec<f64>> {
-        let n_samples = x.len();
-        let mut transformed_x: Vec<Vec<f64>> = Vec::new();
-        for j in 0..n_samples {
-            let mut sample = Vec::new();
-            for (start, end) in intervals {
-                let mean = x[j][*start..*end].iter().sum::<f64>() / (*end - *start) as f64;
-                let std = (x[j][*start..*end]
-                    .iter()
-                    .map(|x| (x - mean).powi(2))
-                    .sum::<f64>()
-                    / (*end - *start) as f64)
-                    .sqrt();
-                let slope = Self::slope(x[j][*start..*end].to_vec());
-                assert!(mean.is_finite());
-                assert!(std.is_finite());
-                assert!(slope.is_finite());
-                sample.extend([mean, std, slope].into_iter());
-            }
-            transformed_x.push(sample);
-        }
-        transformed_x
-    }
-
-    fn slope(x: Vec<f64>) -> f64 {
-        let n = x.len();
-
-        let x_mean = x.iter().sum::<f64>() / n as f64;
-
-        let y = (1..n + 1).map(|x| x as f64).collect::<Vec<f64>>();
-        let y_mean = y.iter().sum::<f64>() / n as f64;
-
-        let xy_mean = x.iter().zip(y.iter()).map(|(x, y)| x * y).sum::<f64>() / n as f64;
-        let y2_mean = y.iter().map(|y| y.powi(2)).sum::<f64>() / n as f64;
-
-        (xy_mean - x_mean * y_mean) / (y2_mean - y_mean.powi(2))
     }
 }

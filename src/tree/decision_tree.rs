@@ -24,7 +24,6 @@ impl Splitter {
             Splitter::Random => "R",
         }
     }
-    
 }
 
 #[derive(Copy, Clone)]
@@ -34,20 +33,12 @@ pub enum Criterion {
     None,
 }
 impl Criterion {
-    fn equals(&self, value: i32) -> bool {
-        match self {
-            Criterion::Gini => value == 0,
-            Criterion::Entropy => value == 1,
-            Criterion::None => value == -1,
-        }
-    }
-
-    pub fn to_string(&self) -> &str
+    pub fn to_string(&self) -> String
     {
         match self {
-            Criterion::Gini => "G",
-            Criterion::Entropy => "E",
-            Criterion::None => "N",
+            Criterion::Gini => String::from("gini"),
+            Criterion::Entropy => String::from("entropy"),
+            Criterion::None => String::from("none"),
         }
     }
 }
@@ -201,7 +192,7 @@ impl DecisionTree {
         let n_samples = samples.len() as f64;
         let mut parent_entropy = 0.0;
 
-        if self.criterion.equals(1) {
+        if self.criterion.to_string() == "entropy"{
             // reset impurity
             best_impurity = 0.0;
             let mut class_counts = HashMap::new();
@@ -244,10 +235,10 @@ impl DecisionTree {
                 let left_size = (i + 1) as f64;
                 let right_size = n_samples - left_size;
 
-                let impurity = if self.criterion.equals(0) {
+                let impurity = if self.criterion.to_string() == "gini" {
                     (left_size / n_samples) * left_impurity
                         + (right_size / n_samples) * right_impurity
-                } else if self.criterion.equals(1) {
+                } else if self.criterion.to_string() == "entropy" {
                     parent_entropy
                         - ((left_size / n_samples) * left_impurity
                             + (right_size / n_samples) * right_impurity)
@@ -255,8 +246,8 @@ impl DecisionTree {
                     -1.0
                 };
 
-                if (impurity < best_impurity) && (self.criterion.equals(0))
-                    || (impurity > best_impurity) && (self.criterion.equals(1))
+                if (impurity < best_impurity) && (self.criterion.to_string() == "gini")
+                    || (impurity > best_impurity) && (self.criterion.to_string() == "entropy")
                 {
                     best_impurity = impurity;
                     best_feature = idx;

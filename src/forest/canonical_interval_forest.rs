@@ -7,6 +7,8 @@ use rayon::prelude::*;
 use std::cmp::max;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use super::forest::Forest;
+
 pub struct CanonicalIntervalForest {
     trees: Vec<DecisionTree>,
     criterion: Criterion,
@@ -19,7 +21,8 @@ pub struct CanonicalIntervalForest {
     max_depth: Option<usize>,
 }
 
-impl CanonicalIntervalForest {
+impl CanonicalIntervalForest
+{
     pub fn new(
         n_trees: usize,
         criterion: Criterion,
@@ -42,7 +45,23 @@ impl CanonicalIntervalForest {
         }
     }
 
-    pub fn fit(&mut self, x: &Vec<Vec<f64>>, y: &Vec<usize>) {
+    pub fn transform(x: &Vec<Vec<f64>>, intervals: &Vec<(usize, usize)>) -> Vec<Vec<f64>> {
+        let n_samples = x.len();
+        let mut transformed_x: Vec<Vec<f64>> = Vec::new();
+        for j in 0..n_samples {
+            let mut sample = Vec::new();
+            for (start, end) in intervals {
+                //TODO
+                sample.extend([0.0, 1.0, 2.0].into_iter());
+            }
+            transformed_x.push(sample);
+        }
+        transformed_x
+    }
+}
+
+impl Forest for CanonicalIntervalForest {
+    fn fit(&mut self, x: &Vec<Vec<f64>>, y: &Vec<usize>) {
         let n_samples = x.len();
 
         // Generate n_intervals, with random start and end
@@ -82,7 +101,7 @@ impl CanonicalIntervalForest {
             }));
     }
 
-    pub fn predict(&self, x: &Vec<Vec<f64>>) -> Vec<usize> {
+    fn predict(&self, x: &Vec<Vec<f64>>) -> Vec<usize> {
         let n_samples = x.len();
         let mut predictions = Vec::new();
         // Make predictions for each sample using each tree in the forest
@@ -117,7 +136,7 @@ impl CanonicalIntervalForest {
         final_predictions
     }
 
-    pub fn pairwise_breiman(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+    fn pairwise_breiman(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
         let distance_matrix: Vec<Vec<_>> = (0..x1.len())
             .map(|_| (0..x2.len()).map(|_| AtomicUsize::new(0)).collect())
             .collect();
@@ -154,7 +173,7 @@ impl CanonicalIntervalForest {
             .collect()
     }
 
-    pub fn pairwise_ancestor(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+    fn pairwise_ancestor(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
         let distance_matrix: Vec<Vec<_>> = (0..x1.len())
             .map(|_| (0..x2.len()).map(|_| Mutex::new(0.0)).collect())
             .collect();
@@ -192,7 +211,7 @@ impl CanonicalIntervalForest {
             .collect()
     }
 
-    pub fn pairwise_zhu(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+    fn pairwise_zhu(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
         let distance_matrix: Vec<Vec<_>> = (0..x1.len())
             .map(|_| (0..x2.len()).map(|_| Mutex::new(0.0)).collect())
             .collect();
@@ -227,21 +246,5 @@ impl CanonicalIntervalForest {
                     .collect()
             })
             .collect()
-    }
-
-    pub fn transform(x: &Vec<Vec<f64>>, intervals: &Vec<(usize, usize)>) -> Vec<Vec<f64>> {
-        let n_samples = x.len();
-        let mut transformed_x: Vec<Vec<f64>> = Vec::new();
-        for j in 0..n_samples {
-            let mut sample = Vec::new();
-            for (start, end) in intervals {
-                //TODO
-                sample.extend([0.0, 1.0, 2.0].into_iter());
-            }
-            transformed_x.push(sample);
-        }
-        transformed_x
-    }
-
-    
+    }    
 }

@@ -12,6 +12,8 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
+use super::forest::Forest;
+
 pub struct RandomForest {
     trees: Vec<DecisionTree>,
     criterion: Criterion,
@@ -20,8 +22,8 @@ pub struct RandomForest {
     max_features: MaxFeatures,
     max_depth: Option<usize>,
 }
-
-impl RandomForest {
+impl RandomForest
+{
     pub fn new(
         n_trees: usize,
         criterion: Criterion,
@@ -38,8 +40,9 @@ impl RandomForest {
             max_depth,
         }
     }
-
-    pub fn fit(&mut self, x: &Vec<Vec<f64>>, y: &Vec<usize>) {
+}
+impl Forest for RandomForest{
+    fn fit(&mut self, x: &Vec<Vec<f64>>, y: &Vec<usize>){
         let n_samples = x.len();
 
         self.trees
@@ -64,7 +67,7 @@ impl RandomForest {
             }));
     }
 
-    pub fn predict(&self, x: &Vec<Vec<f64>>) -> Vec<usize> {
+    fn predict(&self, x: &Vec<Vec<f64>>) -> Vec<usize> {
         let n_samples = x.len();
         let mut predictions = Vec::new();
 
@@ -102,7 +105,7 @@ impl RandomForest {
         final_predictions
     }
 
-    pub fn pairwise_breiman(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+    fn pairwise_breiman(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
         let distance_matrix: Vec<Vec<_>> = (0..x1.len())
             .map(|_| (0..x2.len()).map(|_| AtomicUsize::new(0)).collect())
             .collect();
@@ -131,7 +134,7 @@ impl RandomForest {
             .collect()
     }
 
-    pub fn pairwise_ancestor(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+    fn pairwise_ancestor(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
         let distance_matrix: Vec<Vec<_>> = (0..x1.len())
             .map(|_| (0..x2.len()).map(|_| Mutex::new(0.0)).collect())
             .collect();
@@ -161,7 +164,7 @@ impl RandomForest {
             .collect()
     }
 
-    pub fn pairwise_zhu(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+    fn pairwise_zhu(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
         let distance_matrix: Vec<Vec<_>> = (0..x1.len())
             .map(|_| (0..x2.len()).map(|_| Mutex::new(0.0)).collect())
             .collect();

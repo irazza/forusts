@@ -1,5 +1,5 @@
-use crate::decision_tree::{DecisionTree, Node};
-use crate::random_forest::MaxFeatures;
+use crate::tree::decision_tree::{DecisionTree, Criterion, MaxFeatures, Splitter};
+use crate::tree::node::Node;
 use hashbrown::HashMap;
 use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
@@ -7,26 +7,35 @@ use rayon::prelude::*;
 use std::cmp::max;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-pub struct TimeSeriesForest {
+pub struct CanonicalIntervalForest {
     trees: Vec<DecisionTree>,
+    criterion: Criterion,
+    splitter: Splitter,
     n_trees: usize,
     n_intervals: usize,
+    min_interval_length: usize,
     intervals: Vec<Vec<(usize, usize)>>,
     max_features: MaxFeatures,
     max_depth: Option<usize>,
 }
 
-impl TimeSeriesForest {
+impl CanonicalIntervalForest {
     pub fn new(
         n_trees: usize,
+        criterion: Criterion,
+        splitter: Splitter,
         n_intervals: usize,
+        min_interval_length: usize,
         max_features: MaxFeatures,
         max_depth: Option<usize>,
     ) -> Self {
         Self {
             trees: Vec::new(),
             n_trees,
+            criterion,
+            splitter,
             n_intervals,
+            min_interval_length,
             intervals: Vec::new(),
             max_features,
             max_depth,
@@ -41,8 +50,8 @@ impl TimeSeriesForest {
         for _i in 0..self.n_trees {
             let mut intervals = Vec::new();
             for _j in 0..self.n_intervals {
-                let start = thread_rng().gen_range(0..n_features - 1);
-                let end = thread_rng().gen_range(start + 1..n_features);
+                let start = thread_rng().gen_range(0..n_features - self.min_interval_length);
+                let end = thread_rng().gen_range(start + self.min_interval_length..n_features);
                 intervals.push((start, end));
             }
             self.intervals.push(intervals);
@@ -53,17 +62,15 @@ impl TimeSeriesForest {
                 let bootstrap_indices: Vec<usize> = (0..n_samples)
                     .map(|_| thread_rng().gen_range(0..n_samples))
                     .collect();
-
+                let transformed_x = Self::transform(x, &self.intervals[i]);
                 let mut tree = DecisionTree::new(
+                    self.criterion,
+                    self.splitter,
                     self.max_depth.unwrap_or(usize::MAX),
                     2,
-                    match self.max_features {
-                        MaxFeatures::All => x[0].len(),
-                        MaxFeatures::Sqrt => (x[0].len() as f64).sqrt() as usize,
-                        MaxFeatures::Log2 => x[0].len().ilog2() as usize,
-                    },
+                    1,
+                    self.max_features,
                 );
-                let transformed_x = Self::transform(x, &self.intervals[i]);
                 tree.fit(
                     &bootstrap_indices
                         .iter()
@@ -169,7 +176,8 @@ impl TimeSeriesForest {
                 for (j, &x2_node) in x2_nodes.iter().enumerate() {
                     *distance_matrix[i][j].lock() += (x1_node.get_depth() + x2_node.get_depth()
                         - 2 * distances[&(x2_node as *const Node)].get_depth())
-                        as f64;
+                        as f64
+                        / max(x1_node.get_depth(), x2_node.get_depth()) as f64;
                 }
             }
         });
@@ -221,17 +229,19 @@ impl TimeSeriesForest {
             .collect()
     }
 
-    // pub fn transform(x: &Vec<Vec<f64>>, intervals: &Vec<(usize, usize)>) -> Vec<Vec<f64>> {
-    //     let n_samples = x.len();
-    //     let mut transformed_x: Vec<Vec<f64>> = Vec::new();
-    //     for j in 0..n_samples {
-    //         let mut sample = Vec::new();
-    //         for (start, end) in intervals {
-                
-    //             sample.extend([mean, std, slope].into_iter());
-    //         }
-    //         transformed_x.push(sample);
-    //     }
-    //     transformed_x
-    // }
+    pub fn transform(x: &Vec<Vec<f64>>, intervals: &Vec<(usize, usize)>) -> Vec<Vec<f64>> {
+        let n_samples = x.len();
+        let mut transformed_x: Vec<Vec<f64>> = Vec::new();
+        for j in 0..n_samples {
+            let mut sample = Vec::new();
+            for (start, end) in intervals {
+                //TODO
+                sample.extend([0.0, 1.0, 2.0].into_iter());
+            }
+            transformed_x.push(sample);
+        }
+        transformed_x
+    }
+
+    
 }

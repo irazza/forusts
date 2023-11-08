@@ -63,3 +63,22 @@ pub fn read_csv(
 
     Ok(Dataset { targets, data })
 }
+
+pub fn write_csv(
+    path: impl AsRef<Path>,
+    data: Vec<Vec<f64>>,
+    header: Vec<String>,
+    index: Vec<String>,
+) -> Result<(), Box<dyn Error>> {
+    let mut csv_writer = csv::Writer::from_path(path)?;
+    csv_writer.write_record(header)?;
+    for (i, prediction) in data.iter().enumerate() {
+        csv_writer.write_record(
+            [index[i].clone()]
+            .into_iter()
+            .chain(prediction.iter().map(|f| f.to_string()))
+        )?;
+    }
+    csv_writer.flush()?;
+    Ok(())
+}

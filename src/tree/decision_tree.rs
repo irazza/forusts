@@ -16,6 +16,16 @@ pub enum Splitter {
     Best,
     Random,
 }
+impl Splitter {
+    pub fn to_string(&self) -> &str
+    {
+        match self {
+            Splitter::Best => "B",
+            Splitter::Random => "R",
+        }
+    }
+    
+}
 
 #[derive(Copy, Clone)]
 pub enum Criterion {
@@ -29,6 +39,15 @@ impl Criterion {
             Criterion::Gini => value == 0,
             Criterion::Entropy => value == 1,
             Criterion::None => value == -1,
+        }
+    }
+
+    pub fn to_string(&self) -> &str
+    {
+        match self {
+            Criterion::Gini => "G",
+            Criterion::Entropy => "E",
+            Criterion::None => "N",
         }
     }
 }

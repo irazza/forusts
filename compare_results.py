@@ -1,12 +1,10 @@
 import pandas as pd
 import  matplotlib.pyplot as plt
-from sktime.classification.interval_based import TimeSeriesForestClassifier
-from sklearn.metrics import accuracy_score
 
 
 if __name__ == "__main__":
     # Read the results
-    results = pd.read_csv(f"tsf_E_B_T200R1.csv", index_col=0, header=0)
+    results = pd.read_csv(f"tsf_200_e_b_50.csv", index_col=0, header=0)
     # Group by index and take the mean
     results = results.groupby(results.index).mean()
     # Rename the columns

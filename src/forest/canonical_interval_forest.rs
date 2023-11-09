@@ -1,5 +1,6 @@
 use crate::tree::decision_tree::{Criterion, DecisionTree, MaxFeatures, Splitter};
 use crate::tree::node::Node;
+use crate::feature_extraction::catch22;
 use hashbrown::HashMap;
 use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
@@ -45,6 +46,12 @@ impl CanonicalIntervalForest {
     }
 
     pub fn transform(x: &Vec<Vec<f64>>, intervals: &Vec<(usize, usize)>) -> Vec<Vec<f64>> {
+        let x1 = x[0].clone();
+        let dn5 = catch22::dn_histogram_mode_n(&x1, 5);
+        let dn10 = catch22::dn_histogram_mode_n(&x1, 10);
+        let DN_OutlierInclude_p_001_mdrmd = catch22::dn_outlier_include_p_001_mdrmd(&x1);
+        let DN_OutlierInclude_n_001_mdrmd = catch22::dn_outlier_include_n_001_mdrmd(&x1);
+        println!("dn5: {}, dn10: {}", dn5, dn10);
         let n_samples = x.len();
         let mut transformed_x: Vec<Vec<f64>> = Vec::new();
         for j in 0..n_samples {

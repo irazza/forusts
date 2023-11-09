@@ -18,12 +18,13 @@ mod metrics;
 mod neighbors;
 mod tree;
 mod utils;
+mod feature_extraction;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "FTSD", about = "Forest-based Time-Series Distances")]
 struct Opt {
     // Select model
-    #[structopt(short, long, default_value = "tsf")]
+    #[structopt(short, long, default_value = "cif")]
     model: String,
 
     // Set number of trees
@@ -39,7 +40,7 @@ struct Opt {
     splitter: String,
 
     // Inpur directory
-    #[structopt(short, long)]
+    #[structopt(short, long, default_value = "UCRArchive_2018/")]
     input_dir: String,
 
     // Number of repetitions
@@ -47,7 +48,7 @@ struct Opt {
     repetitions: usize,
 
     // Output file
-    #[structopt(short, long)]
+    #[structopt(short, long, default_value = "test.csv")]
     output_file: String,
 }
 

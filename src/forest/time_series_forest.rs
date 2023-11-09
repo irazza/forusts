@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use crate::tree::decision_tree::{Criterion, DecisionTree, MaxFeatures, Splitter};
+use crate::feature_extraction::ts_features;
 use crate::tree::node::Node;
 use hashbrown::HashMap;
 use parking_lot::Mutex;
@@ -7,8 +8,7 @@ use rand::{thread_rng, Rng};
 use rayon::prelude::*;
 use std::cmp::max;
 use std::sync::atomic::{AtomicUsize, Ordering};
-
-use super::forest::Forest;
+use crate::forest::forest::Forest;
 
 pub struct TimeSeriesForest {
     trees: Vec<DecisionTree>,
@@ -51,36 +51,14 @@ impl TimeSeriesForest {
         for j in 0..n_samples {
             let mut sample = Vec::new();
             for (start, end) in intervals {
-                let mean = x[j][*start..*end].iter().sum::<f64>() / (*end - *start) as f64;
-                let std = (x[j][*start..*end]
-                    .iter()
-                    .map(|x| (x - mean).powi(2))
-                    .sum::<f64>()
-                    / (*end - *start) as f64)
-                    .sqrt();
-                let slope = Self::slope(x[j][*start..*end].to_vec());
-                assert!(mean.is_finite());
-                assert!(std.is_finite());
-                assert!(slope.is_finite());
+                let mean = ts_features::mean(&x[j][*start..*end].to_vec());
+                let std = ts_features::std(&x[j][*start..*end].to_vec());
+                let slope = ts_features::slope(&x[j][*start..*end].to_vec());
                 sample.extend([mean, std, slope].into_iter());
             }
             transformed_x.push(sample);
         }
         transformed_x
-    }
-
-    fn slope(x: Vec<f64>) -> f64 {
-        let n = x.len();
-
-        let x_mean = x.iter().sum::<f64>() / n as f64;
-
-        let y = (1..n + 1).map(|x| x as f64).collect::<Vec<f64>>();
-        let y_mean = y.iter().sum::<f64>() / n as f64;
-
-        let xy_mean = x.iter().zip(y.iter()).map(|(x, y)| x * y).sum::<f64>() / n as f64;
-        let y2_mean = y.iter().map(|y| y.powi(2)).sum::<f64>() / n as f64;
-
-        (xy_mean - x_mean * y_mean) / (y2_mean - y_mean.powi(2))
     }
 }
 

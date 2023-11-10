@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use crate::tree::decision_tree::{Criterion, DecisionTree, MaxFeatures, Splitter};
-use crate::feature_extraction::ts_features;
+use crate::feature_extraction::statistics;
 use crate::tree::node::Node;
 use hashbrown::HashMap;
 use parking_lot::Mutex;
@@ -51,9 +51,9 @@ impl TimeSeriesForest {
         for j in 0..n_samples {
             let mut sample = Vec::new();
             for (start, end) in intervals {
-                let mean = ts_features::mean(&x[j][*start..*end].to_vec());
-                let std = ts_features::std(&x[j][*start..*end].to_vec());
-                let slope = ts_features::slope(&x[j][*start..*end].to_vec());
+                let mean = statistics::mean(&x[j][*start..*end]);
+                let std = statistics::std(&x[j][*start..*end]);
+                let slope = statistics::slope(&x[j][*start..*end]);
                 sample.extend([mean, std, slope].into_iter());
             }
             transformed_x.push(sample);

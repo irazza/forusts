@@ -234,15 +234,14 @@ impl DecisionTree {
                     (left_size / n_samples) * left_impurity
                         + (right_size / n_samples) * right_impurity
                 } else if self.criterion.to_string() == "entropy" {
-                    parent_entropy
+                    1.0 / (parent_entropy
                         - ((left_size / n_samples) * left_impurity
-                            + (right_size / n_samples) * right_impurity)
+                            + (right_size / n_samples) * right_impurity))
                 } else {
-                    -1.0
+                    1.0
                 };
 
-                if (impurity < best_impurity) && (self.criterion.to_string() == "gini")
-                    || (impurity > best_impurity) && (self.criterion.to_string() == "entropy")
+                if impurity < best_impurity
                 {
                     best_impurity = impurity;
                     best_feature = idx;

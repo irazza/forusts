@@ -1,26 +1,22 @@
-pub fn mean(x: &[f64]) -> f64
-{
+pub fn mean(x: &[f64]) -> f64 {
     let mean = x.iter().sum::<f64>() / x.len() as f64;
     assert!(mean.is_finite());
     mean
 }
 
-pub fn max(x: &[f64]) -> f64
-{
+pub fn max(x: &[f64]) -> f64 {
     let max = x.iter().fold(f64::MIN, |max, &val| max.max(val));
     assert!(max.is_finite());
     max
 }
 
-pub fn min(x: &[f64]) -> f64
-{
+pub fn min(x: &[f64]) -> f64 {
     let min = x.iter().fold(f64::MAX, |min, &val| min.min(val));
     assert!(min.is_finite());
     min
 }
 
-pub fn median(x: &[f64]) -> f64
-{
+pub fn median(x: &[f64]) -> f64 {
     let mut x = x.to_vec();
     x.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let median = if x.len() % 2 == 0 {
@@ -32,8 +28,7 @@ pub fn median(x: &[f64]) -> f64
     median
 }
 
-pub fn std(x: &[f64]) -> f64
-{
+pub fn std(x: &[f64]) -> f64 {
     let mean = mean(x);
     let std = (x.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / x.len() as f64).sqrt();
     assert!(std.is_finite());
@@ -74,13 +69,14 @@ pub fn histcounts(x: &[f64], n_bins: usize) -> (Vec<i32>, Vec<f64>) {
     }
 
     // Calculate bin edges
-    let bin_edges: Vec<f64> = (0..=n_bins).map(|i| i as f64 * bin_step + min_val).collect();
+    let bin_edges: Vec<f64> = (0..=n_bins)
+        .map(|i| i as f64 * bin_step + min_val)
+        .collect();
 
     (bin_counts, bin_edges)
 }
 
-pub fn diff(x: &[f64], x_len: usize) -> Vec<f64>
-{
+pub fn diff(x: &[f64], x_len: usize) -> Vec<f64> {
     let mut diff = Vec::new();
     for i in 0..x_len - 1 {
         diff.push(x[i + 1] - x[i]);
@@ -88,27 +84,28 @@ pub fn diff(x: &[f64], x_len: usize) -> Vec<f64>
     diff
 }
 
-pub fn quantile(x: &[f64], q: f64) -> f64
-{
+pub fn quantile(x: &[f64], q: f64) -> f64 {
     let mut x = x.to_vec();
     x.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let q_ind = (x.len() as f64 * q).floor() as usize;
     x[q_ind]
 }
 
-pub fn cov(x: &[f64], y: &[f64]) -> f64
-{
+pub fn cov(x: &[f64], y: &[f64]) -> f64 {
     let x_mean = mean(x);
     let y_mean = mean(y);
 
-    let cov = x.iter().zip(y.iter()).map(|(x, y)| (x - x_mean) * (y - y_mean)).sum::<f64>()
+    let cov = x
+        .iter()
+        .zip(y.iter())
+        .map(|(x, y)| (x - x_mean) * (y - y_mean))
+        .sum::<f64>()
         / x.len() as f64;
     assert!(cov.is_finite());
     cov
 }
 
-pub fn cov_mean(x: &[f64], y: &[f64], lag: usize) -> f64
-{
+pub fn cov_mean(x: &[f64], y: &[f64], lag: usize) -> f64 {
     let mut cov = 0.0;
     for i in 0..x.len() - lag {
         cov += x[i] * y[lag + i];
@@ -117,23 +114,22 @@ pub fn cov_mean(x: &[f64], y: &[f64], lag: usize) -> f64
     cov
 }
 
-pub fn autocov_lag(x: &[f64], lag: usize) -> f64{
-    
+pub fn autocov_lag(x: &[f64], lag: usize) -> f64 {
     cov_mean(x, x, lag)
 }
 
 pub fn corr(x: &[f64], y: &[f64], lag: usize) -> f64 {
     let size = x.len();
-    
+
     let mean_x = mean(x);
     let mean_y = mean(&y[lag..]);
 
     let (mut nom, mut denom_x, mut denom_y) = (0.0, 0.0, 0.0);
 
     for i in 0..size - lag {
-        nom += (x[i] - mean_x) * (y[lag+i] - mean_y);
+        nom += (x[i] - mean_x) * (y[lag + i] - mean_y);
         denom_x += (x[i] - mean_x).powi(2);
-        denom_y += (y[lag+i] - mean_y).powi(2);
+        denom_y += (y[lag + i] - mean_y).powi(2);
 
         //println!("x[{}]={}, y[{}]={}, nom[{}]={}, denom_x[{}]={}, denom_y[{}]={}", i, x[i], i, y[i], i, nom, i, denom_x, i, denom_y);
     }
@@ -141,7 +137,7 @@ pub fn corr(x: &[f64], y: &[f64], lag: usize) -> f64 {
     nom / (denom_x * denom_y).sqrt()
 }
 
-pub fn autocorr_lag(x:&[f64], lag: usize) -> f64{
+pub fn autocorr_lag(x: &[f64], lag: usize) -> f64 {
     corr(x, x, lag)
 }
 
@@ -154,5 +150,3 @@ pub fn f_entropy(a: &[f64]) -> f64 {
     }
     return -1.0 * f;
 }
-
-

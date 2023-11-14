@@ -1,6 +1,7 @@
 #![allow(dead_code)]
-use crate::tree::decision_tree::{Criterion, DecisionTree, MaxFeatures, Splitter};
 use crate::feature_extraction::statistics;
+use crate::forest::forest::Forest;
+use crate::tree::decision_tree::{Criterion, DecisionTree, MaxFeatures, Splitter};
 use crate::tree::node::Node;
 use hashbrown::HashMap;
 use parking_lot::Mutex;
@@ -8,7 +9,6 @@ use rand::{thread_rng, Rng};
 use rayon::prelude::*;
 use std::cmp::max;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use crate::forest::forest::Forest;
 
 pub struct TimeSeriesForest {
     trees: Vec<DecisionTree>,

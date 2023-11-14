@@ -13,18 +13,18 @@ use std::fs;
 use structopt::StructOpt;
 use utils::csv_io::write_csv;
 
+mod feature_extraction;
 mod forest;
 mod metrics;
 mod neighbors;
 mod tree;
 mod utils;
-mod feature_extraction;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "FTSD", about = "Forest-based Time-Series Distances")]
 struct Opt {
     // Select model
-    #[structopt(short, long, default_value = "cif")]
+    #[structopt(short, long, default_value = "tsf")]
     model: String,
 
     // Set number of trees
@@ -32,7 +32,7 @@ struct Opt {
     trees: usize,
 
     // Set criterion
-    #[structopt(short, long, default_value = "gini")]
+    #[structopt(short, long, default_value = "entropy")]
     criterion: String,
 
     //Set splitter
@@ -46,7 +46,6 @@ struct Opt {
     // Number of repetitions
     #[structopt(short, long, default_value = "1")]
     repetitions: usize,
-
     // Output file
     #[structopt(short, long, default_value = "test.csv")]
     output_file: String,

@@ -1,13 +1,14 @@
 use crate::feature_extraction::statistics::histcounts;
-use crate::feature_extraction::statistics::{mean, median, max, diff, quantile, cov, autocov_lag, autocorr_lag, f_entropy};
+use crate::feature_extraction::statistics::{
+    autocorr_lag, autocov_lag, cov, diff, f_entropy, max, mean, median, quantile,
+};
 
-pub fn dn_histogram_mode_n(x: &[f64], n_bins: usize) ->f64{
-
+pub fn dn_histogram_mode_n(x: &[f64], n_bins: usize) -> f64 {
     let (hist_counts, bin_edges) = histcounts(x, n_bins);
 
     let mut max_count = 0;
     let mut num_maxs = 1;
-    let mut dn_histogram_mode_10= 0.0;
+    let mut dn_histogram_mode_10 = 0.0;
 
     for i in 0..n_bins {
         if hist_counts[i] > max_count {
@@ -24,8 +25,7 @@ pub fn dn_histogram_mode_n(x: &[f64], n_bins: usize) ->f64{
     dn_histogram_mode_10
 }
 
-pub fn dn_outlier_include_np_001_mdrmd(x: &[f64], sign: f64) -> f64{
-
+pub fn dn_outlier_include_np_001_mdrmd(x: &[f64], sign: f64) -> f64 {
     let inc = 0.01;
     let mut tot = 0;
     let x_work: Vec<f64> = x.iter().map(|&val| sign * val).collect();
@@ -101,13 +101,11 @@ pub fn dn_outlier_include_np_001_mdrmd(x: &[f64], sign: f64) -> f64{
     output_scalar
 }
 
-pub fn dn_outlier_include_p_001_mdrmd(x: &[f64]) -> f64
-{
+pub fn dn_outlier_include_p_001_mdrmd(x: &[f64]) -> f64 {
     dn_outlier_include_np_001_mdrmd(x, 1.0)
 }
 
-pub fn dn_outlier_include_n_001_mdrmd(x: &[f64]) -> f64
-{
+pub fn dn_outlier_include_n_001_mdrmd(x: &[f64]) -> f64 {
     dn_outlier_include_np_001_mdrmd(x, -1.0)
 }
 
@@ -178,7 +176,6 @@ fn dn_spread_std(x: &[f64]) -> f64 {
 }
 
 pub fn md_hrv_classic_pnn40(x: &[f64]) -> f64 {
-
     let pnnx = 40;
 
     // compute diff
@@ -218,7 +215,7 @@ pub fn sb_binary_stats_mean_longstretch1(x: &[f64]) -> i32 {
 }
 
 fn co_firstzero(x: &[f64], maxtau: usize) -> usize {
-    let autocorrs = vec![0.0, 1.0, 2.0];//co_autocorrs(x);
+    let autocorrs = vec![0.0, 1.0, 2.0]; //co_autocorrs(x);
 
     let mut zerocrossind = 0;
     while autocorrs[zerocrossind] > 0.0 && zerocrossind < maxtau {
@@ -229,7 +226,6 @@ fn co_firstzero(x: &[f64], maxtau: usize) -> usize {
 }
 
 fn sb_coarsegrain(y: &[f64], how: &str, num_groups: usize, labels: &mut [i32]) {
-
     let mut th = vec![0.0; num_groups + 1];
     let mut ls = vec![0.0; num_groups + 1];
 
@@ -424,7 +420,6 @@ pub fn in_auto_mutual_info_stats_40_gaussian_fmmi(x: &[f64]) -> f64 {
 }
 
 pub fn sb_binary_stats_diff_longstretch0(x: &[f64]) -> f64 {
-
     // Binarize
     let mut x_bin: Vec<i32> = Vec::with_capacity(x.len() - 1);
     for i in 0..x.len() - 1 {

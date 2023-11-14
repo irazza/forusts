@@ -1,6 +1,6 @@
+use crate::feature_extraction::catch22;
 use crate::tree::decision_tree::{Criterion, DecisionTree, MaxFeatures, Splitter};
 use crate::tree::node::Node;
-use crate::feature_extraction::catch22;
 use hashbrown::HashMap;
 use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
@@ -51,7 +51,8 @@ impl CanonicalIntervalForest {
         let dn_histogram_mode_10 = catch22::dn_histogram_mode_n(&x1, 10);
         let MD_hrv_classic_pnn40 = catch22::md_hrv_classic_pnn40(&x1);
         let sb_binary_stats_mean_longstretch1 = catch22::sb_binary_stats_mean_longstretch1(&x1);
-        let in_auto_mutual_info_stats_40_gaussian_fmmi = catch22::in_auto_mutual_info_stats_40_gaussian_fmmi(&x1);
+        let in_auto_mutual_info_stats_40_gaussian_fmmi =
+            catch22::in_auto_mutual_info_stats_40_gaussian_fmmi(&x1);
         let DN_OutlierInclude_p_001_mdrmd = catch22::dn_outlier_include_p_001_mdrmd(&x1);
         let DN_OutlierInclude_n_001_mdrmd = catch22::dn_outlier_include_n_001_mdrmd(&x1);
         let sb_binary_stats_diff_longstretch0 = catch22::sb_binary_stats_diff_longstretch0(&x1);

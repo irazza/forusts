@@ -191,8 +191,6 @@ impl DecisionTree {
         let mut parent_entropy = 0.0;
 
         if self.criterion.to_string() == "entropy" {
-            // reset impurity
-            best_impurity = 0.0;
             let mut class_counts = HashMap::new();
             for Sample { target, .. } in samples {
                 *class_counts.entry(*target).or_insert(0) += 1;
@@ -241,8 +239,7 @@ impl DecisionTree {
                     1.0
                 };
 
-                if impurity < best_impurity
-                {
+                if impurity < best_impurity {
                     best_impurity = impurity;
                     best_feature = idx;
                     best_threshold = v;

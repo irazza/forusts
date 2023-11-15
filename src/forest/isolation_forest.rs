@@ -1,8 +1,8 @@
 #![allow(dead_code)]
-use crate::tree::{
+use crate::{tree::{
     decision_tree::{Criterion, DecisionTree, MaxFeatures, Splitter},
     node::Node,
-};
+}, feature_extraction::statistics::{EULER_MASCHERONI, percentile}};
 use hashbrown::HashMap;
 use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
@@ -39,10 +39,6 @@ impl IsolationForest {
 
         self.trees
             .par_extend((0..self.n_trees).into_par_iter().map(|_i| {
-                let bootstrap_indices: Vec<usize> = (0..n_samples)
-                    .map(|_| thread_rng().gen_range(0..n_samples))
-                    .collect();
-
                 let mut tree = DecisionTree::new(
                     Criterion::None,
                     Splitter::Random,
@@ -52,8 +48,8 @@ impl IsolationForest {
                     self.max_features,
                 );
                 tree.fit(
-                    &bootstrap_indices.iter().map(|i| &x[*i]).collect(),
-                    &bootstrap_indices.iter().map(|i| *i).collect(),
+                    &(0..n_samples).into_iter().map(|i| &x[i]).collect(),
+                    &(0..n_samples).collect(),
                 );
                 tree
             }));
@@ -62,38 +58,29 @@ impl IsolationForest {
     pub fn predict(&self, x: &Vec<Vec<f64>>) -> Vec<usize> {
         let n_samples = x.len();
         let mut predictions = Vec::new();
+        let mut leaves: Vec<Vec<usize>> = Vec::new();
+        let c_n = 2.0*(f64::ln((n_samples-1) as f64) +  EULER_MASCHERONI) - (2.0* (n_samples-1) as f64 / n_samples as f64);
 
-        // Make predictions for each sample using each tree in the forest
-        predictions.par_extend(
+        //Make predictions for each sample using each tree in the forest
+        leaves.par_extend(
             self.trees
                 .par_iter()
-                .enumerate()
-                .map(|(_i, tree)| tree.predict(x)),
+                .map(| tree| x.iter().map(|sample| tree.predict_leaf(sample).get_depth()).collect())
         );
 
-        // Combine predictions using a majority vote
-        let mut final_predictions = vec![0; n_samples];
-
         for i in 0..n_samples {
-            let mut class_counts = HashMap::new();
-            for j in 0..self.n_trees {
-                let class = predictions[j][i];
-                *class_counts.entry(class).or_insert(0) += 1;
-            }
-
-            // Find the class with the maximum count
-            let mut max_count = 0;
-            let mut majority_class = 0;
-            for (class, count) in &class_counts {
-                if *count > max_count {
-                    max_count = *count;
-                    majority_class = *class;
-                }
-            }
-
-            final_predictions[i] = majority_class;
+            let e_h = leaves
+                .iter()
+                .map(|leaf| leaf[i])
+                .sum::<usize>() as f64
+                / n_samples as f64;
+            predictions.push(2.0f64.powf(-e_h / c_n));
         }
-
+        let mut final_predictions = Vec::new();
+        let threshold = percentile(&predictions, 95);
+        for i in 0..n_samples {
+            final_predictions.push(if predictions[i] >  threshold {1} else {0});
+        }
         final_predictions
     }
 }

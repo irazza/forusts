@@ -3,3 +3,4 @@ pub mod forest;
 pub mod random_forest;
 pub mod time_series_forest;
 pub mod isolation_forest;
+pub mod time_series_isolation_forest;

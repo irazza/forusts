@@ -1,3 +1,5 @@
+pub const EULER_MASCHERONI: f64 = 0.5772156649015328606065120900824024310421593359399235988057672348849;
+
 pub fn mean(x: &[f64]) -> f64 {
     let mean = x.iter().sum::<f64>() / x.len() as f64;
     assert!(mean.is_finite());
@@ -33,6 +35,15 @@ pub fn std(x: &[f64]) -> f64 {
     let std = (x.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / x.len() as f64).sqrt();
     assert!(std.is_finite());
     std
+}
+
+pub fn percentile(x: &[f64], p: usize) -> f64 {
+    let mut x = x.to_vec();
+    x.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let p_ind = (x.len() as f64 * p as f64 / 100.0).round() as usize;
+    let percentile = x[p_ind];
+    assert!(percentile.is_finite());
+    percentile
 }
 
 pub fn slope(x: &[f64]) -> f64 {

@@ -21,7 +21,6 @@ mod tree;
 mod utils;
 
 fn main() -> Result<(), Box<dyn Error>> {
-
     let paths = fs::read_dir("AD/")?;
     let n_repetitions = 1;
     let n_trees = 100;
@@ -51,11 +50,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let y_true = ds_test.get_targets().clone();
 
         for _i in 0..n_repetitions {
-            let mut clf = IsolationForest::new(
-                n_trees,
-                MaxFeatures::All,
-                None,
-            );
+            let mut clf = IsolationForest::new(n_trees, MaxFeatures::All, None);
 
             clf.fit(&ds_train.get_data());
 

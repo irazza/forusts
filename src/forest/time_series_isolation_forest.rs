@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use crate::feature_extraction::statistics::{self, EULER_MASCHERONI, percentile};
+use crate::feature_extraction::statistics::{self, percentile, EULER_MASCHERONI};
 use crate::forest::forest::Forest;
 use crate::tree::decision_tree::{Criterion, DecisionTree, MaxFeatures, Splitter};
 use crate::tree::node::Node;
@@ -20,7 +20,7 @@ pub struct TimeSeriesIsolationForest {
     max_depth: Option<usize>,
 }
 
-impl  TimeSeriesIsolationForest {
+impl TimeSeriesIsolationForest {
     pub fn new(
         n_trees: usize,
         n_intervals: usize,
@@ -82,9 +82,10 @@ impl  TimeSeriesIsolationForest {
                     self.max_features,
                 );
                 tree.fit(
-                    &(0..n_samples).into_iter()
-                    .map(|i| &transformed_x[i])
-                    .collect(),
+                    &(0..n_samples)
+                        .into_iter()
+                        .map(|i| &transformed_x[i])
+                        .collect(),
                     &(0..n_samples).collect(),
                 );
                 tree
@@ -96,33 +97,29 @@ impl  TimeSeriesIsolationForest {
         let mut predictions = Vec::new();
         let threshold = percentile(&scores, 95);
         for i in 0..x.len() {
-            predictions.push(if scores[i] >  threshold {1} else {0});
+            predictions.push(if scores[i] > threshold { 1 } else { 0 });
         }
         predictions
     }
 
-    pub fn score_samples(&self, x: &Vec<Vec<f64>>) -> Vec<f64> 
-    {
+    pub fn score_samples(&self, x: &Vec<Vec<f64>>) -> Vec<f64> {
         let n_samples = x.len();
         let mut scores = Vec::new();
         let mut leaves: Vec<Vec<usize>> = Vec::new();
-        let c_n = 2.0*(f64::ln((n_samples-1) as f64) +  EULER_MASCHERONI) - (2.0* (n_samples-1) as f64 / n_samples as f64);
+        let c_n = 2.0 * (f64::ln((n_samples - 1) as f64) + EULER_MASCHERONI)
+            - (2.0 * (n_samples - 1) as f64 / n_samples as f64);
 
         //Make predictions for each sample using each tree in the forest
-        leaves.par_extend(
-            self.trees
-                .par_iter()
-                .enumerate()
-                .map(| (i, tree)| Self::transform(x, &self.intervals[i]).iter().map(|sample| tree.predict_leaf(sample).get_depth()).collect())
-        );
+        leaves.par_extend(self.trees.par_iter().enumerate().map(|(i, tree)| {
+            Self::transform(x, &self.intervals[i])
+                .iter()
+                .map(|sample| tree.predict_leaf(sample).get_depth())
+                .collect()
+        }));
 
         for i in 0..n_samples {
-            let e_h = leaves
-                .iter()
-                .map(|leaf| leaf[i])
-                .sum::<usize>() as f64
-                / n_samples as f64;
-                scores.push(2.0f64.powf(-e_h / c_n));
+            let e_h = leaves.iter().map(|leaf| leaf[i]).sum::<usize>() as f64 / n_samples as f64;
+            scores.push(2.0f64.powf(-e_h / c_n));
         }
         scores
     }

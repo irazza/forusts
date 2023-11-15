@@ -56,8 +56,19 @@ impl IsolationForest {
     }
 
     pub fn predict(&self, x: &Vec<Vec<f64>>) -> Vec<usize> {
-        let n_samples = x.len();
+        let scores = self.score_samples(x);
         let mut predictions = Vec::new();
+        let threshold = percentile(&scores, 95);
+        for i in 0..x.len() {
+            predictions.push(if scores[i] >  threshold {1} else {0});
+        }
+        predictions
+    }
+
+    pub fn score_samples(&self, x: &Vec<Vec<f64>>) -> Vec<f64>
+    {
+        let n_samples = x.len();
+        let mut scores = Vec::new();
         let mut leaves: Vec<Vec<usize>> = Vec::new();
         let c_n = 2.0*(f64::ln((n_samples-1) as f64) +  EULER_MASCHERONI) - (2.0* (n_samples-1) as f64 / n_samples as f64);
 
@@ -74,13 +85,8 @@ impl IsolationForest {
                 .map(|leaf| leaf[i])
                 .sum::<usize>() as f64
                 / n_samples as f64;
-            predictions.push(2.0f64.powf(-e_h / c_n));
+                scores.push(2.0f64.powf(-e_h / c_n));
         }
-        let mut final_predictions = Vec::new();
-        let threshold = percentile(&predictions, 95);
-        for i in 0..n_samples {
-            final_predictions.push(if predictions[i] >  threshold {1} else {0});
-        }
-        final_predictions
+        scores
     }
 }

@@ -4,6 +4,7 @@ pub enum Node {
         class: usize,
         depth: usize,
         impurity: f64,
+        n_samples: usize,
     },
     Split {
         feature: usize,
@@ -22,6 +23,7 @@ impl Node {
                 class: _,
                 depth,
                 impurity: _,
+                n_samples: _,
             } => return *depth,
             Node::Split {
                 feature: _,
@@ -40,6 +42,7 @@ impl Node {
                 class,
                 depth: _,
                 impurity: _,
+                n_samples: _,
             } => return *class,
             Node::Split {
                 feature: _,

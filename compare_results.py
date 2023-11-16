@@ -1,37 +1,27 @@
 from pathlib import Path
+import time
 import numpy as np
 import pandas as pd
-import  matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.ensemble import IsolationForest
 from sklearn.model_selection import train_test_split
 
-
 if __name__ == "__main__":
-    n_samples, n_outliers = 120, 40
-    rng = np.random.RandomState(0)
-    covariance = np.array([[0.5, -0.1], [0.7, 0.4]])
-    cluster_1 = 0.4 * rng.randn(n_samples, 2) @ covariance + np.array([2, 2])  # general
-    cluster_2 = 0.3 * rng.randn(n_samples, 2) + np.array([-2, -2])  # spherical
-    outliers = rng.uniform(low=-4, high=4, size=(n_outliers, 2))
 
-    X = np.concatenate([cluster_1, cluster_2, outliers])
-    y = np.concatenate(
-        [np.ones((2 * n_samples), dtype=int), -np.ones((n_outliers), dtype=int)]
-    )
-    print(np.unique(y))
-    X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y, random_state=42)
-    print((y_train == -1).mean())
-    # np.savetxt("IF_TRAIN.tsv", np.hstack([y_train.reshape(-1, 1), X_train]), delimiter="\t")
-    # np.savetxt("IF_TEST.tsv", np.hstack([y_test.reshape(-1, 1), X_test]), delimiter="\t")
+    ecg = pd.read_csv("ecg.csv", header=None)
+    X, y = ecg.iloc[:, :-1].to_numpy(), ecg.iloc[:, -1].to_numpy()
+    
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y)
+    print(np.unique(y_train, return_counts=True))
+    print(np.unique(y_test, return_counts=True))
+    
+    y_train = np.where(y_train == 1, 0, 1)
+    y_test = np.where(y_test == 1, 0, 1)
 
-    clf = IsolationForest()
-    clf.fit(X_train)
-    y_pred = clf.predict(X_test)
-    y_test = np.where(y_test == -1, 1, 0)
-    y_pred = np.where(y_pred == -1, 1, 0)
+    print(np.unique(y_train, return_counts=True))
+    print(np.unique(y_test, return_counts=True))
 
-    print((y_pred==y_test).mean())
+    pd.DataFrame(np.hstack([y_train.reshape(-1, 1), X_train])).to_csv("AD/ECG/ECG_TRAIN.tsv", index=False, header=False, sep="\t")
+    pd.DataFrame(np.hstack([y_test.reshape(-1, 1), X_test])).to_csv("AD/ECG/ECG_TEST.tsv", index=False, header=False, sep="\t")
+    
     # Read the results
     # path = Path("tsf_300_g_b_10.csv")
     # results = pd.read_csv(path, index_col=0, header=0)

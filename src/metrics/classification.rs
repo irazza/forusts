@@ -42,9 +42,10 @@ pub fn recall_score(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
 }
 
 pub fn confusion_matrix(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> Vec<Vec<usize>> {
-    let n_unique = y_true.iter().max().unwrap() + 1;
-    let mut matrix = vec![vec![0; n_unique]; n_unique];
-
+    let n_unique_true = y_true.iter().max().unwrap() + 1;
+    let n_unique_pred = y_pred.iter().max().unwrap() + 1;
+    assert!(n_unique_pred > 1, "y_pred contains only one class");
+    let mut matrix = vec![vec![0; n_unique_true]; n_unique_true];
     for (a, b) in y_pred.iter().zip(y_true.iter()) {
         matrix[*a][*b] += 1;
     }

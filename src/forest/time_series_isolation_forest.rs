@@ -18,6 +18,7 @@ pub struct TimeSeriesIsolationForest {
     intervals: Vec<Vec<(usize, usize)>>,
     max_features: MaxFeatures,
     max_depth: Option<usize>,
+    threshold: f64,
 }
 
 impl TimeSeriesIsolationForest {
@@ -36,6 +37,7 @@ impl TimeSeriesIsolationForest {
             intervals: Vec::new(),
             max_features,
             max_depth,
+            threshold: 0.5,
         }
     }
 
@@ -88,16 +90,19 @@ impl TimeSeriesIsolationForest {
                         .collect(),
                     &(0..n_samples).collect(),
                 );
+                
                 tree
             }));
+
+        let scores = self.score_samples(x);
+        self.threshold = percentile(&scores, 95);
     }
 
     pub fn predict(&self, x: &Vec<Vec<f64>>) -> Vec<usize> {
         let scores = self.score_samples(x);
         let mut predictions = Vec::new();
-        let threshold = percentile(&scores, 95);
         for i in 0..x.len() {
-            predictions.push(if scores[i] > threshold { 1 } else { 0 });
+            predictions.push(if scores[i] > self.threshold { 1 } else { 0 });
         }
         predictions
     }

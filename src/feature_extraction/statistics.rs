@@ -41,7 +41,7 @@ pub fn std(x: &[f64]) -> f64 {
 pub fn percentile(x: &[f64], p: usize) -> f64 {
     let mut x = x.to_vec();
     x.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    let p_ind = (x.len() as f64 * p as f64 / 100.0).round() as usize;
+    let p_ind = (x.len() as f64 * p as f64 / 100.0).floor() as usize;
     let percentile = x[p_ind];
     assert!(percentile.is_finite());
     percentile

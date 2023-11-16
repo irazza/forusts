@@ -23,13 +23,14 @@ impl Dataset {
 
 pub fn read_csv(
     path: impl AsRef<Path>,
+    delimiter: u8,
     mapping: &mut HashMap<isize, i32>,
 ) -> Result<Dataset, Box<dyn Error>> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
     let mut reader = ReaderBuilder::new()
         .has_headers(true)
-        .delimiter(b'\t')
+        .delimiter(delimiter)
         .from_reader(reader);
 
     let mut targets = Vec::new();

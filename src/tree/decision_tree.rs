@@ -53,6 +53,7 @@ pub struct DecisionTree {
     _max_features: usize,
 }
 
+
 struct Sample<'a> {
     data: &'a [f64],
     target: usize,
@@ -72,6 +73,7 @@ impl DecisionTree {
                 class: 0,
                 depth: 0,
                 impurity: f64::MAX,
+                n_samples: 0,
             },
             criterion,
             splitter,
@@ -111,12 +113,7 @@ impl DecisionTree {
     fn build_tree(&mut self, samples: &mut [Sample<'_>], max_depth: usize) -> Node {
         let current_depth = max(1, self.max_depth - max_depth);
 
-        let (best_feature, best_threshold, best_impurity) = match self.splitter {
-            Splitter::Best => self.get_best_split(samples),
-            Splitter::Random => self.get_random_split(samples),
-        };
-
-        if self.stop_conditions(samples, current_depth, best_impurity) {
+        if self.pre_split_conditions(samples, current_depth) {
             let mut class_counts = HashMap::new();
             for Sample { target, .. } in &samples[0..samples.len()] {
                 *class_counts.entry(*target).or_insert(0) += 1;
@@ -125,18 +122,27 @@ impl DecisionTree {
                 class: get_most_common_class(samples),
                 depth: current_depth,
                 impurity: (self.impurity)(&class_counts),
+                n_samples: samples.len(),
             };
         }
 
-        let (left_data, right_data) = split(samples, best_feature, best_threshold);
+        let (best_feature, best_threshold, best_impurity) = match self.splitter {
+            Splitter::Best => self.get_best_split(samples),
+            Splitter::Random => self.get_random_split(samples),
+        };
 
-        if left_data.len() == 0 || right_data.len() == 0 {
+        if self.post_split_conditions(best_impurity) {
             return Node::Leaf {
                 class: get_most_common_class(samples),
                 depth: current_depth,
                 impurity: best_impurity,
+                n_samples: samples.len(),
             };
         }
+        
+        let (left_data, right_data) = split(samples, best_feature, best_threshold);
+
+        
         // Split the data and recursively build the left and right subtrees
         let left_subtree = self.build_tree(left_data, max_depth - 1);
         let right_subtree = self.build_tree(right_data, max_depth - 1);
@@ -151,34 +157,56 @@ impl DecisionTree {
         }
     }
 
-    fn stop_conditions(
+    fn pre_split_conditions(
         &self,
         samples: &mut [Sample<'_>],
         current_depth: usize,
-        impurity: f64,
     ) -> bool {
         // Base case: not enough samples or max depth reached
         if samples.len() <= self.min_samples_split || current_depth == self.max_depth {
             return true;
         }
         // Base case: all samples have the same class
-        let first_class = samples[0].target;
-        for Sample { target, .. } in samples {
-            if *target != first_class {
+        let first_class = &samples[0].target;
+        for Sample { target, .. } in &samples[..] {
+            if *target != *first_class {
                 return false;
             }
         }
-        // Base case: impurity is 0
-        if impurity <= f64::EPSILON {
-            return true;
+        // Base case: samples are the same object
+        let first_sample = samples[0].data;
+        for Sample { data, .. } in samples {
+            if *data != first_sample {
+                return false;
+            }
         }
+
         true
+    }
+
+    fn post_split_conditions(&self, impurity: f64) -> bool {
+        // Check if the impurity is optimal or if the split did not found any valid split
+        impurity < f64::EPSILON || impurity == f64::MAX
     }
 
     fn get_random_split(&self, samples: &[Sample<'_>]) -> (usize, f64, f64) {
         let best_feature = thread_rng().gen_range(0..samples[0].data.len());
         let best_threshold = samples[thread_rng().gen_range(0..samples.len())].data[best_feature];
         let best_impurity = 1.0;
+
+        // Check if the split is valid
+        let count_left = samples
+            .iter()
+            .filter(|sample| sample.data[best_feature] <= best_threshold)
+            .count();
+        let count_right = samples
+            .iter()
+            .filter(|sample| sample.data[best_feature] > best_threshold)
+            .count();
+        
+        if count_left < self.min_samples_leaf || count_right < self.min_samples_leaf {
+            return self.get_random_split(samples);
+        }
 
         (best_feature, best_threshold, best_impurity)
     }
@@ -282,6 +310,22 @@ impl DecisionTree {
         compute_ancestor_rec(&self.root, node, None, &mut ancestors);
         ancestors.insert(node as *const Node, node);
         ancestors
+    }
+
+    pub fn bfs(&self) -> Vec<&Node> {
+        let mut queue = vec![&self.root];
+        let mut bfs = Vec::new();
+
+        while !queue.is_empty() {
+            let node = queue.remove(0);
+            bfs.push(node);
+            if let Node::Split { left, right, .. } = node {
+                queue.push(left);
+                queue.push(right);
+            }
+        }
+
+        bfs
     }
 }
 

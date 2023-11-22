@@ -2,25 +2,33 @@ from pathlib import Path
 import time
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
+from sklearn.ensemble import IsolationForest
+from sklearn.metrics import roc_auc_score, accuracy_score
+from sklearn.model_selection import train_test_splitq
 
 if __name__ == "__main__":
 
-    ecg = pd.read_csv("ecg.csv", header=None)
-    X, y = ecg.iloc[:, :-1].to_numpy(), ecg.iloc[:, -1].to_numpy()
+    # Read the results
+    admep = pd.read_csv("admep.csv", index_col=0, header=0)
+    # Group by index and take the mean
+    admep = admep.groupby(admep.index).mean()
+    # print the results
+    print(admep)
+    # ecg = pd.read_csv("ecg.csv", header=None)
+    # X, y = ecg.iloc[:, :-1].to_numpy(), ecg.iloc[:, -1].to_numpy()
     
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y)
-    print(np.unique(y_train, return_counts=True))
-    print(np.unique(y_test, return_counts=True))
+    # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y)
+    # print(np.unique(y_train, return_counts=True))
+    # print(np.unique(y_test, return_counts=True))
     
-    y_train = np.where(y_train == 1, 0, 1)
-    y_test = np.where(y_test == 1, 0, 1)
+    # y_train = np.where(y_train == 1, 0, 1)
+    # y_test = np.where(y_test == 1, 0, 1)
 
-    print(np.unique(y_train, return_counts=True))
-    print(np.unique(y_test, return_counts=True))
+    # print(np.unique(y_train, return_counts=True))
+    # print(np.unique(y_test, return_counts=True))
 
-    pd.DataFrame(np.hstack([y_train.reshape(-1, 1), X_train])).to_csv("AD/ECG/ECG_TRAIN.tsv", index=False, header=False, sep="\t")
-    pd.DataFrame(np.hstack([y_test.reshape(-1, 1), X_test])).to_csv("AD/ECG/ECG_TEST.tsv", index=False, header=False, sep="\t")
+    # pd.DataFrame(np.hstack([y_train.reshape(-1, 1), X_train])).to_csv("AD/ECG/ECG_TRAIN.tsv", index=False, header=False, sep="\t")
+    # pd.DataFrame(np.hstack([y_test.reshape(-1, 1), X_test])).to_csv("AD/ECG/ECG_TEST.tsv", index=False, header=False, sep="\t")
     
     # Read the results
     # path = Path("tsf_300_g_b_10.csv")

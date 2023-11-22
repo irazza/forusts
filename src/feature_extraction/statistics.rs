@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 pub const EULER_MASCHERONI: f64 =
     0.5772156649015328606065120900824024310421593359399235988057672348849;
 
@@ -17,6 +18,16 @@ pub fn min(x: &[f64]) -> f64 {
     let min = x.iter().fold(f64::MAX, |min, &val| min.min(val));
     assert!(min.is_finite());
     min
+}
+
+pub fn unique(x: &[usize]) -> Vec<usize> {
+    let mut unique = Vec::new();
+    for &val in x {
+        if !unique.contains(&val) {
+            unique.push(val);
+        }
+    }
+    unique
 }
 
 pub fn median(x: &[f64]) -> f64 {
@@ -101,6 +112,32 @@ pub fn quantile(x: &[f64], q: f64) -> f64 {
     x.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let q_ind = (x.len() as f64 * q).floor() as usize;
     x[q_ind]
+}
+
+pub fn argsort<T: PartialOrd>(data: &[T], order: &str) -> Vec<usize> {
+    match order {
+        "asc" => {
+            let mut indices: Vec<usize> = (0..data.len()).collect();
+            indices.sort_by(|&i, &j| data[i].partial_cmp(&data[j]).unwrap());
+            indices
+        }
+        "desc" => {
+            let mut indices: Vec<usize> = (0..data.len()).collect();
+            indices.sort_by(|&i, &j| data[j].partial_cmp(&data[i]).unwrap());
+            indices
+        }
+        _ => panic!("Order must be either 'asc' or 'desc'"),
+    }
+}
+
+pub fn cumsum(x: &[usize]) -> Vec<usize> {
+    let mut cumsum = Vec::new();
+    let mut sum = 0;
+    for &val in x {
+        sum += val;
+        cumsum.push(sum);
+    }
+    cumsum
 }
 
 pub fn cov(x: &[f64], y: &[f64]) -> f64 {

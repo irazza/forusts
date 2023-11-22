@@ -154,6 +154,7 @@ impl DecisionTree {
             right: Box::new(right_subtree),
             depth: current_depth,
             impurity: best_impurity,
+            n_samples: samples.len(),
         }
     }
 
@@ -288,6 +289,7 @@ impl DecisionTree {
             right,
             depth: _,
             impurity: _,
+            n_samples: _,
         } = node
         {
             if x[*feature] <= *threshold {

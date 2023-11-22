@@ -1,3 +1,4 @@
+#![allow(dead_code,unused_variables, unused_mut)]
 use crate::feature_extraction::statistics::histcounts;
 use crate::feature_extraction::statistics::{
     autocorr_lag, autocov_lag, cov, diff, f_entropy, max, mean, median, quantile,
@@ -225,11 +226,10 @@ fn co_firstzero(x: &[f64], maxtau: usize) -> usize {
     zerocrossind
 }
 
-fn sb_coarsegrain(y: &[f64], how: &str, num_groups: usize, labels: &mut [i32]) {
+fn sb_coarsegrain(y: &[f64], num_groups: usize, labels: &mut [i32]) {
     let mut th = vec![0.0; num_groups + 1];
-    let mut ls = vec![0.0; num_groups + 1];
 
-    let mut ls: Vec<usize> = (0..num_groups + 1).step_by(1).collect();
+    let ls: Vec<usize> = (0..num_groups + 1).step_by(1).collect();
 
     for i in 0..=num_groups {
         th[i] = quantile(y, ls[i] as f64);
@@ -276,7 +276,7 @@ pub fn sb_transition_matrix_3ac_sumdiagcov(y: &[f64]) -> f64 {
 
     // transfer to alphabet
     let mut y_cg = vec![0; n_down];
-    sb_coarsegrain(&y_down, "quantile", NUM_GROUPS, &mut y_cg);
+    sb_coarsegrain(&y_down,  NUM_GROUPS, &mut y_cg);
 
     let mut t = [[0; NUM_GROUPS]; NUM_GROUPS];
 

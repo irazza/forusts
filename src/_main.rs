@@ -1,12 +1,21 @@
+#![allow(unused_imports, unused_variables)]
+use crate::feature_extraction::statistics::unique;
+use crate::forest::canonical_interval_forest::CanonicalIntervalForest;
 use crate::forest::forest::Forest;
+use crate::forest::isolation_forest::IsolationForest;
+use crate::forest::random_forest::RandomForest;
 use crate::forest::time_series_forest::TimeSeriesForest;
-use crate::metrics::classification::accuracy_score;
+use crate::forest::time_series_isolation_forest::TimeSeriesIsolationForest;
+use crate::metrics::classification::{accuracy_score, matthews_corrcoef, roc_auc_score};
 use crate::neighbors::nearest_neighbor::k_nearest_neighbor;
 use crate::tree::decision_tree::{Criterion, MaxFeatures, Splitter};
 use crate::utils::csv_io::read_csv;
+use csv::ReaderBuilder;
 use hashbrown::HashMap;
 use std::error::Error;
-use std::fs;
+use std::fs::{self, File};
+use std::io::BufReader;
+use std::process::exit;
 use utils::csv_io::write_csv;
 
 mod feature_extraction;
@@ -17,11 +26,10 @@ mod tree;
 mod utils;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let paths = fs::read_dir("UCRArchive_2018/")?;
+    let paths = fs::read_dir("ADMEP/")?;
+    let mut predictions = Vec::new();
     let n_repetitions = 1;
-    let n_trees = 100;
-    let criterion = Criterion::Gini;
-    let splitter = Splitter::Best;
+    let n_trees = 500;
 
     let mut datasets: Vec<_> = Vec::new();
 
@@ -33,7 +41,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
     datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
-    let mut predictions: Vec<Vec<f64>> = Vec::new();
     for path in &datasets {
         println!("Processing {}", path.file_name().to_string_lossy());
         let train_path = path
@@ -45,50 +52,47 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         let mut mapping = HashMap::new();
         let ds_train = read_csv(train_path, b'\t', &mut mapping)?;
+        let n_features = ds_train.get_data()[0].len() as f64;
         let ds_test = read_csv(test_path, b'\t', &mut mapping)?;
         let y_true = ds_test.get_targets().clone();
+        if unique(&y_true[..]).len() == 1 {
+            println!("Only one class in y_true: {}", y_true[0]);
+            continue;
+        }
 
-        let n_features = ds_train.get_data()[0].len() as f64;
         for _i in 0..n_repetitions {
-            let mut clf = TimeSeriesForest::new(
+            let mut clf = TimeSeriesIsolationForest::new(
                 n_trees,
-                criterion,
-                splitter,
                 n_features.sqrt() as usize,
                 3,
-                MaxFeatures::Sqrt,
+                MaxFeatures::All,
                 None,
             );
+            //let mut clf = IsolationForest::new(n_trees, MaxFeatures::All, None);
 
-            clf.fit(&ds_train.get_data(), &ds_train.get_targets());
-            let tsf_accuracy =
-                accuracy_score(&clf.predict(&ds_test.get_data()), &ds_test.get_targets());
+            clf.fit(&ds_train.get_data());
+
+            let y_score = clf.score_samples(&ds_test.get_data());
+            let accuracy = roc_auc_score(&y_score, &y_true);
 
             let breiman_distance =
                 clf.pairwise_breiman(ds_test.get_data().clone(), ds_train.get_data().clone());
             let prediction_breiman =
                 k_nearest_neighbor(1, &ds_train.get_targets(), &breiman_distance);
-            let accuracy_breiman = accuracy_score(&prediction_breiman, &y_true);
+            let accuracy_breiman = matthews_corrcoef(&prediction_breiman, &y_true);
 
             let ancestor_distance =
                 clf.pairwise_ancestor(ds_test.get_data().clone(), ds_train.get_data().clone());
             let prediction_ancestor =
                 k_nearest_neighbor(1, &ds_train.get_targets(), &ancestor_distance);
-            let accuracy_ancestor = accuracy_score(&prediction_ancestor, &y_true);
+            let accuracy_ancestor = matthews_corrcoef(&prediction_ancestor, &y_true);
 
             let zhu_distance =
                 clf.pairwise_zhu(ds_test.get_data().clone(), ds_train.get_data().clone());
             let prediction_zhu = k_nearest_neighbor(1, &ds_train.get_targets(), &zhu_distance);
-            let accuracy_zhu = accuracy_score(&prediction_zhu, &y_true);
-            predictions.push(
-                [
-                    tsf_accuracy,
-                    accuracy_breiman,
-                    accuracy_ancestor,
-                    accuracy_zhu,
-                ]
-                .to_vec(),
-            );
+            let accuracy_zhu = matthews_corrcoef(&prediction_zhu, &y_true);
+            predictions
+                .push([accuracy, accuracy_breiman, accuracy_ancestor, accuracy_zhu].to_vec());
         }
     }
     // Create index modifying datasets multiplyng by n_repetitions
@@ -98,22 +102,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             index.push(datasets[i].file_name().to_string_lossy().to_string());
         }
     }
-    let header = vec!["Dataset", "TSF", "Breiman", "Ancestor", "Zhu"]
+
+    let header = vec!["Dataset", "ROC-AUC", "Breiman", "Ancestor", "Zhu"]
         .iter()
         .map(|s| s.to_string())
         .collect();
-    write_csv(
-        format!(
-            "tsf_{}_{}_{}_{}.csv",
-            n_trees,
-            criterion.to_string(),
-            splitter.to_string(),
-            n_repetitions
-        ),
-        predictions,
-        header,
-        index,
-    )?;
+    write_csv(format!("admep_{}.csv", n_trees), predictions, header, index)?;
 
     Ok(())
 }

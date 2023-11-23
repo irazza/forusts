@@ -1,4 +1,4 @@
-#![allow(dead_code,unused_variables, unused_mut)]
+#![allow(dead_code, unused_variables, unused_mut)]
 use crate::feature_extraction::statistics::histcounts;
 use crate::feature_extraction::statistics::{
     autocorr_lag, autocov_lag, cov, diff, f_entropy, max, mean, median, quantile,
@@ -276,7 +276,7 @@ pub fn sb_transition_matrix_3ac_sumdiagcov(y: &[f64]) -> f64 {
 
     // transfer to alphabet
     let mut y_cg = vec![0; n_down];
-    sb_coarsegrain(&y_down,  NUM_GROUPS, &mut y_cg);
+    sb_coarsegrain(&y_down, NUM_GROUPS, &mut y_cg);
 
     let mut t = [[0; NUM_GROUPS]; NUM_GROUPS];
 

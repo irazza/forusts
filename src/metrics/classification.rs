@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::feature_extraction::statistics::{unique, argsort, cumsum};
+use crate::feature_extraction::statistics::{argsort, cumsum, unique};
 
 pub fn accuracy_score(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
     (y_pred
@@ -57,7 +57,7 @@ pub fn confusion_matrix(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> Vec<Vec<usi
 
 pub fn matthews_corrcoef(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
     // Base case: only one class predicted
-    if unique(y_true).len() == 1 || unique(y_pred).len() == 1{
+    if unique(y_true).len() == 1 || unique(y_pred).len() == 1 {
         return 0.0;
     }
 
@@ -115,7 +115,7 @@ fn auc(x: &Vec<f64>, y: &Vec<f64>) -> f64 {
 
 fn roc_curve(y_pred: &Vec<f64>, y_true: &Vec<usize>) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
     let (mut fps, mut tps, mut threshold) = _binary_clf_curve(y_pred, y_true, 1);
-    
+
     fps.insert(0, 0);
     tps.insert(0, 0);
 
@@ -124,48 +124,73 @@ fn roc_curve(y_pred: &Vec<f64>, y_true: &Vec<usize>) -> (Vec<f64>, Vec<f64>, Vec
     let fpr;
     let tpr;
 
-    if fps[fps.len()-1] <= 0 {
+    if fps[fps.len() - 1] <= 0 {
         println!("No negative samples in y_true, false positive value should be meaningless");
         fpr = vec![f64::NAN; fps.len()];
     } else {
-        fpr = fps.iter().map(|v| *v as f64 / fps[fps.len()-1] as f64).collect::<Vec<f64>>();
+        fpr = fps
+            .iter()
+            .map(|v| *v as f64 / fps[fps.len() - 1] as f64)
+            .collect::<Vec<f64>>();
     }
 
-    if tps[tps.len()-1] <= 0 {
+    if tps[tps.len() - 1] <= 0 {
         println!("No positive samples in y_true, true positive value should be meaningless");
         tpr = vec![f64::NAN; tps.len()];
     } else {
-        tpr = tps.iter().map(|v| *v as f64 / tps[tps.len()-1] as f64).collect::<Vec<f64>>();
+        tpr = tps
+            .iter()
+            .map(|v| *v as f64 / tps[tps.len() - 1] as f64)
+            .collect::<Vec<f64>>();
     }
 
     (fpr, tpr, threshold)
-
-
 }
 
-fn  _binary_clf_curve(y_score: &Vec<f64>, y_true: &Vec<usize>, pos_label: usize) -> (Vec<usize>, Vec<usize>, Vec<f64>) {
-    
+fn _binary_clf_curve(
+    y_score: &Vec<f64>,
+    y_true: &Vec<usize>,
+    pos_label: usize,
+) -> (Vec<usize>, Vec<usize>, Vec<f64>) {
     // Transform y_true in a boolean vector
-    let boolean_y_true = y_true.iter().map(|v| *v == pos_label).collect::<Vec<bool>>();
+    let boolean_y_true = y_true
+        .iter()
+        .map(|v| *v == pos_label)
+        .collect::<Vec<bool>>();
 
     let desc_score_indices = argsort(y_score, "desc");
 
-    let y_score_ordered = desc_score_indices.iter().map(|i| y_score[*i]).collect::<Vec<f64>>();
-    let y_true_ordered = desc_score_indices.iter().map(|i| if boolean_y_true[*i] {1} else {0}).collect::<Vec<usize>>();
-
+    let y_score_ordered = desc_score_indices
+        .iter()
+        .map(|i| y_score[*i])
+        .collect::<Vec<f64>>();
+    let y_true_ordered = desc_score_indices
+        .iter()
+        .map(|i| if boolean_y_true[*i] { 1 } else { 0 })
+        .collect::<Vec<usize>>();
 
     let mut threshold_idxs = (1..y_score_ordered.len())
-    .into_iter()
-    .filter(|i| y_score_ordered[*i] != y_score_ordered[*i - 1])
-    .collect::<Vec<usize>>();
+        .into_iter()
+        .filter(|i| y_score_ordered[*i] != y_score_ordered[*i - 1])
+        .collect::<Vec<usize>>();
 
-    threshold_idxs.push(y_true_ordered.len()-1);
+    threshold_idxs.push(y_true_ordered.len() - 1);
 
     let tps = cumsum(&y_true_ordered);
-    
-    let fps = threshold_idxs.iter().map(|i| 1 + *i - tps[*i]).collect::<Vec<usize>>();
 
-    (fps, tps, threshold_idxs.iter().map(|i| y_score_ordered[*i]).collect::<Vec<f64>>())
+    let fps = threshold_idxs
+        .iter()
+        .map(|i| 1 + *i - tps[*i])
+        .collect::<Vec<usize>>();
+
+    (
+        fps,
+        tps,
+        threshold_idxs
+            .iter()
+            .map(|i| y_score_ordered[*i])
+            .collect::<Vec<f64>>(),
+    )
 
     // // sort scores and corresponding truth values
     // let mut desc_score_indices = y_score
@@ -210,5 +235,4 @@ fn  _binary_clf_curve(y_score: &Vec<f64>, y_true: &Vec<usize>, pos_label: usize)
     // }
 
     // (tps, fps, threshold_idxs.iter().map(|i| y_score[*i]).collect::<Vec<f64>>())
-
 }

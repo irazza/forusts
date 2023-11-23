@@ -53,7 +53,6 @@ pub struct DecisionTree {
     _max_features: usize,
 }
 
-
 struct Sample<'a> {
     data: &'a [f64],
     target: usize,
@@ -139,10 +138,9 @@ impl DecisionTree {
                 n_samples: samples.len(),
             };
         }
-        
+
         let (left_data, right_data) = split(samples, best_feature, best_threshold);
 
-        
         // Split the data and recursively build the left and right subtrees
         let left_subtree = self.build_tree(left_data, max_depth - 1);
         let right_subtree = self.build_tree(right_data, max_depth - 1);
@@ -158,31 +156,37 @@ impl DecisionTree {
         }
     }
 
-    fn pre_split_conditions(
-        &self,
-        samples: &mut [Sample<'_>],
-        current_depth: usize,
-    ) -> bool {
+    fn pre_split_conditions(&self, samples: &mut [Sample<'_>], current_depth: usize) -> bool {
         // Base case: not enough samples or max depth reached
-        if samples.len() <= self.min_samples_split || current_depth == self.max_depth {
+        if samples.len() < self.min_samples_split || current_depth == self.max_depth {
+            return true;
+        }
+        // Base case: samples are the same object
+        let mut idx = 0;
+        let first_sample = samples[0].data;
+        while idx < samples.len() {
+            if samples[idx].data != first_sample {
+                break;
+            }
+            idx += 1;
+        }
+        if idx == samples.len() {
             return true;
         }
         // Base case: all samples have the same class
+        idx = 0;
         let first_class = &samples[0].target;
-        for Sample { target, .. } in &samples[..] {
-            if *target != *first_class {
-                return false;
+        while idx < samples.len() {
+            if samples[idx].target != *first_class {
+                break;
             }
+            idx += 1;
         }
-        // Base case: samples are the same object
-        let first_sample = samples[0].data;
-        for Sample { data, .. } in samples {
-            if *data != first_sample {
-                return false;
-            }
+        if idx == samples.len() {
+            return true;
         }
 
-        true
+        return false;
     }
 
     fn post_split_conditions(&self, impurity: f64) -> bool {
@@ -204,7 +208,7 @@ impl DecisionTree {
             .iter()
             .filter(|sample| sample.data[best_feature] > best_threshold)
             .count();
-        
+
         if count_left < self.min_samples_leaf || count_right < self.min_samples_leaf {
             return self.get_random_split(samples);
         }

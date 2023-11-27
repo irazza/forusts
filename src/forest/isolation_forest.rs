@@ -1,35 +1,24 @@
-#![allow(dead_code)]
+
 use crate::{
-    feature_extraction::statistics::{percentile, EULER_MASCHERONI},
-    tree::{
-        self,
-        decision_tree::{Criterion, DecisionTree, MaxFeatures, Splitter},
-        node::Node,
-    },
+    feature_extraction::statistics::EULER_MASCHERONI,
+    tree::{node::Node, extra_tree::ExtraTree, tree::Tree}
 };
-use hashbrown::HashMap;
-use parking_lot::Mutex;
-use rand::{seq::SliceRandom, thread_rng, Rng};
-use rayon::{prelude::*, vec};
-use std::{
-    cmp::{max, min},
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use rand::seq::SliceRandom;
+use rayon::prelude::*;
+use std::cmp::min;
 
 pub struct IsolationForest {
-    trees: Vec<DecisionTree>,
+    trees: Vec<ExtraTree>,
     n_trees: usize,
-    max_features: MaxFeatures,
     max_depth: Option<usize>,
     max_samples: usize,
 }
 
 impl IsolationForest {
-    pub fn new(n_trees: usize, max_features: MaxFeatures, max_depth: Option<usize>) -> Self {
+    pub fn new(n_trees: usize, max_depth: Option<usize>) -> Self {
         Self {
             trees: Vec::new(),
             n_trees,
-            max_features,
             max_depth,
             max_samples: 256,
         }
@@ -42,13 +31,9 @@ impl IsolationForest {
             .par_extend((0..self.n_trees).into_par_iter().map(|_i| {
                 let mut n_samples: Vec<usize> = (0..x.len()).collect();
                 n_samples.shuffle(&mut rand::thread_rng());
-                let mut tree = DecisionTree::new(
-                    Criterion::None,
-                    Splitter::Random,
-                    self.max_depth.unwrap_or(usize::MAX),
-                    1,
-                    1,
-                    self.max_features,
+                let mut tree = ExtraTree::new(
+                    self.max_depth.unwrap_or(self.max_samples.ilog2() as usize + 1),
+                    1
                 );
                 tree.fit(
                     &(0..self.max_samples)

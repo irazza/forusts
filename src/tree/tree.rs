@@ -1,0 +1,268 @@
+
+use std::{cmp::max, ops::Deref};
+
+use hashbrown::HashMap;
+
+use crate::utils::structures::Sample;
+
+use super::node::Node;
+
+#[derive(Copy, Clone)]
+pub enum MaxFeatures {
+    All,
+    Sqrt,
+    Log2,
+}
+impl MaxFeatures {
+    pub fn convert(&self, n_features: usize) -> usize {
+        match self {
+            MaxFeatures::All => n_features,
+            MaxFeatures::Sqrt => (n_features as f64).sqrt() as usize,
+            MaxFeatures::Log2 => (n_features as f64).log2() as usize,
+        }
+    }
+
+}
+#[derive(Copy, Clone)]
+pub enum Criterion {
+    Gini,
+    Entropy,
+}
+impl Criterion {
+    pub fn to_string(self) -> &'static str {
+        match self {
+            Criterion::Gini => "gini",
+            Criterion::Entropy => "entropy",
+        }
+    }
+
+    pub fn to_fn<T: Tree>(self) -> fn(&HashMap<usize, usize>) -> f64 {
+        match self {
+            Criterion::Gini => T::gini_impurity,
+            Criterion::Entropy => T::entropy_impurity,
+        }
+    }
+}
+
+pub trait Tree {
+    fn get_max_depth(&self) -> usize;
+    fn set_max_features(&mut self, max_features: usize);
+    fn get_max_features(&self) -> MaxFeatures;
+    fn get_root(&self) -> &Node;
+    fn set_root(&mut self, root: Node);
+    fn get_split(&self, samples: &[Sample<'_>]) -> (usize, f64, f64);
+    fn pre_split_conditions(&self, samples: &[Sample<'_>], current_depth: usize) -> bool;
+    fn post_split_conditions(&self, impurity: f64) -> bool;
+    fn fit(&mut self, x: &Vec<&Vec<f64>>, y: &Vec<usize>) {
+        // Start the iterative tree-building process
+        let mut data = x
+            .iter()
+            .zip(y.iter())
+            .map(|(x, y)| Sample {
+                data: &x,
+                target: *y,
+            })
+            .collect::<Vec<_>>();
+
+        let n_features = data[0].data.len();
+        self.set_max_features(self.get_max_features().convert(n_features));
+        let root = self.build_tree(&mut data, self.get_max_depth());
+        self.set_root(root);
+    }
+    fn build_tree(&mut self, samples: &mut [Sample<'_>], max_depth: usize) -> Node {
+        let current_depth = max(1, self.get_max_depth() - max_depth);
+
+        if self.pre_split_conditions(samples, current_depth) {
+            return Node::Leaf {
+                class: Self::get_most_common_class(samples),
+                depth: current_depth,
+                impurity: f64::EPSILON,
+                n_samples: samples.len(),
+            };
+        }
+
+        let (best_feature, best_threshold, best_impurity) = self.get_split(samples);
+
+        if self.post_split_conditions(best_impurity) {
+            return Node::Leaf {
+                class: Self::get_most_common_class(samples),
+                depth: current_depth,
+                impurity: f64::EPSILON,
+                n_samples: samples.len(),
+            };
+        }
+
+        let (left_data, right_data) = Self::split(samples, best_feature, best_threshold);
+
+        // Split the data and recursively build the left and right subtrees
+        let left_subtree = self.build_tree(left_data, max_depth - 1);
+        let right_subtree = self.build_tree(right_data, max_depth - 1);
+
+        Node::Split {
+            feature: best_feature,
+            threshold: best_threshold,
+            left: Box::new(left_subtree),
+            right: Box::new(right_subtree),
+            depth: current_depth,
+            impurity: best_impurity,
+            n_samples: samples.len(),
+        }
+    }
+    fn predict(&self, x: &Vec<Vec<f64>>) -> Vec<usize> {
+        x.iter()
+            .map(|sample| self.predict_leaf(sample).get_class())
+            .collect()
+    }
+    fn predict_leaf(&self, x: &Vec<f64>) -> &Node {
+        let mut node = self.get_root();
+
+        while let Node::Split {
+            feature,
+            threshold,
+            left,
+            right,
+            depth: _,
+            impurity: _,
+            n_samples: _,
+        } = node
+        {
+            if x[*feature] <= *threshold {
+                node = left;
+            } else {
+                node = right;
+            }
+        }
+        node
+    }
+    fn split<'a, 'b>(samples: & 'a mut [Sample<'b>], feature: usize, threshold: f64) -> (&'a mut [Sample<'b>], &'a mut [Sample<'b>]) {
+        let mut idx = 0;
+        let mut last = samples.len();
+
+        while idx < last {
+            if samples[idx].data[feature] <= threshold {
+                idx += 1;
+            } else {
+                samples.swap(idx, last - 1);
+                last -= 1;
+            }
+        }
+
+        samples.split_at_mut(idx)
+    }
+    fn get_most_common_class(samples: &[Sample<'_>]) -> usize {
+        let mut class_counts = HashMap::new();
+        for Sample { target, .. } in samples {
+            *class_counts.entry(*target).or_insert(0) += 1;
+        }
+    
+        let mut max_count = 0;
+        let mut most_common_class = 0;
+    
+        for (class, count) in &class_counts {
+            if *count > max_count {
+                max_count = *count;
+                most_common_class = *class;
+            }
+        }
+    
+        most_common_class
+    }
+    fn bfs(&self) -> Vec<&Node> {
+        let mut queue = vec![self.get_root()];
+        let mut bfs = Vec::new();
+
+        while !queue.is_empty() {
+            let node = queue.remove(0);
+            bfs.push(node);
+            if let Node::Split { left, right, .. } = node {
+                queue.push(left);
+                queue.push(right);
+            }
+        }
+
+        bfs
+    }
+    fn get_depth(&self) -> usize {
+        let mut max_depth = 0;
+        let mut queue = vec![(self.get_root(), 0)];
+
+        while !queue.is_empty() {
+            let (node, depth) = queue.remove(0);
+            max_depth = max(max_depth, depth);
+            if let Node::Split { left, right, .. } = node {
+                queue.push((left, depth + 1));
+                queue.push((right, depth + 1));
+            }
+        }
+
+        max_depth
+    }
+    fn compute_ancestor<'a>(&'a self, node: &'a Node) -> HashMap<*const Node, &'a Node> {
+        let mut ancestors = HashMap::new();
+        Self::compute_ancestor_rec(&self.get_root(), node, None, &mut ancestors);
+        ancestors.insert(node as *const Node, node);
+        ancestors
+    }
+
+    fn compute_ancestor_rec<'a>(current: &'a Node, target: &'a Node, found_lca: Option<&'a Node>, ancestors: &mut HashMap<*const Node, &'a Node>) -> bool {
+        if (current as *const Node) == (target as *const Node) {
+            return true;
+        }
+    
+        match current {
+            Node::Leaf { .. } => {
+                if let Some(found_lca) = found_lca {
+                    ancestors.insert(current as *const Node, found_lca);
+                }
+                false
+            }
+            Node::Split { left, right, .. } => {
+                if let Some(found_lca) = found_lca {
+                    Self::compute_ancestor_rec(left.deref(), target, Some(found_lca), ancestors);
+                    Self::compute_ancestor_rec(right.deref(), target, Some(found_lca), ancestors);
+                    false
+                } else {
+                    let left_found = Self::compute_ancestor_rec(left.deref(), target, None, ancestors);
+                    if left_found {
+                        Self::compute_ancestor_rec(right.deref(), target, Some(current), ancestors);
+                        true
+                    } else {
+                        let right_found = Self::compute_ancestor_rec(right, target, None, ancestors);
+                        if right_found {
+                            Self::compute_ancestor_rec(left.deref(), target, Some(current), ancestors);
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn entropy_impurity(class_counts: &HashMap<usize, usize>) -> f64 {
+        let mut impurity = 0.0;
+        let total_samples = class_counts.values().sum::<usize>() as f64;
+        for &count in class_counts.values() {
+            if count > 0 {
+                let p = count as f64 / total_samples;
+                impurity -= p * p.log2();
+            }
+        }
+    
+        impurity
+    }
+    
+    fn gini_impurity(class_counts: &HashMap<usize, usize>) -> f64 {
+        let mut impurity = 1.0;
+        let total_samples = class_counts.values().sum::<usize>() as f64;
+        for &count in class_counts.values() {
+            if count > 0 {
+                let p = count as f64 / total_samples;
+                impurity -= p * p;
+            }
+        }
+    
+        impurity
+    }
+}

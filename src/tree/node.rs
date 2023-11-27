@@ -18,6 +18,14 @@ pub enum Node {
 }
 
 impl Node {
+    pub fn new() -> Self {
+        Node::Leaf {
+            class: 0,
+            depth: 0,
+            impurity: 0.0,
+            n_samples: 0,
+        }
+    }
     pub fn get_depth(&self) -> usize {
         match self {
             Node::Leaf {

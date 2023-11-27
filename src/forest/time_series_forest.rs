@@ -1,8 +1,11 @@
 #![allow(dead_code)]
 use crate::feature_extraction::statistics;
 use crate::forest::forest::Forest;
-use crate::tree::decision_tree::{Criterion, DecisionTree, MaxFeatures, Splitter};
-use crate::tree::node::Node;
+use crate::tree::{
+    decision_tree::DecisionTree,
+    node::Node,
+    tree::{Tree, Criterion, MaxFeatures}
+};
 use hashbrown::HashMap;
 use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
@@ -13,7 +16,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 pub struct TimeSeriesForest {
     trees: Vec<DecisionTree>,
     criterion: Criterion,
-    splitter: Splitter,
     n_trees: usize,
     n_intervals: usize,
     min_interval_length: usize,
@@ -26,7 +28,6 @@ impl TimeSeriesForest {
     pub fn new(
         n_trees: usize,
         criterion: Criterion,
-        splitter: Splitter,
         n_intervals: usize,
         min_interval_length: usize,
         max_features: MaxFeatures,
@@ -36,7 +37,6 @@ impl TimeSeriesForest {
             trees: Vec::new(),
             n_trees,
             criterion,
-            splitter,
             n_intervals,
             min_interval_length,
             intervals: Vec::new(),
@@ -86,10 +86,8 @@ impl Forest for TimeSeriesForest {
                 let transformed_x = Self::transform(x, &self.intervals[i]);
                 let mut tree = DecisionTree::new(
                     self.criterion,
-                    self.splitter,
                     self.max_depth.unwrap_or(usize::MAX),
                     2,
-                    1,
                     self.max_features,
                 );
                 tree.fit(

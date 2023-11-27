@@ -1,7 +1,8 @@
 #![allow(dead_code)]
 use crate::tree::{
-    decision_tree::{Criterion, DecisionTree, MaxFeatures, Splitter},
+    decision_tree::DecisionTree,
     node::Node,
+    tree::{Tree, Criterion, MaxFeatures}
 };
 use hashbrown::HashMap;
 use parking_lot::Mutex;
@@ -17,7 +18,6 @@ use super::forest::Forest;
 pub struct RandomForest {
     trees: Vec<DecisionTree>,
     criterion: Criterion,
-    splitter: Splitter,
     n_trees: usize,
     max_features: MaxFeatures,
     max_depth: Option<usize>,
@@ -26,7 +26,6 @@ impl RandomForest {
     pub fn new(
         n_trees: usize,
         criterion: Criterion,
-        splitter: Splitter,
         max_features: MaxFeatures,
         max_depth: Option<usize>,
     ) -> Self {
@@ -34,10 +33,17 @@ impl RandomForest {
             trees: Vec::new(),
             n_trees,
             criterion,
-            splitter,
             max_features,
             max_depth,
         }
+    }
+
+    pub fn forest_depth(&self) -> f64 {
+        self.trees
+            .iter()
+            .map(|tree| tree.get_depth())
+            .sum::<usize>() as f64
+            / self.trees.len() as f64
     }
 }
 impl Forest for RandomForest {
@@ -52,10 +58,8 @@ impl Forest for RandomForest {
 
                 let mut tree = DecisionTree::new(
                     self.criterion,
-                    self.splitter,
                     self.max_depth.unwrap_or(usize::MAX),
                     2,
-                    1,
                     self.max_features,
                 );
                 tree.fit(

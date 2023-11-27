@@ -1,8 +1,8 @@
 use crate::forest::forest::Forest;
-use crate::forest::time_series_forest::TimeSeriesForest;
+use crate::forest::random_forest::RandomForest;
 use crate::metrics::classification::accuracy_score;
 use crate::neighbors::nearest_neighbor::k_nearest_neighbor;
-use crate::tree::decision_tree::{Criterion, MaxFeatures, Splitter};
+use crate::tree::tree::{Criterion, MaxFeatures};
 use crate::utils::csv_io::read_csv;
 use hashbrown::HashMap;
 use std::error::Error;
@@ -17,11 +17,10 @@ mod tree;
 mod utils;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let paths = fs::read_dir("UCRArchive_2018/")?;
+    let paths = fs::read_dir("/media/aazzari/DATA/UCRArchive_2018/")?;
     let n_repetitions = 1;
     let n_trees = 100;
     let criterion = Criterion::Gini;
-    let splitter = Splitter::Best;
 
     let mut datasets: Vec<_> = Vec::new();
 
@@ -47,15 +46,18 @@ fn main() -> Result<(), Box<dyn Error>> {
         let ds_train = read_csv(train_path, b'\t', &mut mapping)?;
         let ds_test = read_csv(test_path, b'\t', &mut mapping)?;
         let y_true = ds_test.get_targets().clone();
-
-        let n_features = ds_train.get_data()[0].len() as f64;
         for _i in 0..n_repetitions {
-            let mut clf = TimeSeriesForest::new(
+            // let mut clf = TimeSeriesForest::new(
+            //     n_trees,
+            //     criterion,
+            //     (ds_train.get_data()[0].len() as f64).sqrt() as usize,
+            //     3,
+            //     MaxFeatures::Sqrt,
+            //     None,
+            // );
+            let mut clf = RandomForest::new(
                 n_trees,
                 criterion,
-                splitter,
-                n_features.sqrt() as usize,
-                3,
                 MaxFeatures::Sqrt,
                 None,
             );
@@ -89,6 +91,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 ]
                 .to_vec(),
             );
+
+            println!("\tAverage depth of trees: {}", clf.forest_depth());
         }
     }
     // Create index modifying datasets multiplyng by n_repetitions
@@ -104,10 +108,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         .collect();
     write_csv(
         format!(
-            "tsf_{}_{}_{}_{}.csv",
+            "tsf_{}_{}_{}.csv",
             n_trees,
             criterion.to_string(),
-            splitter.to_string(),
             n_repetitions
         ),
         predictions,

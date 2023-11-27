@@ -29,7 +29,7 @@ pub fn read_csv(
     let file = File::open(path)?;
     let reader = BufReader::new(file);
     let mut reader = ReaderBuilder::new()
-        .has_headers(true)
+        .has_headers(false)
         .delimiter(delimiter)
         .from_reader(reader);
 

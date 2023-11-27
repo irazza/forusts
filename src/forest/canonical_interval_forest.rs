@@ -1,7 +1,10 @@
 #![allow(dead_code, unused_variables)]
 use crate::feature_extraction::catch22;
-use crate::tree::decision_tree::{Criterion, DecisionTree, MaxFeatures, Splitter};
-use crate::tree::node::Node;
+use crate::tree::{
+    decision_tree::DecisionTree,
+    node::Node,
+    tree::{Tree, Criterion, MaxFeatures}
+};
 use hashbrown::HashMap;
 use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
@@ -14,7 +17,6 @@ use super::forest::Forest;
 pub struct CanonicalIntervalForest {
     trees: Vec<DecisionTree>,
     criterion: Criterion,
-    splitter: Splitter,
     n_trees: usize,
     n_intervals: usize,
     min_interval_length: usize,
@@ -27,7 +29,6 @@ impl CanonicalIntervalForest {
     pub fn new(
         n_trees: usize,
         criterion: Criterion,
-        splitter: Splitter,
         n_intervals: usize,
         min_interval_length: usize,
         max_features: MaxFeatures,
@@ -37,7 +38,6 @@ impl CanonicalIntervalForest {
             trees: Vec::new(),
             n_trees,
             criterion,
-            splitter,
             n_intervals,
             min_interval_length,
             intervals: Vec::new(),
@@ -95,10 +95,8 @@ impl Forest for CanonicalIntervalForest {
                 let transformed_x = Self::transform(x, &self.intervals[i]);
                 let mut tree = DecisionTree::new(
                     self.criterion,
-                    self.splitter,
                     self.max_depth.unwrap_or(usize::MAX),
                     2,
-                    1,
                     self.max_features,
                 );
                 tree.fit(

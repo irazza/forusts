@@ -1,8 +1,13 @@
 use hashbrown::HashMap;
-use rand::{seq::SliceRandom, thread_rng, Rng};
+use rand::{seq::SliceRandom, thread_rng};
 
-use crate::{tree::{tree::{Criterion, MaxFeatures, Tree}, node::Node}, utils::structures::Sample};
-
+use crate::{
+    tree::{
+        node::Node,
+        tree::{Criterion, MaxFeatures, Tree},
+    },
+    utils::structures::Sample,
+};
 
 pub struct DecisionTree {
     root: Node,
@@ -30,7 +35,7 @@ impl DecisionTree {
             criterion,
             max_depth,
             min_samples_split,
-            max_features_ : max_features,
+            max_features_: max_features,
             max_features: 0,
         }
     }
@@ -61,7 +66,10 @@ impl Tree for DecisionTree {
         let mut best_impurity = f64::MAX;
 
         for &feature_idx in &shuffled_features[..self.max_features] {
-            let mut feature_values = samples.iter().map(|v| (v.data[feature_idx], v.target)).collect::<Vec<_>>();
+            let mut feature_values = samples
+                .iter()
+                .map(|v| (v.data[feature_idx], v.target))
+                .collect::<Vec<_>>();
             feature_values.sort_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap());
 
             let mut left_class_counts = HashMap::new();
@@ -84,15 +92,18 @@ impl Tree for DecisionTree {
                 let impurity = match self.criterion {
                     Criterion::Gini => {
                         (left_size / n_samples) * left_impurity
-                        + (right_size / n_samples) * right_impurity
+                            + (right_size / n_samples) * right_impurity
                     }
                     Criterion::Entropy => {
                         let mut class_counts = HashMap::new();
                         for Sample { target, .. } in samples {
                             *class_counts.entry(*target).or_insert(0) += 1;
                         }
-                        let parent_entropy = (self.criterion.to_fn::<DecisionTree>())(&class_counts);
-                        1.0 / (parent_entropy - ((left_size / n_samples) * left_impurity + (right_size / n_samples) * right_impurity))
+                        let parent_entropy =
+                            (self.criterion.to_fn::<DecisionTree>())(&class_counts);
+                        1.0 / (parent_entropy
+                            - ((left_size / n_samples) * left_impurity
+                                + (right_size / n_samples) * right_impurity))
                     }
                 };
                 if impurity < best_impurity {
@@ -100,14 +111,13 @@ impl Tree for DecisionTree {
                     best_feature = feature_idx;
                     best_threshold = threshold;
                 }
-
             }
         }
         (best_feature, best_threshold, best_impurity)
     }
     fn pre_split_conditions(&self, samples: &[Sample<'_>], current_depth: usize) -> bool {
         // Base case: not enough samples or max depth reached
-        if samples.len() < self.min_samples_split || current_depth == self.max_depth {
+        if samples.len() <= self.min_samples_split || current_depth == self.max_depth {
             return true;
         }
         // Base case: samples are the same object

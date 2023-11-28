@@ -1,10 +1,10 @@
 #![allow(dead_code)]
-use crate::feature_extraction::statistics;
+use crate::feature_extraction::statistics::{self, EULER_MASCHERONI};
 use crate::forest::forest::Forest;
 use crate::tree::{
     decision_tree::DecisionTree,
     node::Node,
-    tree::{Tree, Criterion, MaxFeatures}
+    tree::{Criterion, MaxFeatures, Tree},
 };
 use hashbrown::HashMap;
 use parking_lot::Mutex;
@@ -21,6 +21,8 @@ pub struct TimeSeriesForest {
     min_interval_length: usize,
     intervals: Vec<Vec<(usize, usize)>>,
     max_features: MaxFeatures,
+    enhanced_anomaly_score: Option<bool>,
+    max_samples: usize,
     max_depth: Option<usize>,
 }
 
@@ -32,6 +34,7 @@ impl TimeSeriesForest {
         min_interval_length: usize,
         max_features: MaxFeatures,
         max_depth: Option<usize>,
+        enhanced_anomaly_score: Option<bool>,
     ) -> Self {
         Self {
             trees: Vec::new(),
@@ -41,6 +44,8 @@ impl TimeSeriesForest {
             min_interval_length,
             intervals: Vec::new(),
             max_features,
+            max_samples: 256,
+            enhanced_anomaly_score,
             max_depth,
         }
     }
@@ -60,11 +65,53 @@ impl TimeSeriesForest {
         }
         transformed_x
     }
+
+    pub fn score_samples(&self, x: &Vec<Vec<f64>>) -> Vec<f64> {
+        let mut scores = Vec::new();
+        let path_length = self.path_length(x);
+        let c_n = 2.0 * (f64::log2(self.max_samples as f64 - 1.0) + EULER_MASCHERONI)
+            - 2.0 * (self.max_samples as f64 - 1.0) / self.max_samples as f64;
+        if !self.enhanced_anomaly_score.unwrap_or(false) {
+            let e_h = path_length
+                .iter()
+                .map(|x| x.iter().sum::<usize>() as f64 / self.n_trees as f64)
+                .collect::<Vec<f64>>();
+            for i in 0..x.len() {
+                scores.push(2.0f64.powf(-e_h[i] / c_n));
+            }
+        } else {
+            let enhanced_scores = path_length
+                .iter()
+                .map(|x| {
+                    x.iter()
+                        .map(|pl| 2.0f64.powf(-(*pl as f64) / c_n))
+                        .collect::<Vec<f64>>()
+                })
+                .collect::<Vec<Vec<f64>>>();
+            for i in 0..x.len() {
+                scores.push(enhanced_scores[i].iter().sum::<f64>() / self.n_trees as f64);
+            }
+        }
+        scores
+    }
+
+    fn path_length(&self, x: &Vec<Vec<f64>>) -> Vec<Vec<usize>> {
+        let mut path_length = Vec::new();
+        path_length.par_extend((0..x.len()).into_par_iter().map(|i| {
+            let mut depth = Vec::new();
+            for tree in &self.trees {
+                depth.push(tree.predict_leaf(&x[i]).get_depth());
+            }
+            depth
+        }));
+        path_length
+    }
 }
 
 impl Forest for TimeSeriesForest {
     fn fit(&mut self, x: &Vec<Vec<f64>>, y: &Vec<usize>) {
         let n_samples = x.len();
+        self.max_samples = n_samples;
 
         // Generate n_intervals, with random start and end
         let n_features = x[0].len();

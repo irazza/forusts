@@ -1,10 +1,5 @@
-#![allow(dead_code)]
-use crate::feature_extraction::statistics::{EULER_MASCHERONI, mean, std, slope};
-use crate::tree::{
-    extra_tree::ExtraTree,
-    node::Node,
-    tree::{Tree, MaxFeatures}
-};
+use crate::feature_extraction::statistics::{mean, slope, std, EULER_MASCHERONI};
+use crate::tree::{extra_tree::ExtraTree, tree::Tree};
 use rand::{seq::SliceRandom, thread_rng, Rng};
 use rayon::prelude::*;
 use std::cmp::min;
@@ -15,8 +10,8 @@ pub struct TimeSeriesIsolationForest {
     n_intervals: usize,
     min_interval_length: usize,
     intervals: Vec<Vec<(usize, usize)>>,
-    max_features: MaxFeatures,
     max_depth: Option<usize>,
+    enhanced_anomaly_score: Option<bool>,
     max_samples: usize,
 }
 
@@ -25,7 +20,7 @@ impl TimeSeriesIsolationForest {
         n_trees: usize,
         n_intervals: usize,
         min_interval_length: usize,
-        max_features: MaxFeatures,
+        enhanced_anomaly_score: Option<bool>,
         max_depth: Option<usize>,
     ) -> Self {
         Self {
@@ -34,8 +29,8 @@ impl TimeSeriesIsolationForest {
             n_intervals,
             min_interval_length,
             intervals: Vec::new(),
-            max_features,
             max_depth,
+            enhanced_anomaly_score,
             max_samples: 256,
         }
     }
@@ -77,8 +72,9 @@ impl TimeSeriesIsolationForest {
                 n_samples.shuffle(&mut rand::thread_rng());
 
                 let mut tree = ExtraTree::new(
-                    self.max_depth.unwrap_or(usize::MAX),
-                    1
+                    self.max_depth
+                        .unwrap_or(self.max_samples.ilog2() as usize + 1),
+                    1,
                 );
                 tree.fit(
                     &(0..self.max_samples)
@@ -102,96 +98,43 @@ impl TimeSeriesIsolationForest {
     }
 
     pub fn score_samples(&self, x: &Vec<Vec<f64>>) -> Vec<f64> {
-        let average_path_length_max_samples =
-            self.average_path_length([self.max_samples].to_vec())[0] as f64;
-        let mut depths = Vec::new();
-
-        depths.par_extend((0..self.n_trees).into_par_iter().map(|i| {
-            let tree = &self.trees[i];
-            let transformed_x = Self::transform(x, &self.intervals[i]);
-            let node_order = transformed_x
+        let mut scores = Vec::new();
+        let path_length = self.path_length(x);
+        let c_n = 2.0 * (f64::log2(self.max_samples as f64 - 1.0) + EULER_MASCHERONI)
+            - 2.0 * (self.max_samples as f64 - 1.0) / self.max_samples as f64;
+        if !self.enhanced_anomaly_score.unwrap_or(false) {
+            let e_h = path_length
                 .iter()
-                .map(|sample| tree.predict_leaf(sample))
-                .collect::<Vec<&Node>>();
-            let average_path_length_per_tree = self.average_path_length(
-                node_order
-                    .iter()
-                    .map(|node| node.get_n_samples())
-                    .collect::<Vec<usize>>(),
-            );
-            let decision_path_lengths = node_order
+                .map(|x| x.iter().sum::<usize>() as f64 / self.n_trees as f64)
+                .collect::<Vec<f64>>();
+            for i in 0..x.len() {
+                scores.push(2.0f64.powf(-e_h[i] / c_n));
+            }
+        } else {
+            let enhanced_scores = path_length
                 .iter()
-                .map(|node| node.get_depth())
-                .collect::<Vec<usize>>();
-            average_path_length_per_tree
-                .iter()
-                .zip(decision_path_lengths.iter())
-                .map(|(x, y)| x + y - 1)
-                .collect::<Vec<usize>>()
-        }));
-
-        let depths = (0..depths[0].len())
-            .into_iter()
-            .map(|c| depths.iter().map(|r| r[c]).sum())
-            .collect::<Vec<usize>>();
-
-        let denominator = self.trees.len() as f64 * average_path_length_max_samples;
-
-        // Anomaly score
-        depths
-            .iter()
-            .map(|x| 2.0f64.powf(-(*x as f64) / denominator))
-            .collect::<Vec<f64>>()
-
-        // Enhanced anomaly score
-        //TODO
-    }
-
-    fn average_path_length(&self, n_samples_leaf: Vec<usize>) -> Vec<usize> {
-        let mut average_path_length = vec![0; n_samples_leaf.len()];
-        let mask1 = &n_samples_leaf
-            .iter()
-            .map(|x| *x <= 1)
-            .collect::<Vec<bool>>();
-        let mask2 = &n_samples_leaf
-            .iter()
-            .map(|x| *x == 2)
-            .collect::<Vec<bool>>();
-        let not_mask = mask1
-            .iter()
-            .zip(mask2)
-            .map(|(x, y)| !(*x || *y))
-            .collect::<Vec<bool>>();
-
-        mask1
-            .iter()
-            .zip(average_path_length.iter_mut())
-            .for_each(|(x, y)| {
-                if *x {
-                    *y = 0;
-                }
-            });
-
-        mask2
-            .iter()
-            .zip(average_path_length.iter_mut())
-            .for_each(|(x, y)| {
-                if *x {
-                    *y = 1;
-                }
-            });
-
-        for (i, (x, y)) in not_mask
-            .iter()
-            .zip(average_path_length.iter_mut())
-            .enumerate()
-        {
-            if *x {
-                *y = ((2.0 * (f64::ln((n_samples_leaf[i] - 1) as f64) + EULER_MASCHERONI))
-                    - (2.0 * (n_samples_leaf[i] - 1) as f64 / n_samples_leaf[i] as f64))
-                    as usize;
+                .map(|x| {
+                    x.iter()
+                        .map(|pl| 2.0f64.powf(-(*pl as f64) / c_n))
+                        .collect::<Vec<f64>>()
+                })
+                .collect::<Vec<Vec<f64>>>();
+            for i in 0..x.len() {
+                scores.push(enhanced_scores[i].iter().sum::<f64>() / self.n_trees as f64);
             }
         }
-        average_path_length
+        scores
+    }
+
+    fn path_length(&self, x: &Vec<Vec<f64>>) -> Vec<Vec<usize>> {
+        let mut path_length = Vec::new();
+        path_length.par_extend((0..x.len()).into_par_iter().map(|i| {
+            let mut depth = Vec::new();
+            for tree in &self.trees {
+                depth.push(tree.predict_leaf(&x[i]).get_depth());
+            }
+            depth
+        }));
+        path_length
     }
 }

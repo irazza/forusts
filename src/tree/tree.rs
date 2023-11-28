@@ -1,4 +1,3 @@
-
 use std::{cmp::max, ops::Deref};
 
 use hashbrown::HashMap;
@@ -7,7 +6,7 @@ use crate::utils::structures::Sample;
 
 use super::node::Node;
 
-#[derive(Copy, Clone)]
+#[derive(Clone, Copy)]
 pub enum MaxFeatures {
     All,
     Sqrt,
@@ -21,7 +20,6 @@ impl MaxFeatures {
             MaxFeatures::Log2 => (n_features as f64).log2() as usize,
         }
     }
-
 }
 #[derive(Copy, Clone)]
 pub enum Criterion {
@@ -134,7 +132,11 @@ pub trait Tree {
         }
         node
     }
-    fn split<'a, 'b>(samples: & 'a mut [Sample<'b>], feature: usize, threshold: f64) -> (&'a mut [Sample<'b>], &'a mut [Sample<'b>]) {
+    fn split<'a, 'b>(
+        samples: &'a mut [Sample<'b>],
+        feature: usize,
+        threshold: f64,
+    ) -> (&'a mut [Sample<'b>], &'a mut [Sample<'b>]) {
         let mut idx = 0;
         let mut last = samples.len();
 
@@ -154,17 +156,17 @@ pub trait Tree {
         for Sample { target, .. } in samples {
             *class_counts.entry(*target).or_insert(0) += 1;
         }
-    
+
         let mut max_count = 0;
         let mut most_common_class = 0;
-    
+
         for (class, count) in &class_counts {
             if *count > max_count {
                 max_count = *count;
                 most_common_class = *class;
             }
         }
-    
+
         most_common_class
     }
     fn bfs(&self) -> Vec<&Node> {
@@ -204,11 +206,16 @@ pub trait Tree {
         ancestors
     }
 
-    fn compute_ancestor_rec<'a>(current: &'a Node, target: &'a Node, found_lca: Option<&'a Node>, ancestors: &mut HashMap<*const Node, &'a Node>) -> bool {
+    fn compute_ancestor_rec<'a>(
+        current: &'a Node,
+        target: &'a Node,
+        found_lca: Option<&'a Node>,
+        ancestors: &mut HashMap<*const Node, &'a Node>,
+    ) -> bool {
         if (current as *const Node) == (target as *const Node) {
             return true;
         }
-    
+
         match current {
             Node::Leaf { .. } => {
                 if let Some(found_lca) = found_lca {
@@ -222,14 +229,21 @@ pub trait Tree {
                     Self::compute_ancestor_rec(right.deref(), target, Some(found_lca), ancestors);
                     false
                 } else {
-                    let left_found = Self::compute_ancestor_rec(left.deref(), target, None, ancestors);
+                    let left_found =
+                        Self::compute_ancestor_rec(left.deref(), target, None, ancestors);
                     if left_found {
                         Self::compute_ancestor_rec(right.deref(), target, Some(current), ancestors);
                         true
                     } else {
-                        let right_found = Self::compute_ancestor_rec(right, target, None, ancestors);
+                        let right_found =
+                            Self::compute_ancestor_rec(right, target, None, ancestors);
                         if right_found {
-                            Self::compute_ancestor_rec(left.deref(), target, Some(current), ancestors);
+                            Self::compute_ancestor_rec(
+                                left.deref(),
+                                target,
+                                Some(current),
+                                ancestors,
+                            );
                             true
                         } else {
                             false
@@ -249,10 +263,10 @@ pub trait Tree {
                 impurity -= p * p.log2();
             }
         }
-    
+
         impurity
     }
-    
+
     fn gini_impurity(class_counts: &HashMap<usize, usize>) -> f64 {
         let mut impurity = 1.0;
         let total_samples = class_counts.values().sum::<usize>() as f64;
@@ -262,7 +276,7 @@ pub trait Tree {
                 impurity -= p * p;
             }
         }
-    
+
         impurity
     }
 }

@@ -2,7 +2,7 @@
 use crate::tree::{
     decision_tree::DecisionTree,
     node::Node,
-    tree::{Tree, Criterion, MaxFeatures}
+    tree::{Criterion, MaxFeatures, Tree},
 };
 use hashbrown::HashMap;
 use parking_lot::Mutex;

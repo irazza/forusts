@@ -1,6 +1,6 @@
-use crate::{tree::tree::Tree, utils::structures::Sample};
-use rand::{seq::SliceRandom, thread_rng, Rng};
 use super::{node::Node, tree::MaxFeatures};
+use crate::{tree::tree::Tree, utils::structures::Sample};
+use rand::{thread_rng, Rng};
 
 pub struct ExtraTree {
     root: Node,
@@ -10,7 +10,7 @@ pub struct ExtraTree {
 }
 
 impl ExtraTree {
-    pub fn new(max_depth: usize, min_samples_split: usize) -> Self{
+    pub fn new(max_depth: usize, min_samples_split: usize) -> Self {
         let root = Node::new();
         Self {
             root,
@@ -57,7 +57,7 @@ impl Tree for ExtraTree {
 
         return false;
     }
-    fn post_split_conditions(&self, impurity: f64) -> bool {
+    fn post_split_conditions(&self, _impurity: f64) -> bool {
         return false;
     }
     fn get_split(&self, samples: &[Sample<'_>]) -> (usize, f64, f64) {

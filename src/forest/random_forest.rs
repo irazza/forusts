@@ -1,23 +1,14 @@
-#![allow(dead_code)]
 use crate::tree::{
     decision_tree::DecisionTree,
-    node::Node,
-    tree::{Criterion, MaxFeatures, Tree},
-};
-use hashbrown::HashMap;
-use parking_lot::Mutex;
-use rand::{thread_rng, Rng};
-use rayon::prelude::*;
-use std::{
-    cmp::max,
-    sync::atomic::{AtomicUsize, Ordering},
+    tree::{Criterion, MaxFeatures},
 };
 
-use super::forest::Forest;
+use crate::forest::forest::ClassificationForest;
 
 pub struct RandomForest {
     trees: Vec<DecisionTree>,
     criterion: Criterion,
+    min_samples_split: usize,
     n_trees: usize,
     max_features: MaxFeatures,
     max_depth: Option<usize>,
@@ -26,6 +17,7 @@ impl RandomForest {
     pub fn new(
         n_trees: usize,
         criterion: Criterion,
+        min_samples_split: usize,
         max_features: MaxFeatures,
         max_depth: Option<usize>,
     ) -> Self {
@@ -33,166 +25,36 @@ impl RandomForest {
             trees: Vec::new(),
             n_trees,
             criterion,
+            min_samples_split,
             max_features,
             max_depth,
         }
     }
-
-    pub fn forest_depth(&self) -> f64 {
-        self.trees
-            .iter()
-            .map(|tree| tree.get_depth())
-            .sum::<usize>() as f64
-            / self.trees.len() as f64
-    }
 }
-impl Forest for RandomForest {
-    fn fit(&mut self, x: &Vec<Vec<f64>>, y: &Vec<usize>) {
-        let n_samples = x.len();
-
-        self.trees
-            .par_extend((0..self.n_trees).into_par_iter().map(|_i| {
-                let bootstrap_indices: Vec<usize> = (0..n_samples)
-                    .map(|_| thread_rng().gen_range(0..n_samples))
-                    .collect();
-
-                let mut tree = DecisionTree::new(
-                    self.criterion,
-                    self.max_depth.unwrap_or(usize::MAX),
-                    2,
-                    self.max_features,
-                );
-                tree.fit(
-                    &bootstrap_indices.iter().map(|i| &x[*i]).collect(),
-                    &bootstrap_indices.iter().map(|i| y[*i]).collect(),
-                );
-                tree
-            }));
+impl ClassificationForest for RandomForest {
+    fn get_trees_mut(&mut self) -> &mut Vec<DecisionTree> {
+        &mut self.trees
     }
-
-    fn predict(&self, x: &Vec<Vec<f64>>) -> Vec<usize> {
-        let n_samples = x.len();
-        let mut predictions = Vec::new();
-
-        // Make predictions for each sample using each tree in the forest
-        predictions.par_extend(
-            self.trees
-                .par_iter()
-                .enumerate()
-                .map(|(_i, tree)| tree.predict(x)),
-        );
-
-        // Combine predictions using a majority vote
-        let mut final_predictions = vec![0; n_samples];
-
-        for i in 0..n_samples {
-            let mut class_counts = HashMap::new();
-            for j in 0..self.n_trees {
-                let class = predictions[j][i];
-                *class_counts.entry(class).or_insert(0) += 1;
-            }
-
-            // Find the class with the maximum count
-            let mut max_count = 0;
-            let mut majority_class = 0;
-            for (class, count) in &class_counts {
-                if *count > max_count {
-                    max_count = *count;
-                    majority_class = *class;
-                }
-            }
-
-            final_predictions[i] = majority_class;
-        }
-
-        final_predictions
+    fn get_trees(&self) -> &Vec<DecisionTree> {
+        &self.trees
     }
-
-    fn pairwise_breiman(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
-        let distance_matrix: Vec<Vec<_>> = (0..x1.len())
-            .map(|_| (0..x2.len()).map(|_| AtomicUsize::new(0)).collect())
-            .collect();
-
-        self.trees.par_iter().enumerate().for_each(|(_, tree)| {
-            let x1_nodes = x1.iter().map(|x| tree.predict_leaf(x)).collect::<Vec<_>>();
-            let x2_nodes = x2.iter().map(|x| tree.predict_leaf(x)).collect::<Vec<_>>();
-
-            for (i, &x1_node) in x1_nodes.iter().enumerate() {
-                for (j, &x2_node) in x2_nodes.iter().enumerate() {
-                    distance_matrix[i][j].fetch_add(
-                        ((x1_node as *const Node) != (x2_node as *const Node)) as usize,
-                        Ordering::Relaxed,
-                    );
-                }
-            }
-        });
-
-        distance_matrix
-            .into_iter()
-            .map(|d| {
-                d.into_iter()
-                    .map(|d| d.into_inner() as f64 / self.n_trees as f64)
-                    .collect()
-            })
-            .collect()
+    fn get_n_trees(&self) -> usize {
+        self.n_trees
     }
-
-    fn pairwise_ancestor(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
-        let distance_matrix: Vec<Vec<_>> = (0..x1.len())
-            .map(|_| (0..x2.len()).map(|_| Mutex::new(0.0)).collect())
-            .collect();
-        self.trees.par_iter().enumerate().for_each(|(_, tree)| {
-            let x1_nodes = x1.iter().map(|x| tree.predict_leaf(x)).collect::<Vec<_>>();
-            let x2_nodes = x2.iter().map(|x| tree.predict_leaf(x)).collect::<Vec<_>>();
-
-            for (i, &x1_node) in x1_nodes.iter().enumerate() {
-                let distances = tree.compute_ancestor(x1_node);
-
-                for (j, &x2_node) in x2_nodes.iter().enumerate() {
-                    *distance_matrix[i][j].lock() += (x1_node.get_depth() + x2_node.get_depth()
-                        - 2 * distances[&(x2_node as *const Node)].get_depth())
-                        as f64
-                        / max(x1_node.get_depth(), x2_node.get_depth()) as f64;
-                }
-            }
-        });
-
-        distance_matrix
-            .into_iter()
-            .map(|d| {
-                d.into_iter()
-                    .map(|d| d.into_inner() as f64 / self.n_trees as f64)
-                    .collect()
-            })
-            .collect()
+    fn get_criterion(&self) -> Criterion {
+        self.criterion
     }
-
-    fn pairwise_zhu(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
-        let distance_matrix: Vec<Vec<_>> = (0..x1.len())
-            .map(|_| (0..x2.len()).map(|_| Mutex::new(0.0)).collect())
-            .collect();
-        self.trees.par_iter().enumerate().for_each(|(_, tree)| {
-            let x1_nodes = x1.iter().map(|x| tree.predict_leaf(x)).collect::<Vec<_>>();
-            let x2_nodes = x2.iter().map(|x| tree.predict_leaf(x)).collect::<Vec<_>>();
-
-            for (i, &x1_node) in x1_nodes.iter().enumerate() {
-                let distances = tree.compute_ancestor(x1_node);
-
-                for (j, &x2_node) in x2_nodes.iter().enumerate() {
-                    *distance_matrix[i][j].lock() += distances[&(x2_node as *const Node)]
-                        .get_depth() as f64
-                        / max(x1_node.get_depth(), x2_node.get_depth()) as f64;
-                }
-            }
-        });
-
-        distance_matrix
-            .into_iter()
-            .map(|d| {
-                d.into_iter()
-                    .map(|d| 1.0 - (d.into_inner() as f64 / self.n_trees as f64))
-                    .collect()
-            })
-            .collect()
+    fn get_max_features(&self) -> MaxFeatures {
+        self.max_features
     }
+    fn get_max_depth(&self) -> Option<usize> {
+        self.max_depth
+    }
+    fn get_min_samples_split(&self) -> usize {
+        self.min_samples_split
+    }
+    fn transform(&self, x: &Vec<Vec<f64>>, intervals_index: usize) -> Vec<Vec<f64>> {
+        x.clone()
+    }
+    fn compute_intervals(&mut self, n_features: usize) {}
 }

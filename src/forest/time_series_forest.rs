@@ -1,17 +1,11 @@
-#![allow(dead_code)]
-use crate::feature_extraction::statistics::{self, EULER_MASCHERONI};
-use crate::forest::forest::Forest;
+use crate::feature_extraction::statistics::{mean, slope, std, EULER_MASCHERONI};
+use crate::forest::forest::ClassificationForest;
 use crate::tree::{
     decision_tree::DecisionTree,
-    node::Node,
     tree::{Criterion, MaxFeatures, Tree},
 };
-use hashbrown::HashMap;
-use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
 use rayon::prelude::*;
-use std::cmp::max;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub struct TimeSeriesForest {
     trees: Vec<DecisionTree>,
@@ -23,6 +17,7 @@ pub struct TimeSeriesForest {
     max_features: MaxFeatures,
     enhanced_anomaly_score: Option<bool>,
     max_samples: usize,
+    min_samples_split: usize,
     max_depth: Option<usize>,
 }
 
@@ -34,6 +29,7 @@ impl TimeSeriesForest {
         min_interval_length: usize,
         max_features: MaxFeatures,
         max_depth: Option<usize>,
+        min_samples_split: usize,
         enhanced_anomaly_score: Option<bool>,
     ) -> Self {
         Self {
@@ -44,26 +40,11 @@ impl TimeSeriesForest {
             min_interval_length,
             intervals: Vec::new(),
             max_features,
+            min_samples_split,
             max_samples: 256,
             enhanced_anomaly_score,
             max_depth,
         }
-    }
-
-    pub fn transform(x: &Vec<Vec<f64>>, intervals: &Vec<(usize, usize)>) -> Vec<Vec<f64>> {
-        let n_samples = x.len();
-        let mut transformed_x: Vec<Vec<f64>> = Vec::new();
-        for j in 0..n_samples {
-            let mut sample = Vec::new();
-            for (start, end) in intervals {
-                let mean = statistics::mean(&x[j][*start..*end]);
-                let std = statistics::std(&x[j][*start..*end]);
-                let slope = statistics::slope(&x[j][*start..*end]);
-                sample.extend([mean, std, slope].into_iter());
-            }
-            transformed_x.push(sample);
-        }
-        transformed_x
     }
 
     pub fn score_samples(&self, x: &Vec<Vec<f64>>) -> Vec<f64> {
@@ -108,14 +89,31 @@ impl TimeSeriesForest {
     }
 }
 
-impl Forest for TimeSeriesForest {
-    fn fit(&mut self, x: &Vec<Vec<f64>>, y: &Vec<usize>) {
-        let n_samples = x.len();
-        self.max_samples = n_samples;
-
+impl ClassificationForest for TimeSeriesForest {
+    fn get_trees_mut(&mut self) -> &mut Vec<DecisionTree> {
+        &mut self.trees
+    }
+    fn get_trees(&self) -> &Vec<DecisionTree> {
+        &self.trees
+    }
+    fn get_n_trees(&self) -> usize {
+        self.n_trees
+    }
+    fn get_criterion(&self) -> Criterion {
+        self.criterion
+    }
+    fn get_max_features(&self) -> MaxFeatures {
+        self.max_features
+    }
+    fn get_max_depth(&self) -> Option<usize> {
+        self.max_depth
+    }
+    fn get_min_samples_split(&self) -> usize {
+        self.min_samples_split
+    }
+    fn compute_intervals(&mut self, n_features: usize) {
         // Generate n_intervals, with random start and end
-        let n_features = x[0].len();
-        for _i in 0..self.n_trees {
+        for _i in 0..self.get_n_trees() {
             let mut intervals = Vec::new();
             for _j in 0..self.n_intervals {
                 let start = thread_rng().gen_range(0..n_features - self.min_interval_length);
@@ -124,174 +122,20 @@ impl Forest for TimeSeriesForest {
             }
             self.intervals.push(intervals);
         }
-
-        self.trees
-            .par_extend((0..self.n_trees).into_par_iter().map(|i| {
-                let bootstrap_indices: Vec<usize> = (0..n_samples)
-                    .map(|_| thread_rng().gen_range(0..n_samples))
-                    .collect();
-                let transformed_x = Self::transform(x, &self.intervals[i]);
-                let mut tree = DecisionTree::new(
-                    self.criterion,
-                    self.max_depth.unwrap_or(usize::MAX),
-                    2,
-                    self.max_features,
-                );
-                tree.fit(
-                    &bootstrap_indices
-                        .iter()
-                        .map(|i| &transformed_x[*i])
-                        .collect(),
-                    &bootstrap_indices.iter().map(|i| y[*i]).collect(),
-                );
-                tree
-            }));
     }
-
-    fn predict(&self, x: &Vec<Vec<f64>>) -> Vec<usize> {
+    fn transform(&self, x: &Vec<Vec<f64>>, intervals_index: usize) -> Vec<Vec<f64>> {
         let n_samples = x.len();
-        let mut predictions = Vec::new();
-        // Make predictions for each sample using each tree in the forest
-        predictions.par_extend(self.trees.par_iter().enumerate().map(|(i, tree)| {
-            let transformed_x = Self::transform(x, &self.intervals[i]);
-            tree.predict(&transformed_x)
-        }));
-
-        // Combine predictions using a majority vote
-        let mut final_predictions = vec![0; n_samples];
-
-        for i in 0..n_samples {
-            let mut class_counts = HashMap::new();
-            for j in 0..self.n_trees {
-                let class = predictions[j][i];
-                *class_counts.entry(class).or_insert(0) += 1;
+        let mut transformed_x: Vec<Vec<f64>> = Vec::new();
+        for j in 0..n_samples {
+            let mut sample = Vec::new();
+            for (start, end) in self.intervals[intervals_index].iter().copied() {
+                let mean = mean(&x[j][start..end]);
+                let std = std(&x[j][start..end]);
+                let slope = slope(&x[j][start..end]);
+                sample.extend([mean, std, slope].into_iter());
             }
-
-            // Find the class with the maximum count
-            let mut max_count = 0;
-            let mut majority_class = 0;
-            for (class, count) in &class_counts {
-                if *count > max_count {
-                    max_count = *count;
-                    majority_class = *class;
-                }
-            }
-
-            final_predictions[i] = majority_class;
+            transformed_x.push(sample);
         }
-
-        final_predictions
-    }
-
-    fn pairwise_breiman(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
-        let distance_matrix: Vec<Vec<_>> = (0..x1.len())
-            .map(|_| (0..x2.len()).map(|_| AtomicUsize::new(0)).collect())
-            .collect();
-
-        self.trees.par_iter().enumerate().for_each(|(i, tree)| {
-            let transformed_x1 = Self::transform(&x1, &self.intervals[i]);
-            let transformed_x2 = Self::transform(&x2, &self.intervals[i]);
-            let x1_nodes = transformed_x1
-                .iter()
-                .map(|x| tree.predict_leaf(x))
-                .collect::<Vec<_>>();
-            let x2_nodes = transformed_x2
-                .iter()
-                .map(|x| tree.predict_leaf(x))
-                .collect::<Vec<_>>();
-
-            for (i, &x1_node) in x1_nodes.iter().enumerate() {
-                for (j, &x2_node) in x2_nodes.iter().enumerate() {
-                    distance_matrix[i][j].fetch_add(
-                        ((x1_node as *const Node) != (x2_node as *const Node)) as usize,
-                        Ordering::Relaxed,
-                    );
-                }
-            }
-        });
-
-        distance_matrix
-            .into_iter()
-            .map(|d| {
-                d.into_iter()
-                    .map(|d| d.into_inner() as f64 / self.n_trees as f64)
-                    .collect()
-            })
-            .collect()
-    }
-
-    fn pairwise_ancestor(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
-        let distance_matrix: Vec<Vec<_>> = (0..x1.len())
-            .map(|_| (0..x2.len()).map(|_| Mutex::new(0.0)).collect())
-            .collect();
-        self.trees.par_iter().enumerate().for_each(|(i, tree)| {
-            let transformed_x1 = Self::transform(&x1, &self.intervals[i]);
-            let transformed_x2 = Self::transform(&x2, &self.intervals[i]);
-            let x1_nodes = transformed_x1
-                .iter()
-                .map(|x| tree.predict_leaf(x))
-                .collect::<Vec<_>>();
-            let x2_nodes = transformed_x2
-                .iter()
-                .map(|x| tree.predict_leaf(x))
-                .collect::<Vec<_>>();
-
-            for (i, &x1_node) in x1_nodes.iter().enumerate() {
-                let distances = tree.compute_ancestor(x1_node);
-
-                for (j, &x2_node) in x2_nodes.iter().enumerate() {
-                    *distance_matrix[i][j].lock() += (x1_node.get_depth() + x2_node.get_depth()
-                        - 2 * distances[&(x2_node as *const Node)].get_depth())
-                        as f64
-                        / max(x1_node.get_depth(), x2_node.get_depth()) as f64;
-                }
-            }
-        });
-
-        distance_matrix
-            .into_iter()
-            .map(|d| {
-                d.into_iter()
-                    .map(|d| d.into_inner() as f64 / self.n_trees as f64)
-                    .collect()
-            })
-            .collect()
-    }
-
-    fn pairwise_zhu(&self, x1: Vec<Vec<f64>>, x2: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
-        let distance_matrix: Vec<Vec<_>> = (0..x1.len())
-            .map(|_| (0..x2.len()).map(|_| Mutex::new(0.0)).collect())
-            .collect();
-        self.trees.par_iter().enumerate().for_each(|(i, tree)| {
-            let transformed_x1 = Self::transform(&x1, &self.intervals[i]);
-            let transformed_x2 = Self::transform(&x2, &self.intervals[i]);
-            let x1_nodes = transformed_x1
-                .iter()
-                .map(|x| tree.predict_leaf(x))
-                .collect::<Vec<_>>();
-            let x2_nodes = transformed_x2
-                .iter()
-                .map(|x| tree.predict_leaf(x))
-                .collect::<Vec<_>>();
-
-            for (i, &x1_node) in x1_nodes.iter().enumerate() {
-                let distances = tree.compute_ancestor(x1_node);
-
-                for (j, &x2_node) in x2_nodes.iter().enumerate() {
-                    *distance_matrix[i][j].lock() += distances[&(x2_node as *const Node)]
-                        .get_depth() as f64
-                        / max(x1_node.get_depth(), x2_node.get_depth()) as f64;
-                }
-            }
-        });
-
-        distance_matrix
-            .into_iter()
-            .map(|d| {
-                d.into_iter()
-                    .map(|d| 1.0 - (d.into_inner() as f64 / self.n_trees as f64))
-                    .collect()
-            })
-            .collect()
+        transformed_x
     }
 }

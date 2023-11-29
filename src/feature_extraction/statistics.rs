@@ -179,8 +179,6 @@ pub fn corr(x: &[f64], y: &[f64], lag: usize) -> f64 {
         nom += (x[i] - mean_x) * (y[lag + i] - mean_y);
         denom_x += (x[i] - mean_x).powi(2);
         denom_y += (y[lag + i] - mean_y).powi(2);
-
-        //println!("x[{}]={}, y[{}]={}, nom[{}]={}, denom_x[{}]={}, denom_y[{}]={}", i, x[i], i, y[i], i, nom, i, denom_x, i, denom_y);
     }
 
     nom / (denom_x * denom_y).sqrt()

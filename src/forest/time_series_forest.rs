@@ -111,6 +111,15 @@ impl ClassificationForest for TimeSeriesForest {
     fn get_min_samples_split(&self) -> usize {
         self.min_samples_split
     }
+    fn get_max_samples(&self) -> usize {
+        self.max_samples
+    }
+    fn set_max_samples(&mut self, max_samples: usize) {
+        self.max_samples = max_samples;
+    }
+    fn get_enhanced_anomaly_score(&self) -> Option<bool> {
+        self.enhanced_anomaly_score
+    }
     fn compute_intervals(&mut self, n_features: usize) {
         // Generate n_intervals, with random start and end
         for _i in 0..self.get_n_trees() {

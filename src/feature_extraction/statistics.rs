@@ -21,12 +21,9 @@ pub fn min(x: &[f64]) -> f64 {
 }
 
 pub fn unique(x: &[usize]) -> Vec<usize> {
-    let mut unique = Vec::new();
-    for &val in x {
-        if !unique.contains(&val) {
-            unique.push(val);
-        }
-    }
+    let mut unique = x.to_vec();
+    unique.sort();
+    unique.dedup();
     unique
 }
 

@@ -113,126 +113,170 @@ fn auc(x: &Vec<f64>, y: &Vec<f64>) -> f64 {
     auc
 }
 
+fn true_positive_rate(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
+    let tp = y_true
+        .iter()
+        .zip(y_pred.iter())
+        .filter(|(&a, &b)| a == 1 && b == 1)
+        .count();
+    let fn_ = y_true
+        .iter()
+        .zip(y_pred.iter())
+        .filter(|(&a, &b)| a == 1 && b == 0)
+        .count();
+    tp as f64 / (tp as f64 + fn_ as f64)
+}
+
+fn false_positive_rate(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
+    let fp = y_true
+        .iter()
+        .zip(y_pred.iter())
+        .filter(|(&a, &b)| a == 0 && b == 1)
+        .count();
+    let tn = y_true
+        .iter()
+        .zip(y_pred.iter())
+        .filter(|(&a, &b)| a == 0 && b == 0)
+        .count();
+    fp as f64 / (fp as f64 + tn as f64)
+}
+
 fn roc_curve(y_pred: &Vec<f64>, y_true: &Vec<usize>) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
-    let (mut fps, mut tps, mut threshold) = _binary_clf_curve(y_pred, y_true, 1);
-
-    fps.insert(0, 0);
-    tps.insert(0, 0);
-
-    threshold.insert(0, f64::INFINITY);
-
-    let fpr;
-    let tpr;
-
-    if fps[fps.len() - 1] <= 0 {
-        println!("No negative samples in y_true, false positive value should be meaningless");
-        fpr = vec![f64::NAN; fps.len()];
-    } else {
-        fpr = fps
+    assert!(y_pred.len() > 0, "{:?}", y_pred);
+    let mut threshold = y_pred.clone();
+    threshold.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let mut tpr = vec![0.0];
+    let mut fpr = vec![0.0];
+    for t in &threshold {
+        let y_pred = y_pred
             .iter()
-            .map(|v| *v as f64 / fps[fps.len() - 1] as f64)
-            .collect::<Vec<f64>>();
+            .map(|v| if *v >= *t { 1 } else { 0 })
+            .collect::<Vec<usize>>();
+        tpr.push(true_positive_rate(&y_pred, y_true));
+        fpr.push(false_positive_rate(&y_pred, y_true));
     }
-
-    if tps[tps.len() - 1] <= 0 {
-        println!("No positive samples in y_true, true positive value should be meaningless");
-        tpr = vec![f64::NAN; tps.len()];
-    } else {
-        tpr = tps
-            .iter()
-            .map(|v| *v as f64 / tps[tps.len() - 1] as f64)
-            .collect::<Vec<f64>>();
-    }
-
+    tpr.push(1.0);
+    fpr.push(1.0);
     (fpr, tpr, threshold)
+    // let (mut fps, mut tps, mut threshold) = _binary_clf_curve(y_pred, y_true, 1);
+
+    // fps.insert(0, 0);
+    // tps.insert(0, 0);
+
+    // threshold.insert(0, f64::INFINITY);
+
+    // let fpr;
+    // let tpr;
+
+    // if fps[fps.len() - 1] <= 0 {
+    //     println!("No negative samples in y_true, false positive value should be meaningless");
+    //     fpr = vec![f64::NAN; fps.len()];
+    // } else {
+    //     fpr = fps
+    //         .iter()
+    //         .map(|v| *v as f64 / fps[fps.len() - 1] as f64)
+    //         .collect::<Vec<f64>>();
+    // }
+
+    // if tps[tps.len() - 1] <= 0 {
+    //     println!("No positive samples in y_true, true positive value should be meaningless");
+    //     tpr = vec![f64::NAN; tps.len()];
+    // } else {
+    //     tpr = tps
+    //         .iter()
+    //         .map(|v| *v as f64 / tps[tps.len() - 1] as f64)
+    //         .collect::<Vec<f64>>();
+    // }
+
+    // (fpr, tpr, threshold)
 }
 
-fn _binary_clf_curve(
-    y_score: &Vec<f64>,
-    y_true: &Vec<usize>,
-    pos_label: usize,
-) -> (Vec<usize>, Vec<usize>, Vec<f64>) {
-    // Transform y_true in a boolean vector
-    let boolean_y_true = y_true
-        .iter()
-        .map(|v| *v == pos_label)
-        .collect::<Vec<bool>>();
+// fn _binary_clf_curve(
+//     y_score: &Vec<f64>,
+//     y_true: &Vec<usize>,
+//     pos_label: usize,
+// ) -> (Vec<usize>, Vec<usize>, Vec<f64>) {
+//     // Transform y_true in a boolean vector
+//     let boolean_y_true = y_true
+//         .iter()
+//         .map(|v| *v == pos_label)
+//         .collect::<Vec<bool>>();
 
-    let desc_score_indices = argsort(y_score, "desc");
+//     let desc_score_indices = argsort(y_score, "desc");
 
-    let y_score_ordered = desc_score_indices
-        .iter()
-        .map(|i| y_score[*i])
-        .collect::<Vec<f64>>();
-    let y_true_ordered = desc_score_indices
-        .iter()
-        .map(|i| if boolean_y_true[*i] { 1 } else { 0 })
-        .collect::<Vec<usize>>();
+//     let y_score_ordered = desc_score_indices
+//         .iter()
+//         .map(|i| y_score[*i])
+//         .collect::<Vec<f64>>();
+//     let y_true_ordered = desc_score_indices
+//         .iter()
+//         .map(|i| if boolean_y_true[*i] { 1 } else { 0 })
+//         .collect::<Vec<usize>>();
 
-    let mut threshold_idxs = (1..y_score_ordered.len())
-        .into_iter()
-        .filter(|i| y_score_ordered[*i] != y_score_ordered[*i - 1])
-        .collect::<Vec<usize>>();
+//     let mut threshold_idxs = (1..y_score_ordered.len())
+//         .into_iter()
+//         .filter(|i| y_score_ordered[*i] != y_score_ordered[*i - 1])
+//         .collect::<Vec<usize>>();
 
-    threshold_idxs.push(y_true_ordered.len() - 1);
+//     threshold_idxs.push(y_true_ordered.len() - 1);
 
-    let tps = cumsum(&y_true_ordered);
+//     let tps = cumsum(&y_true_ordered);
 
-    let fps = threshold_idxs
-        .iter()
-        .map(|i| 1 + *i - tps[*i])
-        .collect::<Vec<usize>>();
+//     let fps = threshold_idxs
+//         .iter()
+//         .map(|i| 1 + *i - tps[*i])
+//         .collect::<Vec<usize>>();
 
-    (
-        fps,
-        tps,
-        threshold_idxs
-            .iter()
-            .map(|i| y_score_ordered[*i])
-            .collect::<Vec<f64>>(),
-    )
+//     (
+//         fps,
+//         tps,
+//         threshold_idxs
+//             .iter()
+//             .map(|i| y_score_ordered[*i])
+//             .collect::<Vec<f64>>(),
+//     )
 
-    // // sort scores and corresponding truth values
-    // let mut desc_score_indices = y_score
-    //     .iter()
-    //     .enumerate()
-    //     .map(|(i, v)| (*v, i))
-    //     .collect::<Vec<_>>();
+//     // // sort scores and corresponding truth values
+//     // let mut desc_score_indices = y_score
+//     //     .iter()
+//     //     .enumerate()
+//     //     .map(|(i, v)| (*v, i))
+//     //     .collect::<Vec<_>>();
 
-    // desc_score_indices.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap().reverse());
+//     // desc_score_indices.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap().reverse());
 
-    // let mut y_score_sorted = vec![0.0; y_score.len()];
-    // let mut y_true_sorted = vec![0; y_true.len()];
+//     // let mut y_score_sorted = vec![0.0; y_score.len()];
+//     // let mut y_true_sorted = vec![0; y_true.len()];
 
-    // for (i, (v, j)) in desc_score_indices.iter().enumerate() {
-    //     y_score_sorted[i] = *v;
-    //     y_true_sorted[i] = y_true[*j];
-    // }
+//     // for (i, (v, j)) in desc_score_indices.iter().enumerate() {
+//     //     y_score_sorted[i] = *v;
+//     //     y_true_sorted[i] = y_true[*j];
+//     // }
 
-    // let distinct_value_indices = (1..y_score_sorted.len())
-    //     .into_iter()
-    //     .filter(|i| y_score_sorted[*i] != y_score_sorted[*i - 1])
-    //     .collect::<Vec<_>>();
+//     // let distinct_value_indices = (1..y_score_sorted.len())
+//     //     .into_iter()
+//     //     .filter(|i| y_score_sorted[*i] != y_score_sorted[*i - 1])
+//     //     .collect::<Vec<_>>();
 
-    // let mut threshold_idxs = vec![0; distinct_value_indices.len() + 1];
-    // threshold_idxs[distinct_value_indices.len()] = y_score_sorted.len()-1;
+//     // let mut threshold_idxs = vec![0; distinct_value_indices.len() + 1];
+//     // threshold_idxs[distinct_value_indices.len()] = y_score_sorted.len()-1;
 
-    // for (i, v) in distinct_value_indices.iter().enumerate() {
-    //     threshold_idxs[i] = *v;
-    // }
+//     // for (i, v) in distinct_value_indices.iter().enumerate() {
+//     //     threshold_idxs[i] = *v;
+//     // }
 
-    // let mut tps = vec![0; threshold_idxs.len()];
-    // let mut fps = vec![0; threshold_idxs.len()];
+//     // let mut tps = vec![0; threshold_idxs.len()];
+//     // let mut fps = vec![0; threshold_idxs.len()];
 
-    // for (i, v) in threshold_idxs.iter().enumerate() {
-    //     for j in 0..*v {
-    //         if y_true_sorted[j] == 1 {
-    //             tps[i] += 1;
-    //         } else {
-    //             fps[i] += 1;
-    //         }
-    //     }
-    // }
+//     // for (i, v) in threshold_idxs.iter().enumerate() {
+//     //     for j in 0..*v {
+//     //         if y_true_sorted[j] == 1 {
+//     //             tps[i] += 1;
+//     //         } else {
+//     //             fps[i] += 1;
+//     //         }
+//     //     }
+//     // }
 
-    // (tps, fps, threshold_idxs.iter().map(|i| y_score[*i]).collect::<Vec<f64>>())
-}
+//     // (tps, fps, threshold_idxs.iter().map(|i| y_score[*i]).collect::<Vec<f64>>())
+// }

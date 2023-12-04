@@ -1,8 +1,5 @@
 /target
-UCRArchive_2018/
-AnomalyDatasets_2021
-ADMEP/
 .vscode/
 .DS_Store
-UCRArchive_2018.zip
-UCR_TimeSeriesAnomalyDatasets2021.zip
+*.zip
+admep*.csv

@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 
-use crate::feature_extraction::statistics::{argsort, cumsum, unique};
+use core::panic;
+
+use crate::{feature_extraction::statistics::{argsort, cumsum, unique, diff}, utils::csv_io::vec_to_csv};
 
 pub fn accuracy_score(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
     (y_pred
@@ -101,182 +103,132 @@ pub fn matthews_corrcoef(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
 }
 
 pub fn roc_auc_score(y_pred: &Vec<f64>, y_true: &Vec<usize>) -> f64 {
-    let (fpr, tpr, _) = roc_curve(y_pred, y_true);
-    auc(&fpr, &tpr)
+    assert_eq!(y_pred.len(), y_true.len(), "y_pred and y_true must have the same length");
+    
+    // Calculate ROC curve
+    let (fprs, tprs, _) = roc_curve(y_pred, y_true);
+
+    // Calculate AUC from the ROC curve
+    let auc_value = auc(&fprs, &tprs);
+
+    auc_value
 }
 
 fn auc(x: &Vec<f64>, y: &Vec<f64>) -> f64 {
-    let mut auc = 0.0;
-    for i in 1..x.len() {
-        auc += (x[i] - x[i - 1]) * (y[i] + y[i - 1]) / 2.0;
+    // Ensure the input vectors have the same length
+    assert_eq!(x.len(), y.len(), "Input vectors must have the same length");
+
+    // Sort the vectors based on x (false positive rates) in ascending order
+    let mut sorted_data: Vec<_> = x.iter().zip(y.iter()).collect();
+    sorted_data.sort_by(|a, b| a.0.partial_cmp(b.0).unwrap());
+
+    // Calculate AUC using the trapezoidal rule
+    let mut auc_value = 0.0;
+    let n = sorted_data.len();
+
+    for i in 0..(n - 1) {
+        let x1 = sorted_data[i].0;
+        let x2 = sorted_data[i + 1].0;
+        let y1 = sorted_data[i].1;
+        let y2 = sorted_data[i + 1].1;
+
+        // Calculate the area of the trapezoid and add it to the total AUC
+        auc_value += 0.5 * (x2 - x1) * (y1 + y2);
     }
-    auc
+
+    auc_value
 }
 
 fn true_positive_rate(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
-    let tp = y_true
-        .iter()
-        .zip(y_pred.iter())
-        .filter(|(&a, &b)| a == 1 && b == 1)
-        .count();
-    let fn_ = y_true
-        .iter()
-        .zip(y_pred.iter())
-        .filter(|(&a, &b)| a == 1 && b == 0)
-        .count();
-    tp as f64 / (tp as f64 + fn_ as f64)
+    // Ensure the input vectors have the same length
+    assert_eq!(y_pred.len(), y_true.len(), "Input vectors must have the same length");
+
+    // Count true positives (TP) and false negatives (FN)
+    let (mut true_positives, mut false_negatives) = (0usize, 0usize);
+
+    for (&pred, &true_val) in y_pred.iter().zip(y_true.iter()) {
+        if pred == 1 && true_val == 1 {
+            // Increment true positives when prediction is positive and true value is positive
+            true_positives += 1;
+        } else if pred == 0 && true_val == 1 {
+            // Increment false negatives when prediction is negative, but true value is positive
+            false_negatives += 1;
+        }
+    }
+
+    // Calculate true positive rate
+    let tpr = if true_positives == 0 {
+        0.0 // Handle the case where there are no true positives to avoid division by zero
+    } else {
+        true_positives as f64 / (true_positives + false_negatives) as f64
+    };
+
+    tpr
 }
 
 fn false_positive_rate(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
-    let fp = y_true
-        .iter()
-        .zip(y_pred.iter())
-        .filter(|(&a, &b)| a == 0 && b == 1)
-        .count();
-    let tn = y_true
-        .iter()
-        .zip(y_pred.iter())
-        .filter(|(&a, &b)| a == 0 && b == 0)
-        .count();
-    fp as f64 / (fp as f64 + tn as f64)
+    // Ensure the input vectors have the same length
+    assert_eq!(y_pred.len(), y_true.len(), "Input vectors must have the same length");
+
+    // Count false positives (FP) and true negatives (TN)
+    let (mut false_positives, mut true_negatives) = (0usize, 0usize);
+
+    for (&pred, &true_val) in y_pred.iter().zip(y_true.iter()) {
+        if pred == 1 && true_val == 0 {
+            // Increment false positives when prediction is positive, but true value is negative
+            false_positives += 1;
+        } else if pred == 0 && true_val == 0 {
+            // Increment true negatives when both prediction and true value are negative
+            true_negatives += 1;
+        }
+    }
+
+    // Calculate false positive rate
+    let fpr = if true_negatives+false_positives == 0 {
+        0.0 // Handle the case where there are no true negatives to avoid division by zero
+    } else {
+        false_positives as f64 / (true_negatives + false_positives)  as f64
+    };
+
+    fpr
 }
 
 fn roc_curve(y_pred: &Vec<f64>, y_true: &Vec<usize>) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
-    assert!(y_pred.len() > 0, "{:?}", y_pred);
-    let mut threshold = y_pred.clone();
-    threshold.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    let mut tpr = vec![0.0];
-    let mut fpr = vec![0.0];
-    for t in &threshold {
-        let y_pred = y_pred
-            .iter()
-            .map(|v| if *v >= *t { 1 } else { 0 })
-            .collect::<Vec<usize>>();
-        tpr.push(true_positive_rate(&y_pred, y_true));
-        fpr.push(false_positive_rate(&y_pred, y_true));
+    // Ensure the input vectors have the same length
+    assert_eq!(y_pred.len(), y_true.len(), "Input vectors must have the same length");
+
+    // Initialize vectors to store true positive rate (sensitivity), false positive rate, and thresholds
+    let mut tprs = Vec::new();
+    let mut fprs = Vec::new();
+    let thresholds = unique(y_pred);
+
+    // Iterate through a range of thresholds
+    for threshold in &thresholds {
+        // Create a binary vector based on the current threshold
+        let y_pred_binary: Vec<usize> = y_pred.iter().map(|&x| if x >= *threshold { 1 } else { 0 }).collect();
+
+        // Calculate true positive rate and false positive rate using the previously implemented functions
+        let tpr = true_positive_rate(&y_pred_binary, y_true);
+        let fpr = false_positive_rate(&y_pred_binary, y_true);
+
+        // Store TPR, FPR, and threshold for the current iteration
+        tprs.push(tpr);
+        fprs.push(fpr);
     }
-    tpr.push(1.0);
-    fpr.push(1.0);
-    (fpr, tpr, threshold)
-    // let (mut fps, mut tps, mut threshold) = _binary_clf_curve(y_pred, y_true, 1);
 
-    // fps.insert(0, 0);
-    // tps.insert(0, 0);
-
-    // threshold.insert(0, f64::INFINITY);
-
-    // let fpr;
-    // let tpr;
-
-    // if fps[fps.len() - 1] <= 0 {
-    //     println!("No negative samples in y_true, false positive value should be meaningless");
-    //     fpr = vec![f64::NAN; fps.len()];
-    // } else {
-    //     fpr = fps
+    (fprs, tprs, thresholds)
+    // let mut threshold = unique(y_pred);
+    // threshold.insert(0, 0.0);
+    // threshold.push(1.0);
+    // let mut tpr = Vec::new();
+    // let mut fpr = Vec::new();
+    // for t in &threshold {
+    //     let y_pred = y_pred
     //         .iter()
-    //         .map(|v| *v as f64 / fps[fps.len() - 1] as f64)
-    //         .collect::<Vec<f64>>();
+    //         .map(|v| if *v >= *t { 1 } else { 0 })
+    //         .collect::<Vec<usize>>();
+    //     tpr.push(true_positive_rate(&y_pred, y_true));
+    //     fpr.push(false_positive_rate(&y_pred, y_true));
     // }
-
-    // if tps[tps.len() - 1] <= 0 {
-    //     println!("No positive samples in y_true, true positive value should be meaningless");
-    //     tpr = vec![f64::NAN; tps.len()];
-    // } else {
-    //     tpr = tps
-    //         .iter()
-    //         .map(|v| *v as f64 / tps[tps.len() - 1] as f64)
-    //         .collect::<Vec<f64>>();
-    // }
-
     // (fpr, tpr, threshold)
 }
-
-// fn _binary_clf_curve(
-//     y_score: &Vec<f64>,
-//     y_true: &Vec<usize>,
-//     pos_label: usize,
-// ) -> (Vec<usize>, Vec<usize>, Vec<f64>) {
-//     // Transform y_true in a boolean vector
-//     let boolean_y_true = y_true
-//         .iter()
-//         .map(|v| *v == pos_label)
-//         .collect::<Vec<bool>>();
-
-//     let desc_score_indices = argsort(y_score, "desc");
-
-//     let y_score_ordered = desc_score_indices
-//         .iter()
-//         .map(|i| y_score[*i])
-//         .collect::<Vec<f64>>();
-//     let y_true_ordered = desc_score_indices
-//         .iter()
-//         .map(|i| if boolean_y_true[*i] { 1 } else { 0 })
-//         .collect::<Vec<usize>>();
-
-//     let mut threshold_idxs = (1..y_score_ordered.len())
-//         .into_iter()
-//         .filter(|i| y_score_ordered[*i] != y_score_ordered[*i - 1])
-//         .collect::<Vec<usize>>();
-
-//     threshold_idxs.push(y_true_ordered.len() - 1);
-
-//     let tps = cumsum(&y_true_ordered);
-
-//     let fps = threshold_idxs
-//         .iter()
-//         .map(|i| 1 + *i - tps[*i])
-//         .collect::<Vec<usize>>();
-
-//     (
-//         fps,
-//         tps,
-//         threshold_idxs
-//             .iter()
-//             .map(|i| y_score_ordered[*i])
-//             .collect::<Vec<f64>>(),
-//     )
-
-//     // // sort scores and corresponding truth values
-//     // let mut desc_score_indices = y_score
-//     //     .iter()
-//     //     .enumerate()
-//     //     .map(|(i, v)| (*v, i))
-//     //     .collect::<Vec<_>>();
-
-//     // desc_score_indices.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap().reverse());
-
-//     // let mut y_score_sorted = vec![0.0; y_score.len()];
-//     // let mut y_true_sorted = vec![0; y_true.len()];
-
-//     // for (i, (v, j)) in desc_score_indices.iter().enumerate() {
-//     //     y_score_sorted[i] = *v;
-//     //     y_true_sorted[i] = y_true[*j];
-//     // }
-
-//     // let distinct_value_indices = (1..y_score_sorted.len())
-//     //     .into_iter()
-//     //     .filter(|i| y_score_sorted[*i] != y_score_sorted[*i - 1])
-//     //     .collect::<Vec<_>>();
-
-//     // let mut threshold_idxs = vec![0; distinct_value_indices.len() + 1];
-//     // threshold_idxs[distinct_value_indices.len()] = y_score_sorted.len()-1;
-
-//     // for (i, v) in distinct_value_indices.iter().enumerate() {
-//     //     threshold_idxs[i] = *v;
-//     // }
-
-//     // let mut tps = vec![0; threshold_idxs.len()];
-//     // let mut fps = vec![0; threshold_idxs.len()];
-
-//     // for (i, v) in threshold_idxs.iter().enumerate() {
-//     //     for j in 0..*v {
-//     //         if y_true_sorted[j] == 1 {
-//     //             tps[i] += 1;
-//     //         } else {
-//     //             fps[i] += 1;
-//     //         }
-//     //     }
-//     // }
-
-//     // (tps, fps, threshold_idxs.iter().map(|i| y_score[*i]).collect::<Vec<f64>>())
-// }

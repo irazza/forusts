@@ -180,7 +180,7 @@ pub fn md_hrv_classic_pnn40(x: &[f64]) -> f64 {
     let pnnx = 40;
 
     // compute diff
-    let dx = diff(x, x.len());
+    let dx = diff(x);
 
     let mut pnn40 = 0;
     for &diff_value in &dx {

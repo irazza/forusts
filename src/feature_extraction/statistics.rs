@@ -20,11 +20,19 @@ pub fn min(x: &[f64]) -> f64 {
     min
 }
 
-pub fn unique(x: &[usize]) -> Vec<usize> {
+pub fn unique<T: PartialOrd+Clone>(x: &[T]) -> Vec<T> {
     let mut unique = x.to_vec();
-    unique.sort();
+    unique.sort_by(|a, b| a.partial_cmp(b).unwrap());
     unique.dedup();
     unique
+}
+
+pub fn diff<T: std::ops::Sub<Output = T> + Clone>(x: &[T]) -> Vec<T> {
+    let mut diff = Vec::new();
+    for i in 0..x.len() - 1 {
+        diff.push(x[i + 1].clone() - x[i].clone());
+    }
+    diff
 }
 
 pub fn median(x: &[f64]) -> f64 {
@@ -94,14 +102,6 @@ pub fn histcounts(x: &[f64], n_bins: usize) -> (Vec<i32>, Vec<f64>) {
         .collect();
 
     (bin_counts, bin_edges)
-}
-
-pub fn diff(x: &[f64], x_len: usize) -> Vec<f64> {
-    let mut diff = Vec::new();
-    for i in 0..x_len - 1 {
-        diff.push(x[i + 1] - x[i]);
-    }
-    diff
 }
 
 pub fn quantile(x: &[f64], q: f64) -> f64 {

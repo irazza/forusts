@@ -1,11 +1,9 @@
 use crate::feature_extraction::statistics::unique;
-use crate::forest::forest::ClassificationForest;
 use crate::forest::forest::OutlierForest;
 use crate::forest::isolation_forest::IsolationForest;
-use crate::forest::time_series_forest::TimeSeriesForest;
 use crate::forest::time_series_isolation_forest::TimeSeriesIsolationForest;
-use crate::metrics::classification::{matthews_corrcoef, roc_auc_score};
-use crate::utils::csv_io::read_csv;
+use crate::metrics::classification::roc_auc_score;
+use crate::utils::csv_io::{read_csv, vec_to_csv};
 use hashbrown::HashMap;
 use std::error::Error;
 use std::fs;
@@ -21,8 +19,8 @@ mod utils;
 fn main() -> Result<(), Box<dyn Error>> {
     let paths = fs::read_dir("/media/aazzari/DATA/admep/")?;
     let mut predictions = Vec::new();
-    let n_repetitions = 1;
-    let n_trees = 200;
+    let n_repetitions = 50;
+    let n_trees = 100;
 
     let mut datasets: Vec<_> = Vec::new();
 
@@ -64,24 +62,22 @@ fn main() -> Result<(), Box<dyn Error>> {
             //     tree::tree::MaxFeatures::Sqrt,
             //     None,
             // );
-            let mut clf = TimeSeriesForest::new(
+            let mut clf = TimeSeriesIsolationForest::new(
                 n_trees,
-                tree::tree::Criterion::Entropy,
                 n_features.sqrt() as usize,
                 3,
-                tree::tree::MaxFeatures::Sqrt,
+                Some(true),
                 None,
-                2,
-                Some(false),
             );
-
-            clf.fit(&ds_train.get_data(), &ds_train.get_targets());
-            let y_score = clf.score_samples(&ds_test.get_data());
-            let y_pred = clf.predict(&ds_test.get_data());
+            // let mut clf = IsolationForest::new(
+            //     n_trees,
+            //     None,
+            //     Some(false)
+            // );
+            clf.fit(&ds_train.get_data());
+            let y_score = clf.decision_function(&ds_test.get_data());
             let roc_auc = roc_auc_score(&y_score, &y_true);
-            let mcc = matthews_corrcoef(&y_pred, &y_true);
-
-            predictions.push([roc_auc, mcc].to_vec());
+            predictions.push([roc_auc].to_vec());
         }
     }
     // Create index modifying datasets multiplying by n_repetitions
@@ -92,12 +88,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let header = vec!["Dataset", "ROC-AUC", "MCC"]
+    let header = vec!["Dataset", "ROC-AUC"]
         .iter()
         .map(|s| s.to_string())
         .collect();
     write_csv(
-        format!("admep_T{}_R{}.csv", n_trees, n_repetitions),
+        format!("admepTSIF_T{}_R{}.csv", n_trees, n_repetitions),
         predictions,
         header,
         index,

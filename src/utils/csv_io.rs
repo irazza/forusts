@@ -84,10 +84,7 @@ pub fn write_csv(
     Ok(())
 }
 
-pub fn vec_to_csv(
-    path: impl AsRef<Path>,
-    data: &Vec<f64>
-) -> Result<(), Box<dyn Error>> {
+pub fn vec_to_csv(path: impl AsRef<Path>, data: &Vec<f64>) -> Result<(), Box<dyn Error>> {
     let mut csv_writer = csv::Writer::from_path(path)?;
     csv_writer.write_record(data.iter().map(|v| v.to_string()))?;
     csv_writer.flush()?;

@@ -1,4 +1,3 @@
-#![allow(dead_code, unused_variables, unused_mut)]
 use crate::feature_extraction::statistics::histcounts;
 use crate::feature_extraction::statistics::{
     autocorr_lag, autocov_lag, cov, diff, f_entropy, max, mean, median, quantile,

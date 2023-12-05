@@ -1,4 +1,5 @@
-#![allow(dead_code)]
+use std::ops::{Add, Div};
+
 pub const EULER_MASCHERONI: f64 =
     0.5772156649015328606065120900824024310421593359399235988057672348849;
 
@@ -20,7 +21,7 @@ pub fn min(x: &[f64]) -> f64 {
     min
 }
 
-pub fn unique<T: PartialOrd+Clone>(x: &[T]) -> Vec<T> {
+pub fn unique<T: PartialOrd + Clone>(x: &[T]) -> Vec<T> {
     let mut unique = x.to_vec();
     unique.sort_by(|a, b| a.partial_cmp(b).unwrap());
     unique.dedup();
@@ -35,7 +36,10 @@ pub fn diff<T: std::ops::Sub<Output = T> + Clone>(x: &[T]) -> Vec<T> {
     diff
 }
 
-pub fn median(x: &[f64]) -> f64 {
+pub fn median<T>(x: &[T]) -> T
+where
+    T: Add<Output = T> + Div<f64, Output = T> + Clone + PartialOrd + Copy,
+{
     let mut x = x.to_vec();
     x.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let median = if x.len() % 2 == 0 {
@@ -43,7 +47,6 @@ pub fn median(x: &[f64]) -> f64 {
     } else {
         x[x.len() / 2]
     };
-    assert!(median.is_finite());
     median
 }
 

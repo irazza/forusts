@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let paths = fs::read_dir("/media/aazzari/DATA/admep/")?;
     let mut predictions = Vec::new();
     let n_repetitions = 50;
-    let n_trees = 100;
+    let n_trees = 200;
 
     let mut datasets: Vec<_> = Vec::new();
 

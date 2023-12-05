@@ -1,8 +1,4 @@
-#![allow(dead_code)]
-
-use core::panic;
-
-use crate::{feature_extraction::statistics::{argsort, cumsum, unique, diff}, utils::csv_io::vec_to_csv};
+use crate::{feature_extraction::statistics::unique, utils::csv_io::vec_to_csv};
 
 pub fn accuracy_score(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
     (y_pred
@@ -103,8 +99,6 @@ pub fn matthews_corrcoef(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
 }
 
 pub fn roc_auc_score(y_pred: &Vec<f64>, y_true: &Vec<usize>) -> f64 {
-    assert_eq!(y_pred.len(), y_true.len(), "y_pred and y_true must have the same length");
-    
     // Calculate ROC curve
     let (fprs, tprs, _) = roc_curve(y_pred, y_true);
 
@@ -139,9 +133,20 @@ fn auc(x: &Vec<f64>, y: &Vec<f64>) -> f64 {
     auc_value
 }
 
-fn true_positive_rate(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
+pub fn true_positive_rate(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
     // Ensure the input vectors have the same length
-    assert_eq!(y_pred.len(), y_true.len(), "Input vectors must have the same length");
+    assert_eq!(
+        y_pred.len(),
+        y_true.len(),
+        "Input vectors must have the same length"
+    );
+
+    // Ensure that is a binary problem
+    assert_eq!(
+        unique(y_true).len(),
+        2,
+        "TPR is only defined for binary problems"
+    );
 
     // Count true positives (TP) and false negatives (FN)
     let (mut true_positives, mut false_negatives) = (0usize, 0usize);
@@ -155,7 +160,6 @@ fn true_positive_rate(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
             false_negatives += 1;
         }
     }
-
     // Calculate true positive rate
     let tpr = if true_positives == 0 {
         0.0 // Handle the case where there are no true positives to avoid division by zero
@@ -166,9 +170,20 @@ fn true_positive_rate(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
     tpr
 }
 
-fn false_positive_rate(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
+pub fn false_positive_rate(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
     // Ensure the input vectors have the same length
-    assert_eq!(y_pred.len(), y_true.len(), "Input vectors must have the same length");
+    assert_eq!(
+        y_pred.len(),
+        y_true.len(),
+        "Input vectors must have the same length"
+    );
+
+    // Ensure that is a binary problem
+    assert_eq!(
+        unique(y_true).len(),
+        2,
+        "FPR is only defined for binary problems"
+    );
 
     // Count false positives (FP) and true negatives (TN)
     let (mut false_positives, mut true_negatives) = (0usize, 0usize);
@@ -184,10 +199,10 @@ fn false_positive_rate(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
     }
 
     // Calculate false positive rate
-    let fpr = if true_negatives+false_positives == 0 {
+    let fpr = if true_negatives + false_positives == 0 {
         0.0 // Handle the case where there are no true negatives to avoid division by zero
     } else {
-        false_positives as f64 / (true_negatives + false_positives)  as f64
+        false_positives as f64 / (true_negatives + false_positives) as f64
     };
 
     fpr
@@ -195,7 +210,18 @@ fn false_positive_rate(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
 
 fn roc_curve(y_pred: &Vec<f64>, y_true: &Vec<usize>) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
     // Ensure the input vectors have the same length
-    assert_eq!(y_pred.len(), y_true.len(), "Input vectors must have the same length");
+    assert_eq!(
+        y_pred.len(),
+        y_true.len(),
+        "Input vectors must have the same length"
+    );
+
+    // Ensure that is a binary problem
+    assert_eq!(
+        unique(y_true).len(),
+        2,
+        "ROC curve is only defined for binary problems"
+    );
 
     // Initialize vectors to store true positive rate (sensitivity), false positive rate, and thresholds
     let mut tprs = Vec::new();
@@ -205,7 +231,10 @@ fn roc_curve(y_pred: &Vec<f64>, y_true: &Vec<usize>) -> (Vec<f64>, Vec<f64>, Vec
     // Iterate through a range of thresholds
     for threshold in &thresholds {
         // Create a binary vector based on the current threshold
-        let y_pred_binary: Vec<usize> = y_pred.iter().map(|&x| if x >= *threshold { 1 } else { 0 }).collect();
+        let y_pred_binary: Vec<usize> = y_pred
+            .iter()
+            .map(|&x| if x >= *threshold { 1 } else { 0 })
+            .collect();
 
         // Calculate true positive rate and false positive rate using the previously implemented functions
         let tpr = true_positive_rate(&y_pred_binary, y_true);
@@ -217,18 +246,4 @@ fn roc_curve(y_pred: &Vec<f64>, y_true: &Vec<usize>) -> (Vec<f64>, Vec<f64>, Vec
     }
 
     (fprs, tprs, thresholds)
-    // let mut threshold = unique(y_pred);
-    // threshold.insert(0, 0.0);
-    // threshold.push(1.0);
-    // let mut tpr = Vec::new();
-    // let mut fpr = Vec::new();
-    // for t in &threshold {
-    //     let y_pred = y_pred
-    //         .iter()
-    //         .map(|v| if *v >= *t { 1 } else { 0 })
-    //         .collect::<Vec<usize>>();
-    //     tpr.push(true_positive_rate(&y_pred, y_true));
-    //     fpr.push(false_positive_rate(&y_pred, y_true));
-    // }
-    // (fpr, tpr, threshold)
 }

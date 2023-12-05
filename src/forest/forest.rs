@@ -308,7 +308,10 @@ pub trait OutlierForest: Sync + Send {
     }
 
     fn decision_function(&self, x: &Vec<Vec<f64>>) -> Vec<f64> {
-        self.score_samples(x).iter().map(|v| *v - 0.5).collect::<Vec<f64>>()
+        self.score_samples(x)
+            .iter()
+            .map(|v| *v - 0.5)
+            .collect::<Vec<f64>>()
     }
 
     fn score_samples(&self, x: &Vec<Vec<f64>>) -> Vec<f64> {

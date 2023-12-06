@@ -18,11 +18,11 @@ mod utils;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let paths = fs::read_dir("/media/aazzari/DATA/UCRArchive_2018/")?;
-    let n_repetitions = 1;
+    let n_repetitions = 50;
     let n_trees = 100;
     let criterion = Criterion::Entropy;
 
-    let mut datasets: Vec<_> = Vec::new();
+    let mut datasets = Vec::new();
 
     for entry in paths {
         // Unwrap the entry or handle the error, if any.
@@ -55,7 +55,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 MaxFeatures::Sqrt,
                 None,
                 2,
-                None,
             );
             //let mut clf = RandomForest::new(n_trees, criterion, MaxFeatures::Sqrt, None);
 
@@ -103,7 +102,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .collect();
     write_csv(
         format!(
-            "tsf_{}_{}_{}.csv",
+            "ucrTSF_{}_{}_{}.csv",
             n_trees,
             criterion.to_string(),
             n_repetitions

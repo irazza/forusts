@@ -17,7 +17,6 @@ impl TimeSeriesIsolationForest {
     pub fn new(
         n_trees: usize,
         n_intervals: usize,
-        min_interval_length: usize,
         enhanced_anomaly_score: Option<bool>,
         max_depth: Option<usize>,
     ) -> Self {
@@ -25,11 +24,11 @@ impl TimeSeriesIsolationForest {
             trees: Vec::new(),
             n_trees,
             n_intervals,
-            min_interval_length,
             intervals: Vec::new(),
             max_depth,
             enhanced_anomaly_score,
-            max_samples: 256,
+            max_samples: 0,
+            min_interval_length: 3
         }
     }
 }

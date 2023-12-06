@@ -12,7 +12,6 @@ pub struct RandomForest {
     n_trees: usize,
     max_features: MaxFeatures,
     max_depth: Option<usize>,
-    enhanced_anomaly_score: Option<bool>,
     max_samples: usize,
 }
 impl RandomForest {
@@ -31,7 +30,6 @@ impl RandomForest {
             max_features,
             max_depth,
             max_samples: 0,
-            enhanced_anomaly_score: Some(false),
         }
     }
 }
@@ -63,11 +61,8 @@ impl ClassificationForest for RandomForest {
     fn set_max_samples(&mut self, max_samples: usize) {
         self.max_samples = max_samples;
     }
-    fn get_enhanced_anomaly_score(&self) -> Option<bool> {
-        self.enhanced_anomaly_score
-    }
-    fn transform(&self, x: &Vec<Vec<f64>>, intervals_index: usize) -> Vec<Vec<f64>> {
+    fn transform(&self, x: &Vec<Vec<f64>>, _intervals_index: usize) -> Vec<Vec<f64>> {
         x.clone()
     }
-    fn compute_intervals(&mut self, n_features: usize) {}
+    fn compute_intervals(&mut self, _n_features: usize) {}
 }

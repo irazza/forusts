@@ -50,7 +50,7 @@ pub trait Tree {
     fn set_root(&mut self, root: Node);
     fn get_split(&self, samples: &[Sample<'_>]) -> (usize, f64, f64);
     fn pre_split_conditions(&self, samples: &[Sample<'_>], current_depth: usize) -> bool;
-    fn post_split_conditions(&self, impurity: f64) -> bool;
+    fn post_split_conditions(&self, new_impurity: f64, old_impurity: f64) -> bool;
     fn fit(&mut self, x: &Vec<&Vec<f64>>, y: &Vec<usize>) {
         // Start the iterative tree-building process
         let mut data = x
@@ -64,10 +64,10 @@ pub trait Tree {
 
         let n_features = data[0].data.len();
         self.set_max_features(self.get_max_features().convert(n_features));
-        let root = self.build_tree(&mut data, self.get_max_depth());
+        let root = self.build_tree(&mut data, self.get_max_depth(), 0.0);
         self.set_root(root);
     }
-    fn build_tree(&mut self, samples: &mut [Sample<'_>], max_depth: usize) -> Node {
+    fn build_tree(&mut self, samples: &mut [Sample<'_>], max_depth: usize, impurity: f64) -> Node {
         let current_depth = max(1, self.get_max_depth() - max_depth);
 
         if self.pre_split_conditions(samples, current_depth) {
@@ -81,7 +81,7 @@ pub trait Tree {
 
         let (best_feature, best_threshold, best_impurity) = self.get_split(samples);
 
-        if self.post_split_conditions(best_impurity) {
+        if self.post_split_conditions(best_impurity, impurity) {
             return Node::Leaf {
                 class: Self::get_most_common_class(samples),
                 depth: current_depth,
@@ -93,8 +93,8 @@ pub trait Tree {
         let (left_data, right_data) = Self::split(samples, best_feature, best_threshold);
 
         // Split the data and recursively build the left and right subtrees
-        let left_subtree = self.build_tree(left_data, max_depth - 1);
-        let right_subtree = self.build_tree(right_data, max_depth - 1);
+        let left_subtree = self.build_tree(left_data, max_depth - 1, best_impurity);
+        let right_subtree = self.build_tree(right_data, max_depth - 1, best_impurity);
 
         Node::Split {
             feature: best_feature,
@@ -141,7 +141,7 @@ pub trait Tree {
         let mut last = samples.len();
 
         while idx < last {
-            if samples[idx].data[feature] <= threshold {
+            if samples[idx].data[feature] < threshold {
                 idx += 1;
             } else {
                 samples.swap(idx, last - 1);

@@ -65,4 +65,24 @@ impl Node {
             } => panic!("Cannot get class of a split node"),
         }
     }
+
+    pub fn get_samples(&self) -> usize {
+        match self {
+            Node::Leaf {
+                class: _,
+                depth: _,
+                impurity: _,
+                n_samples,
+            } => return *n_samples,
+            Node::Split {
+                feature: _,
+                threshold: _,
+                left: _,
+                right: _,
+                depth: _,
+                impurity: _,
+                n_samples,
+            } => return *n_samples,
+        }
+    }
 }

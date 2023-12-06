@@ -39,30 +39,17 @@ impl Tree for ExtraTree {
     }
     fn pre_split_conditions(&self, samples: &[Sample<'_>], current_depth: usize) -> bool {
         // Base case: not enough samples or max depth reached
-        if samples.len() <= self.min_samples_split || current_depth == self.max_depth {
-            return true;
-        }
-        // Base case: samples are the same object
-        let first_sample = samples[0].data;
-        let is_all_same_data = samples.iter().all(|v| v.data == first_sample);
-        if is_all_same_data {
-            return true;
-        }
-        // Base case: all samples have the same class
-        let first_class = samples[0].target;
-        let is_all_same_target = samples.iter().all(|v| v.target == first_class);
-        if is_all_same_target {
-            return true;
-        }
-
-        return false;
+        return samples.len() <= self.min_samples_split || current_depth >= self.max_depth
     }
-    fn post_split_conditions(&self, _impurity: f64) -> bool {
+    fn post_split_conditions(&self, _new_impurity: f64, _old_impurity: f64) -> bool {
         return false;
     }
     fn get_split(&self, samples: &[Sample<'_>]) -> (usize, f64, f64) {
         let best_feature = thread_rng().gen_range(0..samples[0].data.len());
-        let best_threshold = samples[thread_rng().gen_range(0..samples.len())].data[best_feature];
+        // Exclude first and last thresholds, avoiding a split on the min and max values (could move all samples on the left or right child)
+        let mut thresholds = samples.iter().map(|f| f.data[best_feature]).collect::<Vec<f64>>();
+        thresholds.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let best_threshold = thresholds[thread_rng().gen_range(1..thresholds.len()-1)];
         let best_impurity = thread_rng().gen_range(f64::EPSILON..1.0);
 
         (best_feature, best_threshold, best_impurity)

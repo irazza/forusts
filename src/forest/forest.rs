@@ -9,7 +9,7 @@ use rand::{seq::SliceRandom, thread_rng, Rng};
 use rayon::prelude::*;
 
 use crate::{
-    feature_extraction::statistics::EULER_MASCHERONI,
+    feature_extraction::statistics::{EULER_MASCHERONI, mean},
     tree::{
         decision_tree::DecisionTree,
         extra_tree::ExtraTree,
@@ -28,7 +28,6 @@ pub trait ClassificationForest: Sync + Send {
     fn get_min_samples_split(&self) -> usize;
     fn get_max_samples(&self) -> usize;
     fn set_max_samples(&mut self, max_samples: usize);
-    fn get_enhanced_anomaly_score(&self) -> Option<bool>;
     fn transform(&self, x: &Vec<Vec<f64>>, intervals_index: usize) -> Vec<Vec<f64>>;
     fn compute_intervals(&mut self, n_features: usize);
     fn fit(&mut self, x: &Vec<Vec<f64>>, y: &Vec<usize>) {
@@ -219,45 +218,6 @@ pub trait ClassificationForest: Sync + Send {
             })
             .collect()
     }
-    fn score_samples(&self, x: &Vec<Vec<f64>>) -> Vec<f64> {
-        let mut scores = Vec::new();
-        let path_length = self.path_length(x);
-        let c_n = 2.0 * (f64::log2(self.get_max_samples() as f64 - 1.0) + EULER_MASCHERONI)
-            - 2.0 * (self.get_max_samples() as f64 - 1.0) / self.get_max_samples() as f64;
-        if !self.get_enhanced_anomaly_score().unwrap_or(false) {
-            let e_h = path_length
-                .iter()
-                .map(|x| x.iter().sum::<usize>() as f64 / self.get_n_trees() as f64)
-                .collect::<Vec<f64>>();
-            for i in 0..x.len() {
-                scores.push(2.0f64.powf(-e_h[i] / c_n));
-            }
-        } else {
-            let enhanced_scores = path_length
-                .iter()
-                .map(|x| {
-                    x.iter()
-                        .map(|pl| 2.0f64.powf(-(*pl as f64) / c_n))
-                        .collect::<Vec<f64>>()
-                })
-                .collect::<Vec<Vec<f64>>>();
-            for i in 0..x.len() {
-                scores.push(enhanced_scores[i].iter().sum::<f64>() / self.get_n_trees() as f64);
-            }
-        }
-        scores
-    }
-    fn path_length(&self, x: &Vec<Vec<f64>>) -> Vec<Vec<usize>> {
-        let mut path_length = Vec::new();
-        path_length.par_extend((0..x.len()).into_par_iter().map(|i| {
-            let mut depth = Vec::new();
-            for tree in self.get_trees() {
-                depth.push(tree.predict_leaf(&x[i]).get_depth());
-            }
-            depth
-        }));
-        path_length
-    }
 }
 
 pub trait OutlierForest: Sync + Send {
@@ -272,7 +232,6 @@ pub trait OutlierForest: Sync + Send {
     fn compute_intervals(&mut self, n_features: usize);
     fn fit(&mut self, x: &Vec<Vec<f64>>) {
         self.set_max_samples(min(256, x.len()));
-        // Generate n_intervals, with random start and end
         self.compute_intervals(x[0].len());
         let mut trees = Vec::new();
         trees.par_extend((0..self.get_n_trees()).into_par_iter().map(|i| {
@@ -281,9 +240,8 @@ pub trait OutlierForest: Sync + Send {
             n_samples.shuffle(&mut rand::thread_rng());
 
             let mut tree = ExtraTree::new(
-                self.get_max_depth()
-                    .unwrap_or(self.get_max_samples().ilog2() as usize + 1),
-                1,
+                self.get_max_depth().unwrap_or(self.get_max_samples().ilog2() as usize + 1),
+                2, // Setted to 2 to avoid empty child when splitting when there are only two samples
             );
             tree.fit(
                 &(0..self.get_max_samples())
@@ -307,50 +265,96 @@ pub trait OutlierForest: Sync + Send {
         predictions
     }
 
-    fn decision_function(&self, x: &Vec<Vec<f64>>) -> Vec<f64> {
-        self.score_samples(x)
-            .iter()
-            .map(|v| *v - 0.5)
-            .collect::<Vec<f64>>()
-    }
-
     fn score_samples(&self, x: &Vec<Vec<f64>>) -> Vec<f64> {
         let mut scores = Vec::new();
-        let path_length = self.path_length(x);
-        let c_n = 2.0 * (f64::log2(self.get_max_samples() as f64 - 1.0) + EULER_MASCHERONI)
-            - 2.0 * (self.get_max_samples() as f64 - 1.0) / self.get_max_samples() as f64;
-        if !self.get_enhanced_anomaly_score().unwrap_or(false) {
-            let e_h = path_length
-                .iter()
-                .map(|x| x.iter().sum::<usize>() as f64 / self.get_n_trees() as f64)
-                .collect::<Vec<f64>>();
-            for i in 0..x.len() {
-                scores.push(2.0f64.powf(-e_h[i] / c_n));
+        scores.par_extend(x.par_iter().map(|sample| {
+            let mut transformed_sample = Vec::new();
+            let mut depths = Vec::new();
+            for (i, tree) in self.get_trees().iter().enumerate() {
+                transformed_sample = self.transform(&vec![sample.clone()], i)[0].clone();
+                let leaf = tree.predict_leaf(&transformed_sample);
+                depths.push(leaf.get_depth() as f64);
             }
-        } else {
-            let enhanced_scores = path_length
-                .iter()
-                .map(|x| {
-                    x.iter()
-                        .map(|pl| 2.0f64.powf(-(*pl as f64) / c_n))
-                        .collect::<Vec<f64>>()
-                })
-                .collect::<Vec<Vec<f64>>>();
-            for i in 0..x.len() {
-                scores.push(enhanced_scores[i].iter().sum::<f64>() / self.get_n_trees() as f64);
-            }
-        }
-        scores
-    }
-    fn path_length(&self, x: &Vec<Vec<f64>>) -> Vec<Vec<usize>> {
-        let mut path_length = Vec::new();
-        path_length.par_extend((0..x.len()).into_par_iter().map(|i| {
-            let mut depth = Vec::new();
-            for tree in self.get_trees() {
-                depth.push(tree.predict_leaf(&x[i]).get_depth());
-            }
-            depth
+            let depth = mean(&depths[..]);
+            let average_path_length = self.average_path_length(&transformed_sample);
+            2.0f64.powf(-depth / average_path_length)
         }));
-        path_length
+        scores
+        // for sample in x {
+        //     let mut transformed_sample = Vec::new();
+        //     let mut depths = Vec::new();
+        //     for (i, tree) in self.get_trees().iter().enumerate() {
+        //         transformed_sample = self.transform(&vec![sample.clone()], i)[0].clone();
+        //         let leaf = tree.predict_leaf(&transformed_sample);
+        //         depths.push(leaf.get_depth() as f64);
+        //     }
+        //     let depth = mean(&depths[..]);
+        //     let average_path_length = self.average_path_length(&transformed_sample);
+        //     scores.push(2.0f64.powf(-depth / average_path_length));
+        // }
+        // scores
     }
+
+    fn average_path_length(&self, x: &Vec<f64>) -> f64 {
+        let mut path_length = Vec::new();
+        for tree in self.get_trees() {
+            let leaf = tree.predict_leaf(x);
+            let samples = leaf.get_samples();
+            if samples > 1 {
+                path_length.push(leaf.get_depth() as f64 + Self::path_length(samples as f64));
+            } else {
+                path_length.push(leaf.get_depth() as f64);
+            }
+            
+        }
+        mean(&path_length[..])
+    }
+
+    fn path_length(n: f64) -> f64 {
+        return 2.0*(Self::armonic_number(n-1.0)) - 2.0*(n - 1.0)/n;
+    }
+
+    fn armonic_number(n: f64) -> f64 {
+        f64::ln(n) + EULER_MASCHERONI
+    }
+
+    // fn score_samples(&self, x: &Vec<Vec<f64>>) -> Vec<f64> {
+    //     let mut scores = Vec::new();
+    //     let path_length = self.path_length(x);
+    //     let c_n = 2.0 * (f64::log2(self.get_max_samples() as f64 - 1.0) + EULER_MASCHERONI)
+    //         - 2.0 * (self.get_max_samples() as f64 - 1.0) / self.get_max_samples() as f64;
+    //     if !self.get_enhanced_anomaly_score().unwrap_or(false) {
+    //         let e_h = path_length
+    //             .iter()
+    //             .map(|x| x.iter().sum::<usize>() as f64 / self.get_n_trees() as f64)
+    //             .collect::<Vec<f64>>();
+    //         for i in 0..x.len() {
+    //             scores.push(2.0f64.powf(-e_h[i] / c_n));
+    //         }
+    //     } else {
+    //         let enhanced_scores = path_length
+    //             .iter()
+    //             .map(|x| {
+    //                 x.iter()
+    //                     .map(|pl| 2.0f64.powf(-(*pl as f64) / c_n))
+    //                     .collect::<Vec<f64>>()
+    //             })
+    //             .collect::<Vec<Vec<f64>>>();
+    //         for i in 0..x.len() {
+    //             scores.push(enhanced_scores[i].iter().sum::<f64>() / self.get_n_trees() as f64);
+    //         }
+    //     }
+    //     scores
+    // }
+    // fn path_length(&self, x: &Vec<Vec<f64>>) -> Vec<Vec<usize>> {
+    //     let mut path_length = Vec::new();
+    //     path_length.par_extend((0..x.len()).into_par_iter().map(|i| {
+    //         let mut depth = Vec::new();
+    //         for tree in self.get_trees() {
+    //             depth.push(tree.predict_leaf(&x[i]).get_depth());
+    //         }
+    //         depth
+    //     }));
+    //     path_length
+    // }
 }

@@ -1,9 +1,8 @@
 use crate::feature_extraction::statistics::unique;
 use crate::forest::forest::OutlierForest;
-use crate::forest::isolation_forest::IsolationForest;
 use crate::forest::time_series_isolation_forest::TimeSeriesIsolationForest;
 use crate::metrics::classification::roc_auc_score;
-use crate::utils::csv_io::{read_csv, vec_to_csv};
+use crate::utils::csv_io::read_csv;
 use hashbrown::HashMap;
 use std::error::Error;
 use std::fs;
@@ -20,7 +19,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let paths = fs::read_dir("/media/aazzari/DATA/admep/")?;
     let mut predictions = Vec::new();
     let n_repetitions = 50;
-    let n_trees = 200;
+    let n_trees = 100;
 
     let mut datasets: Vec<_> = Vec::new();
 
@@ -32,6 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
     datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
+    let mut mean_m = 0.0;
     for path in &datasets {
         println!("Processing {}", path.file_name().to_string_lossy());
         let train_path = path
@@ -53,33 +53,24 @@ fn main() -> Result<(), Box<dyn Error>> {
             continue;
         }
         let n_features = ds_train.get_data()[0].len() as f64;
+        let mut mean = 0.0;
         for _i in 0..n_repetitions {
-            // let mut clf = TimeSeriesForest::new(
-            //     n_trees,
-            //     tree::tree::Criterion::Gini,
-            //     n_features.sqrt() as usize,
-            //     3,
-            //     tree::tree::MaxFeatures::Sqrt,
-            //     None,
-            // );
             let mut clf = TimeSeriesIsolationForest::new(
                 n_trees,
                 n_features.sqrt() as usize,
-                3,
                 Some(true),
                 None,
             );
-            // let mut clf = IsolationForest::new(
-            //     n_trees,
-            //     None,
-            //     Some(false)
-            // );
             clf.fit(&ds_train.get_data());
-            let y_score = clf.decision_function(&ds_test.get_data());
+            let y_score = clf.score_samples(&ds_test.get_data());
             let roc_auc = roc_auc_score(&y_score, &y_true);
+            mean += roc_auc;
             predictions.push([roc_auc].to_vec());
         }
+        mean_m += mean / n_repetitions as f64;
+
     }
+    println!("\tROC-AUC: {}", mean_m / datasets.len() as f64);
     // Create index modifying datasets multiplying by n_repetitions
     let mut index = Vec::new();
     for i in 0..datasets.len() {

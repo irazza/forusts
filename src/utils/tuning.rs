@@ -10,7 +10,7 @@ enum Numerical {
     Float(f64),
 }
 
-pub fn tuning<T: OutlierForest + ClassificationForest>(model: T, ds_train: &Dataset, ds_test: &Dataset, parameters: HashMap<&'static str, Vec<Numerical>>, metric: &'static str) -> HashMap<String, f64> {
+pub fn tuning(ds_train: &Dataset, ds_test: &Dataset) -> HashMap<String, f64> {
     // Set parameters
     let n_trees = (1..11).into_iter().map(|x| x * 50).collect::<Vec<usize>>();
     let mut intervals = (1..6).into_iter().map(|x| x * 2).collect::<Vec<i32>>();
@@ -45,7 +45,7 @@ pub fn tuning<T: OutlierForest + ClassificationForest>(model: T, ds_train: &Data
 
         let mut scores = 0.0;
         for _i in 0..20 {
-            let mut clf = TimeSeriesIsolationForest::new(t, i, Some(false), d);
+            let mut clf = TimeSeriesIsolationForest::new(t, i, false, d);
             clf.fit(&ds_train.get_data());
             let y_pred = clf.score_samples(&ds_test.get_data());
             scores += roc_auc_score(&y_pred, &ds_test.get_targets());

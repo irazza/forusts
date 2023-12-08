@@ -4,15 +4,15 @@ pub struct IsolationForest {
     trees: Vec<ExtraTree>,
     n_trees: usize,
     max_samples: usize,
-    enhanced_anomaly_score: Option<bool>,
+    enhanced_anomaly_score: bool,
     max_depth: Option<usize>,
 }
 
 impl IsolationForest {
     pub fn new(
         n_trees: usize,
-        max_depth: Option<usize>,
-        enhanced_anomaly_score: Option<bool>,
+        enhanced_anomaly_score: bool,
+        max_depth: Option<usize>
     ) -> Self {
         Self {
             trees: Vec::new(),
@@ -43,7 +43,7 @@ impl OutlierForest for IsolationForest {
     fn get_max_depth(&self) -> Option<usize> {
         self.max_depth
     }
-    fn get_enhanced_anomaly_score(&self) -> Option<bool> {
+    fn get_enhanced_anomaly_score(&self) -> bool {
         self.enhanced_anomaly_score
     }
     fn transform(&self, x: &Vec<Vec<f64>>, _intervals_index: usize) -> Vec<Vec<f64>> {

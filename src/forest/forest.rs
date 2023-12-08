@@ -218,6 +218,12 @@ pub trait ClassificationForest: Sync + Send {
             })
             .collect()
     }
+    
+    fn hyperparams_tuning(&mut self, params: HashMap<String, Vec<f64>>) -> HashMap<String, f64> {
+        let n_params = params.len();
+        //TODO
+        todo!();
+    }
 }
 
 pub trait OutlierForest: Sync + Send {
@@ -227,7 +233,7 @@ pub trait OutlierForest: Sync + Send {
     fn get_trees(&self) -> &Vec<ExtraTree>;
     fn get_n_trees(&self) -> usize;
     fn get_max_depth(&self) -> Option<usize>;
-    fn get_enhanced_anomaly_score(&self) -> Option<bool>;
+    fn get_enhanced_anomaly_score(&self) -> bool;
     fn transform(&self, x: &Vec<Vec<f64>>, intervals_index: usize) -> Vec<Vec<f64>>;
     fn compute_intervals(&mut self, n_features: usize);
     fn fit(&mut self, x: &Vec<Vec<f64>>) {
@@ -276,32 +282,38 @@ pub trait OutlierForest: Sync + Send {
                 let leaf = tree.predict_leaf(&transformed_sample);
                 depths.push(leaf.get_depth() as f64);
             }
-            let depth = mean(&depths[..]);
-            let average_path_length = self.average_path_length(&transformed_sample);
-            2.0f64.powf(-depth / average_path_length)
+            let path_length = self.path_length(&transformed_sample);
+            if self.get_enhanced_anomaly_score() {
+                let mut enhanced_scores = Vec::new(); 
+                for (pl, d) in path_length.iter().zip(depths.iter()) {
+                    enhanced_scores.push(2.0f64.powf(-d/pl));
+                }
+                return mean(&enhanced_scores[..]);
+            } else {
+                let average_path_length = mean(&path_length[..]);
+                let average_depth = mean(&depths[..]);
+                return 2.0f64.powf(-average_depth / average_path_length);
+            }
         }));
         scores
     }
 
-    fn average_path_length(&self, x: &Vec<f64>) -> f64 {
+    fn path_length(&self, x: &Vec<f64>) -> Vec<f64> {
         let mut path_length = Vec::new();
         for tree in self.get_trees() {
             let leaf = tree.predict_leaf(x);
-            let samples = leaf.get_samples();
-            if samples > 1 {
-                path_length.push(leaf.get_depth() as f64 + Self::path_length(samples as f64));
+            let samples = leaf.get_samples() as f64;
+            if samples > 1.0 {
+                path_length.push(leaf.get_depth() as f64 + (2.0 * (f64::ln(samples-1.0) + EULER_MASCHERONI) - 2.0 * (samples - 1.0) / samples));
             } else {
                 path_length.push(leaf.get_depth() as f64);
             }
         }
-        mean(&path_length[..])
+        path_length
     }
-
-    fn path_length(n: f64) -> f64 {
-        return 2.0 * (Self::armonic_number(n - 1.0)) - 2.0 * (n - 1.0) / n;
-    }
-
-    fn armonic_number(n: f64) -> f64 {
-        f64::ln(n) + EULER_MASCHERONI
+    fn hyperparams_tuning(&mut self, params: HashMap<String, Vec<f64>>) -> HashMap<String, f64> {
+        let n_params = params.len();
+        //TODO
+        todo!();
     }
 }

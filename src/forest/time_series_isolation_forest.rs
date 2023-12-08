@@ -8,16 +8,16 @@ pub struct TimeSeriesIsolationForest {
     n_intervals: usize,
     min_interval_length: usize,
     intervals: Vec<Vec<(usize, usize)>>,
-    max_depth: Option<usize>,
-    enhanced_anomaly_score: Option<bool>,
+    enhanced_anomaly_score: bool,
     max_samples: usize,
+    max_depth: Option<usize>,
 }
 
 impl TimeSeriesIsolationForest {
     pub fn new(
         n_trees: usize,
         n_intervals: usize,
-        enhanced_anomaly_score: Option<bool>,
+        enhanced_anomaly_score: bool,
         max_depth: Option<usize>,
     ) -> Self {
         Self {
@@ -52,7 +52,7 @@ impl OutlierForest for TimeSeriesIsolationForest {
     fn get_max_depth(&self) -> Option<usize> {
         self.max_depth
     }
-    fn get_enhanced_anomaly_score(&self) -> Option<bool> {
+    fn get_enhanced_anomaly_score(&self) -> bool {
         self.enhanced_anomaly_score
     }
     fn compute_intervals(&mut self, n_features: usize) {

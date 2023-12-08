@@ -1,5 +1,6 @@
 use crate::feature_extraction::statistics::unique;
 use crate::forest::forest::OutlierForest;
+use crate::forest::isolation_forest::IsolationForest;
 use crate::forest::time_series_isolation_forest::TimeSeriesIsolationForest;
 use crate::metrics::classification::roc_auc_score;
 use crate::utils::csv_io::read_csv;
@@ -49,6 +50,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         let ds_test = read_csv(test_path, b'\t', &mut mapping)?;
         let y_true = ds_test.get_targets().clone();
 
+        let mut clf = TimeSeriesIsolationForest::new(
+            n_trees, //n_trees,
+            2,       //n_features.sqrt() as usize,
+            false,
+            Some(5),
+        );
         hyperparameters.push(tuning(&ds_train, &ds_test));
         println!();
     }

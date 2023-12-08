@@ -136,6 +136,8 @@ impl Tree for DecisionTree {
         return false;
     }
     fn post_split_conditions(&self, new_impurity: f64, old_impurity: f64) -> bool {
-        new_impurity <= f64::EPSILON || new_impurity.is_nan() || new_impurity - old_impurity <= f64::EPSILON
+        new_impurity <= f64::EPSILON
+            || new_impurity.is_nan()
+            || new_impurity - old_impurity <= f64::EPSILON
     }
 }

@@ -28,7 +28,7 @@ impl TimeSeriesIsolationForest {
             max_depth,
             enhanced_anomaly_score,
             max_samples: 0,
-            min_interval_length: 3
+            min_interval_length: 3,
         }
     }
 }

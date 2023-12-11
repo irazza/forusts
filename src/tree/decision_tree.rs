@@ -6,7 +6,7 @@ use crate::{
         node::Node,
         tree::{Criterion, MaxFeatures, Tree},
     },
-    utils::structures::Sample
+    utils::structures::Sample,
 };
 
 pub struct DecisionTree {

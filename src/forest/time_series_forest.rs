@@ -1,9 +1,10 @@
 use crate::feature_extraction::statistics::{mean, slope, std};
-use crate::forest::forest::ClassificationForest;
+use crate::forest::forest::{ClassificationForest, Forest};
 use crate::tree::{
     decision_tree::DecisionTree,
     tree::{Criterion, MaxFeatures, Tree},
 };
+use crate::utils::structures::Sample;
 use rand::{thread_rng, Rng};
 use rayon::prelude::*;
 
@@ -44,34 +45,7 @@ impl TimeSeriesForest {
     }
 }
 
-impl ClassificationForest for TimeSeriesForest {
-    fn get_trees_mut(&mut self) -> &mut Vec<DecisionTree> {
-        &mut self.trees
-    }
-    fn get_trees(&self) -> &Vec<DecisionTree> {
-        &self.trees
-    }
-    fn get_n_trees(&self) -> usize {
-        self.n_trees
-    }
-    fn get_criterion(&self) -> Criterion {
-        self.criterion
-    }
-    fn get_max_features(&self) -> MaxFeatures {
-        self.max_features
-    }
-    fn get_max_depth(&self) -> Option<usize> {
-        self.max_depth
-    }
-    fn get_min_samples_split(&self) -> usize {
-        self.min_samples_split
-    }
-    fn get_max_samples(&self) -> usize {
-        self.max_samples
-    }
-    fn set_max_samples(&mut self, max_samples: usize) {
-        self.max_samples = max_samples;
-    }
+impl Forest<DecisionTree> for TimeSeriesForest {
     fn compute_intervals(&mut self, n_features: usize) {
         // Generate n_intervals, with random start and end
         for _i in 0..self.get_n_trees() {
@@ -84,19 +58,52 @@ impl ClassificationForest for TimeSeriesForest {
             self.intervals.push(intervals);
         }
     }
-    fn transform(&self, x: &[Vec<f64>], intervals_index: usize) -> Vec<Vec<f64>> {
-        let n_samples = x.len();
-        let mut transformed_x: Vec<Vec<f64>> = Vec::new();
+    fn get_max_depth(&self) -> Option<usize> {
+        self.max_depth
+    }
+    fn get_max_samples(&self) -> usize {
+        self.max_samples
+    }
+    fn get_n_trees(&self) -> usize {
+        self.n_trees
+    }
+    fn get_trees(&self) -> &Vec<DecisionTree> {
+        &self.trees
+    }
+    fn get_trees_mut(&mut self) -> &mut Vec<DecisionTree> {
+        &mut self.trees
+    }
+    fn set_max_samples(&mut self, max_samples: usize) {
+        self.max_samples = max_samples;
+    }
+    fn transform<'a>(&self, data: &[Sample<'a>], intervals_index: usize) -> Vec<Sample<'a>> {
+        let n_samples = data.len();
+        let mut transformed_data: Vec<Sample<'_>> = Vec::new();
         for j in 0..n_samples {
             let mut sample = Vec::new();
             for (start, end) in self.intervals[intervals_index].iter().copied() {
-                let mean = mean(&x[j][start..end]);
-                let std = std(&x[j][start..end]);
-                let slope = slope(&x[j][start..end]);
+                let mean = mean(&data[j].data[start..end]);
+                let std = std(&data[j].data[start..end]);
+                let slope = slope(&data[j].data[start..end]);
                 sample.extend([mean, std, slope].into_iter());
             }
-            transformed_x.push(sample);
+            transformed_data.push(Sample {
+                data: std::borrow::Cow::Owned(sample),
+                target: data[j].target,
+            });
         }
-        transformed_x
+        transformed_data
+    }
+}
+
+impl ClassificationForest for TimeSeriesForest {
+    fn get_criterion(&self) -> Criterion {
+        self.criterion
+    }
+    fn get_max_features(&self) -> MaxFeatures {
+        self.max_features
+    }
+    fn get_min_samples_split(&self) -> usize {
+        self.min_samples_split
     }
 }

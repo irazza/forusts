@@ -51,9 +51,10 @@ pub trait Tree {
     fn get_split(&self, samples: &[Sample<'_>]) -> (usize, f64, f64);
     fn pre_split_conditions(&self, samples: &[Sample<'_>], current_depth: usize) -> bool;
     fn post_split_conditions(&self, new_impurity: f64, old_impurity: f64) -> bool;
-    fn fit(&mut self, data: &mut[Sample<'_>]) {
+    fn fit(&mut self, data: &[Sample<'_>]) {
         let n_features = data[0].data.len();
         self.set_max_features(self.get_max_features().convert(n_features));
+        let data = &mut data.to_vec();
         let root = self.build_tree(data, self.get_max_depth(), f64::MAX);
         self.set_root(root);
     }
@@ -96,12 +97,12 @@ pub trait Tree {
             n_samples: samples.len(),
         }
     }
-    fn predict(&self, x: &[Vec<f64>]) -> Vec<isize> {
+    fn predict(&self, x: &[Sample<'_>]) -> Vec<isize> {
         x.iter()
             .map(|sample| self.predict_leaf(sample).get_class())
             .collect()
     }
-    fn predict_leaf(&self, x: &Vec<f64>) -> &Node {
+    fn predict_leaf(&self, x: &Sample<'_>) -> &Node {
         let mut node = self.get_root();
 
         while let Node::Split {
@@ -114,7 +115,7 @@ pub trait Tree {
             n_samples: _,
         } = node
         {
-            if x[*feature] <= *threshold {
+            if x.data[*feature] <= *threshold {
                 node = left;
             } else {
                 node = right;
@@ -195,7 +196,6 @@ pub trait Tree {
         ancestors.insert(node as *const Node, node);
         ancestors
     }
-
     fn compute_ancestor_rec<'a>(
         current: &'a Node,
         target: &'a Node,
@@ -243,7 +243,6 @@ pub trait Tree {
             }
         }
     }
-
     fn entropy_impurity(class_counts: &HashMap<isize, usize>) -> f64 {
         let mut impurity = 0.0;
         let total_samples = class_counts.values().sum::<usize>() as f64;
@@ -256,7 +255,6 @@ pub trait Tree {
 
         impurity
     }
-
     fn gini_impurity(class_counts: &HashMap<isize, usize>) -> f64 {
         let mut impurity = 1.0;
         let total_samples = class_counts.values().sum::<usize>() as f64;

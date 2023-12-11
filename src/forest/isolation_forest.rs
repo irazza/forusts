@@ -1,4 +1,8 @@
-use crate::{forest::forest::OutlierForest, tree::isolation_tree::IsolationTree};
+use crate::{
+    forest::forest::{Forest, OutlierForest},
+    tree::{isolation_tree::IsolationTree, tree::Tree},
+    utils::structures::Sample,
+};
 
 pub struct IsolationForest {
     trees: Vec<IsolationTree>,
@@ -19,31 +23,32 @@ impl IsolationForest {
         }
     }
 }
-
-impl OutlierForest for IsolationForest {
-    fn set_max_samples(&mut self, max_samples: usize) {
-        self.max_samples = max_samples;
+impl Forest<IsolationTree> for IsolationForest {
+    fn compute_intervals(&mut self, _n_features: usize) {}
+    fn get_max_depth(&self) -> Option<usize> {
+        self.max_depth
     }
     fn get_max_samples(&self) -> usize {
         self.max_samples
     }
-    fn get_trees_mut(&mut self) -> &mut Vec<IsolationTree> {
-        &mut self.trees
+    fn get_n_trees(&self) -> usize {
+        self.n_trees
     }
     fn get_trees(&self) -> &Vec<IsolationTree> {
         &self.trees
     }
-    fn get_n_trees(&self) -> usize {
-        self.n_trees
+    fn get_trees_mut(&mut self) -> &mut Vec<IsolationTree> {
+        &mut self.trees
     }
-    fn get_max_depth(&self) -> Option<usize> {
-        self.max_depth
+    fn set_max_samples(&mut self, max_samples: usize) {
+        self.max_samples = max_samples;
     }
+    fn transform<'a>(&self, data: &[Sample<'a>], _intervals_index: usize) -> Vec<Sample<'a>> {
+        data.to_vec()
+    }
+}
+impl OutlierForest for IsolationForest {
     fn get_enhanced_anomaly_score(&self) -> bool {
         self.enhanced_anomaly_score
     }
-    fn transform(&self, x: &[Vec<f64>], _intervals_index: usize) -> Vec<Vec<f64>> {
-        x.to_vec()
-    }
-    fn compute_intervals(&mut self, _n_features: usize) {}
 }

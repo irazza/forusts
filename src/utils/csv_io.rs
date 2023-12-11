@@ -1,4 +1,3 @@
-
 use csv::ReaderBuilder;
 use hashbrown::HashMap;
 use std::error::Error;
@@ -8,14 +7,11 @@ use std::path::Path;
 
 use crate::utils::structures::Sample;
 
-
-
 pub fn read_csv(
     path: impl AsRef<Path>,
     delimiter: u8,
     header: bool,
-) -> Result<Vec<Sample<'static>>, Box<dyn Error>>{
-
+) -> Result<Vec<Sample<'static>>, Box<dyn Error>> {
     let reader = BufReader::new(File::open(path)?);
     let mut reader = ReaderBuilder::new()
         .has_headers(header)
@@ -24,7 +20,7 @@ pub fn read_csv(
 
     let mut samples = Vec::new();
 
-    for result in reader.deserialize(){
+    for result in reader.deserialize() {
         let record: Sample = result.unwrap();
         samples.push(record);
     }

@@ -7,6 +7,7 @@ use hashbrown::HashMap;
 use parking_lot::Mutex;
 use rand::{seq::SliceRandom, thread_rng, Rng};
 use rayon::prelude::*;
+use std::borrow::Cow::Borrowed;
 
 use crate::{
     feature_extraction::statistics::{mean, EULER_MASCHERONI},
@@ -15,8 +16,10 @@ use crate::{
         isolation_tree::IsolationTree,
         node::Node,
         tree::{Criterion, MaxFeatures, Tree},
-    },
+    }, utils::structures::Sample,
 };
+
+pub const ANOMALY_SCORE: f64 = 2.0;
 
 pub trait ClassificationForest: Sync + Send {
     fn get_trees_mut(&mut self) -> &mut Vec<DecisionTree>;
@@ -30,7 +33,7 @@ pub trait ClassificationForest: Sync + Send {
     fn set_max_samples(&mut self, max_samples: usize);
     fn transform(&self, x: &[Vec<f64>], intervals_index: usize) -> Vec<Vec<f64>>;
     fn compute_intervals(&mut self, n_features: usize);
-    fn fit(&mut self, x: &[Vec<f64>], y: &Vec<usize>) {
+    fn fit(&mut self, x: &[Vec<f64>], y: &Vec<isize>) {
         let n_samples = x.len();
         self.set_max_samples(n_samples);
         let n_trees = self.get_n_trees();
@@ -50,11 +53,10 @@ pub trait ClassificationForest: Sync + Send {
                 self.get_max_features(),
             );
             tree.fit(
-                &bootstrap_indices
+                &mut bootstrap_indices
                     .iter()
-                    .map(|i| &transformed_x[*i])
-                    .collect(),
-                &bootstrap_indices.iter().map(|i| y[*i]).collect(),
+                    .map(|i| Sample{target: y[*i], data: Borrowed(&transformed_x[*i])})
+                    .collect::<Vec<Sample<'_>>>(),
             );
             tree
         }));
@@ -67,7 +69,7 @@ pub trait ClassificationForest: Sync + Send {
             .sum::<usize>() as f64
             / self.get_n_trees() as f64
     }
-    fn predict(&self, x: &[Vec<f64>]) -> Vec<usize> {
+    fn predict(&self, x: &[Vec<f64>]) -> Vec<isize> {
         let n_samples = x.len();
         let mut predictions = Vec::new();
         // Make predictions for each sample using each tree in the forest
@@ -218,12 +220,6 @@ pub trait ClassificationForest: Sync + Send {
             })
             .collect()
     }
-
-    fn hyperparams_tuning(&mut self, params: HashMap<String, Vec<f64>>) -> HashMap<String, f64> {
-        let n_params = params.len();
-        //TODO
-        todo!();
-    }
 }
 
 pub trait OutlierForest: Sync + Send {
@@ -251,11 +247,10 @@ pub trait OutlierForest: Sync + Send {
                 2, // Setted to 2 to avoid empty child when splitting when there are only two samples
             );
             tree.fit(
-                &(0..self.get_max_samples())
+                &mut(0..self.get_max_samples())
                     .into_iter()
-                    .map(|i| &transformed_x[n_samples[i]])
-                    .collect::<Vec<&Vec<f64>>>(),
-                &(0..self.get_max_samples()).collect(),
+                    .map(|i| Sample{target: i as isize, data: Borrowed(&transformed_x[n_samples[i]])})
+                    .collect::<Vec<Sample<'_>>>()
             );
 
             tree
@@ -286,7 +281,7 @@ pub trait OutlierForest: Sync + Send {
                 let depth = leaf.get_depth() as f64;
 
                 if self.get_enhanced_anomaly_score() {
-                    enhnaced_score += 2.0f64.powf(-depth / path_length);
+                    enhnaced_score += ANOMALY_SCORE.powf(-depth / path_length);
                 } else {
                     average_depth += depth;
                     average_path_length += path_length;
@@ -296,7 +291,7 @@ pub trait OutlierForest: Sync + Send {
             if self.get_enhanced_anomaly_score() {
                 return enhnaced_score / self.get_n_trees() as f64;
             } else {
-                return 2.0f64.powf(-average_depth / average_path_length);
+                return ANOMALY_SCORE.powf(-average_depth / average_path_length);
             }
         }));
         // scores.par_extend(x.par_iter().map(|sample| {
@@ -333,10 +328,5 @@ pub trait OutlierForest: Sync + Send {
         } else {
             return leaf.get_depth() as f64;
         }
-    }
-    fn hyperparams_tuning(&mut self, params: HashMap<String, Vec<f64>>) -> HashMap<String, f64> {
-        let n_params = params.len();
-        //TODO
-        todo!();
     }
 }

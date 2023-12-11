@@ -34,7 +34,7 @@ impl Criterion {
         }
     }
 
-    pub fn to_fn<T: Tree>(self) -> fn(&HashMap<usize, usize>) -> f64 {
+    pub fn to_fn<T: Tree>(self) -> fn(&HashMap<isize, usize>) -> f64 {
         match self {
             Criterion::Gini => T::gini_impurity,
             Criterion::Entropy => T::entropy_impurity,
@@ -51,20 +51,10 @@ pub trait Tree {
     fn get_split(&self, samples: &[Sample<'_>]) -> (usize, f64, f64);
     fn pre_split_conditions(&self, samples: &[Sample<'_>], current_depth: usize) -> bool;
     fn post_split_conditions(&self, new_impurity: f64, old_impurity: f64) -> bool;
-    fn fit(&mut self, x: &Vec<&Vec<f64>>, y: &Vec<usize>) {
-        // Start the iterative tree-building process
-        let mut data = x
-            .iter()
-            .zip(y.iter())
-            .map(|(x, y)| Sample {
-                data: &x,
-                target: *y,
-            })
-            .collect::<Vec<_>>();
-
+    fn fit(&mut self, data: &mut[Sample<'_>]) {
         let n_features = data[0].data.len();
         self.set_max_features(self.get_max_features().convert(n_features));
-        let root = self.build_tree(&mut data, self.get_max_depth(), f64::MAX);
+        let root = self.build_tree(data, self.get_max_depth(), f64::MAX);
         self.set_root(root);
     }
     fn build_tree(&mut self, samples: &mut [Sample<'_>], max_depth: usize, impurity: f64) -> Node {
@@ -106,7 +96,7 @@ pub trait Tree {
             n_samples: samples.len(),
         }
     }
-    fn predict(&self, x: &[Vec<f64>]) -> Vec<usize> {
+    fn predict(&self, x: &[Vec<f64>]) -> Vec<isize> {
         x.iter()
             .map(|sample| self.predict_leaf(sample).get_class())
             .collect()
@@ -151,7 +141,7 @@ pub trait Tree {
 
         samples.split_at_mut(idx)
     }
-    fn get_most_common_class(samples: &[Sample<'_>]) -> usize {
+    fn get_most_common_class(samples: &[Sample<'_>]) -> isize {
         let mut class_counts = HashMap::new();
         for Sample { target, .. } in samples {
             *class_counts.entry(*target).or_insert(0) += 1;
@@ -254,7 +244,7 @@ pub trait Tree {
         }
     }
 
-    fn entropy_impurity(class_counts: &HashMap<usize, usize>) -> f64 {
+    fn entropy_impurity(class_counts: &HashMap<isize, usize>) -> f64 {
         let mut impurity = 0.0;
         let total_samples = class_counts.values().sum::<usize>() as f64;
         for &count in class_counts.values() {
@@ -267,7 +257,7 @@ pub trait Tree {
         impurity
     }
 
-    fn gini_impurity(class_counts: &HashMap<usize, usize>) -> f64 {
+    fn gini_impurity(class_counts: &HashMap<isize, usize>) -> f64 {
         let mut impurity = 1.0;
         let total_samples = class_counts.values().sum::<usize>() as f64;
         for &count in class_counts.values() {

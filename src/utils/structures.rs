@@ -1,4 +1,8 @@
+use std::borrow::Cow;
+use serde::{Serialize, Deserialize};
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct Sample<'a> {
-    pub data: &'a [f64],
-    pub target: usize,
+    pub target: isize,
+    pub data: Cow<'a, [f64]>
 }

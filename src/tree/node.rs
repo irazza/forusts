@@ -1,7 +1,7 @@
 #[derive(Debug, Clone)]
 pub enum Node {
     Leaf {
-        class: usize,
+        class: isize,
         depth: usize,
         impurity: f64,
         n_samples: usize,
@@ -46,7 +46,7 @@ impl Node {
         }
     }
 
-    pub fn get_class(&self) -> usize {
+    pub fn get_class(&self) -> isize {
         match self {
             Node::Leaf {
                 class,

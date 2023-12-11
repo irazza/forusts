@@ -98,7 +98,7 @@ pub fn matthews_corrcoef(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
     }
 }
 
-pub fn roc_auc_score(y_pred: &Vec<f64>, y_true: &Vec<usize>) -> f64 {
+pub fn roc_auc_score(y_pred: &Vec<f64>, y_true: &Vec<isize>) -> f64 {
     // Calculate ROC curve
     let (fprs, tprs, _) = roc_curve(y_pred, y_true);
 
@@ -133,7 +133,7 @@ fn auc(x: &Vec<f64>, y: &Vec<f64>) -> f64 {
     auc_value
 }
 
-pub fn true_positive_rate(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
+pub fn true_positive_rate(y_pred: &Vec<usize>, y_true: &Vec<isize>) -> f64 {
     // Ensure the input vectors have the same length
     assert_eq!(
         y_pred.len(),
@@ -170,7 +170,7 @@ pub fn true_positive_rate(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
     tpr
 }
 
-pub fn false_positive_rate(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
+pub fn false_positive_rate(y_pred: &Vec<usize>, y_true: &Vec<isize>) -> f64 {
     // Ensure the input vectors have the same length
     assert_eq!(
         y_pred.len(),
@@ -208,7 +208,7 @@ pub fn false_positive_rate(y_pred: &Vec<usize>, y_true: &Vec<usize>) -> f64 {
     fpr
 }
 
-fn roc_curve(y_pred: &Vec<f64>, y_true: &Vec<usize>) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+fn roc_curve(y_pred: &Vec<f64>, y_true: &Vec<isize>) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
     // Ensure the input vectors have the same length
     assert_eq!(
         y_pred.len(),

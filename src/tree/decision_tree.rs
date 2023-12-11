@@ -6,7 +6,7 @@ use crate::{
         node::Node,
         tree::{Criterion, MaxFeatures, Tree},
     },
-    utils::structures::Sample,
+    utils::structures::Sample
 };
 
 pub struct DecisionTree {
@@ -121,8 +121,8 @@ impl Tree for DecisionTree {
             return true;
         }
         // Base case: samples are the same object
-        let first_sample = samples[0].data;
-        let is_all_same_data = samples.iter().all(|v| v.data == first_sample);
+        let first_sample = &samples[0];
+        let is_all_same_data = samples.iter().all(|v| v == first_sample);
         if is_all_same_data {
             return true;
         }

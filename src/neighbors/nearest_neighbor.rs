@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use hashbrown::HashMap;
 
-pub fn k_nearest_neighbor(k: usize, y_train: &Vec<usize>, x_test: &Vec<Vec<f64>>) -> Vec<usize> {
+pub fn k_nearest_neighbor(k: usize, y_train: &Vec<usize>, x_test: &[Vec<f64>]) -> Vec<usize> {
     let mut predictions = Vec::new();
 
     for i in 0..x_test.len() {

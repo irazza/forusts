@@ -12,7 +12,7 @@ use crate::{
     feature_extraction::statistics::{mean, EULER_MASCHERONI},
     tree::{
         decision_tree::DecisionTree,
-        extra_tree::ExtraTree,
+        isolation_tree::IsolationTree,
         node::Node,
         tree::{Criterion, MaxFeatures, Tree},
     },
@@ -28,9 +28,9 @@ pub trait ClassificationForest: Sync + Send {
     fn get_min_samples_split(&self) -> usize;
     fn get_max_samples(&self) -> usize;
     fn set_max_samples(&mut self, max_samples: usize);
-    fn transform(&self, x: &Vec<Vec<f64>>, intervals_index: usize) -> Vec<Vec<f64>>;
+    fn transform(&self, x: &[Vec<f64>], intervals_index: usize) -> Vec<Vec<f64>>;
     fn compute_intervals(&mut self, n_features: usize);
-    fn fit(&mut self, x: &Vec<Vec<f64>>, y: &Vec<usize>) {
+    fn fit(&mut self, x: &[Vec<f64>], y: &Vec<usize>) {
         let n_samples = x.len();
         self.set_max_samples(n_samples);
         let n_trees = self.get_n_trees();
@@ -67,7 +67,7 @@ pub trait ClassificationForest: Sync + Send {
             .sum::<usize>() as f64
             / self.get_n_trees() as f64
     }
-    fn predict(&self, x: &Vec<Vec<f64>>) -> Vec<usize> {
+    fn predict(&self, x: &[Vec<f64>]) -> Vec<usize> {
         let n_samples = x.len();
         let mut predictions = Vec::new();
         // Make predictions for each sample using each tree in the forest
@@ -218,7 +218,7 @@ pub trait ClassificationForest: Sync + Send {
             })
             .collect()
     }
-    
+
     fn hyperparams_tuning(&mut self, params: HashMap<String, Vec<f64>>) -> HashMap<String, f64> {
         let n_params = params.len();
         //TODO
@@ -229,14 +229,14 @@ pub trait ClassificationForest: Sync + Send {
 pub trait OutlierForest: Sync + Send {
     fn set_max_samples(&mut self, max_samples: usize);
     fn get_max_samples(&self) -> usize;
-    fn get_trees_mut(&mut self) -> &mut Vec<ExtraTree>;
-    fn get_trees(&self) -> &Vec<ExtraTree>;
+    fn get_trees_mut(&mut self) -> &mut Vec<IsolationTree>;
+    fn get_trees(&self) -> &Vec<IsolationTree>;
     fn get_n_trees(&self) -> usize;
     fn get_max_depth(&self) -> Option<usize>;
     fn get_enhanced_anomaly_score(&self) -> bool;
-    fn transform(&self, x: &Vec<Vec<f64>>, intervals_index: usize) -> Vec<Vec<f64>>;
+    fn transform(&self, x: &[Vec<f64>], intervals_index: usize) -> Vec<Vec<f64>>;
     fn compute_intervals(&mut self, n_features: usize);
-    fn fit(&mut self, x: &Vec<Vec<f64>>) {
+    fn fit(&mut self, x: &[Vec<f64>]) {
         self.set_max_samples(min(256, x.len()));
         self.compute_intervals(x[0].len());
         let mut trees = Vec::new();
@@ -245,7 +245,7 @@ pub trait OutlierForest: Sync + Send {
             let mut n_samples: Vec<usize> = (0..x.len()).collect();
             n_samples.shuffle(&mut rand::thread_rng());
 
-            let mut tree = ExtraTree::new(
+            let mut tree = IsolationTree::new(
                 self.get_max_depth()
                     .unwrap_or(self.get_max_samples().ilog2() as usize + 1),
                 2, // Setted to 2 to avoid empty child when splitting when there are only two samples
@@ -263,7 +263,7 @@ pub trait OutlierForest: Sync + Send {
         *self.get_trees_mut() = trees;
     }
 
-    fn predict(&self, x: &Vec<Vec<f64>>) -> Vec<usize> {
+    fn predict(&self, x: &[Vec<f64>]) -> Vec<usize> {
         let scores = self.score_samples(x);
         let mut predictions = Vec::new();
         for i in 0..x.len() {
@@ -272,44 +272,67 @@ pub trait OutlierForest: Sync + Send {
         predictions
     }
 
-    fn score_samples(&self, x: &Vec<Vec<f64>>) -> Vec<f64> {
+    fn score_samples(&self, x: &[Vec<f64>]) -> Vec<f64> {
         let mut scores = Vec::new();
-        scores.par_extend(x.par_iter().map(|sample| {
-            let mut transformed_sample = Vec::new();
-            let mut depths = Vec::new();
+        scores.par_extend(x.par_windows(1).map(|sample| {
+            let mut average_depth = 0.0;
+            let mut average_path_length = 0.0;
+            let mut enhnaced_score = 0.0;
+
             for (i, tree) in self.get_trees().iter().enumerate() {
-                transformed_sample = self.transform(&vec![sample.clone()], i)[0].clone();
-                let leaf = tree.predict_leaf(&transformed_sample);
-                depths.push(leaf.get_depth() as f64);
-            }
-            let path_length = self.path_length(&transformed_sample);
-            if self.get_enhanced_anomaly_score() {
-                let mut enhanced_scores = Vec::new(); 
-                for (pl, d) in path_length.iter().zip(depths.iter()) {
-                    enhanced_scores.push(2.0f64.powf(-d/pl));
+                let transformed_x = self.transform(sample, i).into_iter().next().unwrap();
+                let leaf = tree.predict_leaf(&transformed_x);
+                let path_length = Self::path_length(&leaf);
+                let depth = leaf.get_depth() as f64;
+
+                if self.get_enhanced_anomaly_score() {
+                    enhnaced_score += 2.0f64.powf(-depth / path_length);
+                } else {
+                    average_depth += depth;
+                    average_path_length += path_length;
                 }
-                return mean(&enhanced_scores[..]);
+            }
+
+            if self.get_enhanced_anomaly_score() {
+                return enhnaced_score / self.get_n_trees() as f64;
             } else {
-                let average_path_length = mean(&path_length[..]);
-                let average_depth = mean(&depths[..]);
                 return 2.0f64.powf(-average_depth / average_path_length);
             }
         }));
+        // scores.par_extend(x.par_iter().map(|sample| {
+        //     let mut transformed_sample = Vec::new();
+        //     let mut depths = Vec::new();
+        //     for (i, tree) in self.get_trees().iter().enumerate() {
+        //         transformed_sample = self.transform(&vec![sample.clone()], i)[0].clone();
+        //         let leaf = tree.predict_leaf(&transformed_sample);
+        //         depths.push(leaf.get_depth() as f64);
+        //     }
+        // // ERROR PATH LENGHT ALWAYS USE THE LAST TRANSFORMED SAMPLE
+        //     let path_length = self.path_length(&transformed_sample);
+        //     if self.get_enhanced_anomaly_score() {
+        //         let mut enhanced_scores = Vec::new();
+        //         for (pl, d) in path_length.iter().zip(depths.iter()) {
+        //             enhanced_scores.push(2.0f64.powf(-d/pl));
+        //         }
+        //         return mean(&enhanced_scores[..]);
+        //     } else {
+        //         let average_path_length = mean(&path_length[..]);
+        //         let average_depth = mean(&depths[..]);
+        //         return 2.0f64.powf(-average_depth / average_path_length);
+        //     }
+        // }));
         scores
     }
 
-    fn path_length(&self, x: &Vec<f64>) -> Vec<f64> {
-        let mut path_length = Vec::new();
-        for tree in self.get_trees() {
-            let leaf = tree.predict_leaf(x);
-            let samples = leaf.get_samples() as f64;
-            if samples > 1.0 {
-                path_length.push(leaf.get_depth() as f64 + (2.0 * (f64::ln(samples-1.0) + EULER_MASCHERONI) - 2.0 * (samples - 1.0) / samples));
-            } else {
-                path_length.push(leaf.get_depth() as f64);
-            }
+    fn path_length(leaf: &Node) -> f64 {
+        let samples = leaf.get_samples() as f64;
+        if samples > 1.0 {
+            return leaf.get_depth() as f64
+                + (2.0 * (f64::ln(samples - 1.0) + EULER_MASCHERONI)
+                    - 2.0 * (samples - 1.0) / samples);
+        } else {
+            return leaf.get_depth() as f64;
         }
-        path_length
     }
     fn hyperparams_tuning(&mut self, params: HashMap<String, Vec<f64>>) -> HashMap<String, f64> {
         let n_params = params.len();

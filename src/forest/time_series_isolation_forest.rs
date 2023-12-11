@@ -1,9 +1,9 @@
 use crate::feature_extraction::statistics::{mean, slope, std};
-use crate::{forest::forest::OutlierForest, tree::extra_tree::ExtraTree};
+use crate::{forest::forest::OutlierForest, tree::isolation_tree::IsolationTree};
 use rand::{thread_rng, Rng};
 
 pub struct TimeSeriesIsolationForest {
-    trees: Vec<ExtraTree>,
+    trees: Vec<IsolationTree>,
     n_trees: usize,
     n_intervals: usize,
     min_interval_length: usize,
@@ -40,10 +40,10 @@ impl OutlierForest for TimeSeriesIsolationForest {
     fn get_max_samples(&self) -> usize {
         self.max_samples
     }
-    fn get_trees_mut(&mut self) -> &mut Vec<ExtraTree> {
+    fn get_trees_mut(&mut self) -> &mut Vec<IsolationTree> {
         &mut self.trees
     }
-    fn get_trees(&self) -> &Vec<ExtraTree> {
+    fn get_trees(&self) -> &Vec<IsolationTree> {
         &self.trees
     }
     fn get_n_trees(&self) -> usize {
@@ -67,7 +67,7 @@ impl OutlierForest for TimeSeriesIsolationForest {
             self.intervals.push(intervals);
         }
     }
-    fn transform(&self, x: &Vec<Vec<f64>>, intervals_index: usize) -> Vec<Vec<f64>> {
+    fn transform(&self, x: &[Vec<f64>], intervals_index: usize) -> Vec<Vec<f64>> {
         let n_samples = x.len();
         let mut transformed_x: Vec<Vec<f64>> = Vec::new();
         for j in 0..n_samples {

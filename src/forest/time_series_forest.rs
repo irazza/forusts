@@ -84,7 +84,7 @@ impl ClassificationForest for TimeSeriesForest {
             self.intervals.push(intervals);
         }
     }
-    fn transform(&self, x: &Vec<Vec<f64>>, intervals_index: usize) -> Vec<Vec<f64>> {
+    fn transform(&self, x: &[Vec<f64>], intervals_index: usize) -> Vec<Vec<f64>> {
         let n_samples = x.len();
         let mut transformed_x: Vec<Vec<f64>> = Vec::new();
         for j in 0..n_samples {

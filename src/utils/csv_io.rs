@@ -16,7 +16,7 @@ impl Dataset {
         &self.targets
     }
 
-    pub fn get_data(&self) -> &Vec<Vec<f64>> {
+    pub fn get_data(&self) -> &[Vec<f64>] {
         &self.data
     }
 }

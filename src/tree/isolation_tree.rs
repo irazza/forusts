@@ -2,14 +2,14 @@ use super::{node::Node, tree::MaxFeatures};
 use crate::{tree::tree::Tree, utils::structures::Sample};
 use rand::{thread_rng, Rng};
 
-pub struct ExtraTree {
+pub struct IsolationTree {
     root: Node,
     max_depth: usize,
     min_samples_split: usize,
     max_features: usize,
 }
 
-impl ExtraTree {
+impl IsolationTree {
     pub fn new(max_depth: usize, min_samples_split: usize) -> Self {
         let root = Node::new();
         Self {
@@ -20,8 +20,7 @@ impl ExtraTree {
         }
     }
 }
-
-impl Tree for ExtraTree {
+impl Tree for IsolationTree {
     fn get_max_depth(&self) -> usize {
         self.max_depth
     }

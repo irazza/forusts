@@ -35,7 +35,7 @@
 //         }
 //     }
 
-//     pub fn transform(x: &Vec<Vec<f64>>, intervals: &Vec<(usize, usize)>) -> Vec<Vec<f64>> {
+//     pub fn transform(x: &[Vec<f64>], intervals: &Vec<(usize, usize)>) -> Vec<Vec<f64>> {
 //         let x1 = x[0].clone();
 //         let dn_histogram_mode_5 = catch22::dn_histogram_mode_n(&x1, 5);
 //         let dn_histogram_mode_10 = catch22::dn_histogram_mode_n(&x1, 10);

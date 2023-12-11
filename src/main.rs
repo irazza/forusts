@@ -48,18 +48,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         mapping.insert(1, 1);
         let ds_train = read_csv(train_path, b'\t', &mut mapping)?;
         let ds_test = read_csv(test_path, b'\t', &mut mapping)?;
-        let y_true = ds_test.get_targets().clone();
-
-        let mut clf = TimeSeriesIsolationForest::new(
-            n_trees, //n_trees,
-            2,       //n_features.sqrt() as usize,
-            false,
-            Some(5),
-        );
         hyperparameters.push(tuning(&ds_train, &ds_test));
-        println!();
     }
     println!("{:?}", hyperparameters);
+    serde_json::to_writer(fs::File::create("hyperparameters.json")?, &hyperparameters)?;
+
     //     let n_features = ds_train.get_data()[0].len() as f64;
     //     for _i in 0..n_repetitions {
     //         let mut clf = TimeSeriesIsolationForest::new(

@@ -64,7 +64,7 @@ pub trait Tree {
 
         let n_features = data[0].data.len();
         self.set_max_features(self.get_max_features().convert(n_features));
-        let root = self.build_tree(&mut data, self.get_max_depth(), 0.0);
+        let root = self.build_tree(&mut data, self.get_max_depth(), f64::MAX);
         self.set_root(root);
     }
     fn build_tree(&mut self, samples: &mut [Sample<'_>], max_depth: usize, impurity: f64) -> Node {
@@ -106,7 +106,7 @@ pub trait Tree {
             n_samples: samples.len(),
         }
     }
-    fn predict(&self, x: &Vec<Vec<f64>>) -> Vec<usize> {
+    fn predict(&self, x: &[Vec<f64>]) -> Vec<usize> {
         x.iter()
             .map(|sample| self.predict_leaf(sample).get_class())
             .collect()

@@ -61,8 +61,8 @@ impl ClassificationForest for RandomForest {
     fn set_max_samples(&mut self, max_samples: usize) {
         self.max_samples = max_samples;
     }
-    fn transform(&self, x: &Vec<Vec<f64>>, _intervals_index: usize) -> Vec<Vec<f64>> {
-        x.clone()
+    fn transform(&self, x: &[Vec<f64>], _intervals_index: usize) -> Vec<Vec<f64>> {
+        x.to_vec()
     }
     fn compute_intervals(&mut self, _n_features: usize) {}
 }

@@ -1,8 +1,9 @@
-use crate::forest::forest::OutlierForest;
-use crate::forest::time_series_isolation_forest::TimeSeriesIsolationForest;
+use crate::forest::forest::{Forest, OutlierForest, OutlierForestConfig};
+use crate::forest::time_series_isolation_forest::{
+    TimeSeriesIsolationForest, TimeSeriesIsolationForestConfig,
+};
 use crate::metrics::classification::roc_auc_score;
 use crate::utils::csv_io::read_csv;
-use crate::utils::tuning::tuning;
 use std::error::Error;
 use std::fs;
 use utils::csv_io::write_csv;
@@ -16,8 +17,8 @@ mod utils;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let paths = fs::read_dir("/media/aazzari/DATA/admep/")?;
-    //let mut predictions = Vec::new();
-    let mut hyperparameters = Vec::new();
+    let mut predictions = Vec::new();
+    //let mut hyperparameters = Vec::new();
     let n_repetitions = 10;
     let n_trees = 100;
 
@@ -39,47 +40,55 @@ fn main() -> Result<(), Box<dyn Error>> {
             .path()
             .join(format!("{}_TEST.tsv", path.file_name().to_string_lossy()));
 
-        let ds_train = read_csv(train_path, b'\t', false)?;
+        let mut ds_train = read_csv(train_path, b'\t', false)?;
         let ds_test = read_csv(test_path, b'\t', false)?;
         let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
 
         let n_features = ds_train[0].data.len() as f64;
 
-        hyperparameters.push(tuning(&ds_train, &ds_test));
+        //     hyperparameters.push(tuning(&ds_train, &ds_test));
 
+        // }
+
+        // serde_json::to_writer_pretty(
+        //     std::fs::File::create("admepTSIF_hyperparameters.json")?,
+        //     &hyperparameters,
+        // )?;
+        let config = TimeSeriesIsolationForestConfig {
+            n_intervals: n_features.sqrt() as usize,
+            outlier_config: OutlierForestConfig {
+                n_trees: n_trees,
+                enhanced_anomaly_score: false,
+                max_depth: None,
+            },
+        };
+
+        for _i in 0..n_repetitions {
+            let mut clf = TimeSeriesIsolationForest::new(config);
+            clf.fit(&mut ds_train);
+            let y_score = clf.score_samples(&ds_test);
+            let roc_auc = roc_auc_score(&y_score, &y_true);
+            predictions.push([roc_auc].to_vec());
+        }
+    }
+    // Create index modifying datasets multiplying by n_repetitions
+    let mut index = Vec::new();
+    for i in 0..datasets.len() {
+        for _j in 0..n_repetitions {
+            index.push(datasets[i].file_name().to_string_lossy().to_string());
+        }
     }
 
-    serde_json::to_writer_pretty(
-        std::fs::File::create("admepTSIF_hyperparameters.json")?,
-        &hyperparameters,
+    let header = vec!["Dataset", "ROC-AUC"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    write_csv(
+        format!("admepTSIF_T{}_R{}.csv", n_trees, n_repetitions),
+        predictions,
+        header,
+        index,
     )?;
-    //     for _i in 0..n_repetitions {
-    //         let mut clf =
-    //             TimeSeriesIsolationForest::new(n_trees, n_features.sqrt() as usize, false, None);
-    //         clf.fit(&ds_train);
-    //         let y_score = clf.score_samples(&ds_test);
-    //         let roc_auc = roc_auc_score(&y_score, &y_true);
-    //         predictions.push([roc_auc].to_vec());
-    //     }
-    // }
-    // // Create index modifying datasets multiplying by n_repetitions
-    // let mut index = Vec::new();
-    // for i in 0..datasets.len() {
-    //     for _j in 0..n_repetitions {
-    //         index.push(datasets[i].file_name().to_string_lossy().to_string());
-    //     }
-    // }
-
-    // let header = vec!["Dataset", "ROC-AUC"]
-    //     .iter()
-    //     .map(|s| s.to_string())
-    //     .collect();
-    // write_csv(
-    //     format!("admepTSIF_T{}_R{}.csv", n_trees, n_repetitions),
-    //     predictions,
-    //     header,
-    //     index,
-    // )?;
 
     Ok(())
 }

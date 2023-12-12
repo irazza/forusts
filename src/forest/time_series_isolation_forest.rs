@@ -1,4 +1,5 @@
 use crate::feature_extraction::statistics::{mean, slope, std};
+use crate::grid_search_tuning;
 use crate::tree::tree::Tree;
 use crate::utils::structures::Sample;
 use crate::{
@@ -7,43 +8,44 @@ use crate::{
 };
 use rand::{thread_rng, Rng};
 
-pub struct TimeSeriesIsolationForest {
-    trees: Vec<IsolationTree>,
-    n_trees: usize,
-    n_intervals: usize,
-    min_interval_length: usize,
-    intervals: Vec<Vec<(usize, usize)>>,
-    enhanced_anomaly_score: bool,
-    max_samples: usize,
-    max_depth: Option<usize>,
-}
+use super::forest::OutlierForestConfig;
 
-impl TimeSeriesIsolationForest {
-    pub fn new(
-        n_trees: usize,
-        n_intervals: usize,
-        enhanced_anomaly_score: bool,
-        max_depth: Option<usize>,
-    ) -> Self {
-        Self {
-            trees: Vec::new(),
-            n_trees,
-            n_intervals,
-            intervals: Vec::new(),
-            max_depth,
-            enhanced_anomaly_score,
-            max_samples: 0,
-            min_interval_length: 3,
-        }
+
+grid_search_tuning!{
+    pub struct TimeSeriesIsolationForestConfig[TimeSeriesIsolationForestConfigTuning] {
+        pub n_intervals: usize,
+        pub outlier_config: OutlierForestConfig [OutlierForestConfigTuning],
     }
 }
 
+pub struct TimeSeriesIsolationForest {
+    trees: Vec<IsolationTree>,
+    min_interval_length: usize,
+    intervals: Vec<Vec<(usize, usize)>>,
+    config: TimeSeriesIsolationForestConfig,
+}
+
 impl Forest<IsolationTree> for TimeSeriesIsolationForest {
+    type Config = TimeSeriesIsolationForestConfig;
+    fn new(config: Self::Config) -> Self {
+        Self {
+            trees: Vec::new(),
+            min_interval_length: 3,
+            intervals: Vec::new(),
+            config,
+        }
+    }
+    fn fit(&mut self, data: &mut [Sample<'_>]) {
+        self.fit_(data);
+    }
+    fn predict(&self, data: &[Sample<'_>]) -> Vec<isize> {
+        self.predict_(data)
+    }
     fn compute_intervals(&mut self, n_features: usize) {
         // Generate n_intervals, with random start and end
-        for _i in 0..self.get_n_trees() {
+        for _i in 0..self.config.outlier_config.n_trees {
             let mut intervals = Vec::new();
-            for _j in 0..self.n_intervals {
+            for _j in 0..self.config.n_intervals {
                 let start = thread_rng().gen_range(0..n_features - self.min_interval_length);
                 let end = thread_rng().gen_range(start + self.min_interval_length..n_features);
                 intervals.push((start, end));
@@ -51,23 +53,11 @@ impl Forest<IsolationTree> for TimeSeriesIsolationForest {
             self.intervals.push(intervals);
         }
     }
-    fn get_max_depth(&self) -> Option<usize> {
-        self.max_depth
-    }
-    fn get_max_samples(&self) -> usize {
-        self.max_samples
-    }
-    fn get_n_trees(&self) -> usize {
-        self.n_trees
-    }
     fn get_trees(&self) -> &Vec<IsolationTree> {
         &self.trees
     }
     fn get_trees_mut(&mut self) -> &mut Vec<IsolationTree> {
         &mut self.trees
-    }
-    fn set_max_samples(&mut self, max_samples: usize) {
-        self.max_samples = max_samples;
     }
     fn transform<'a>(&self, data: &[Sample<'a>], intervals_index: usize) -> Vec<Sample<'a>> {
         let n_samples = data.len();
@@ -90,7 +80,7 @@ impl Forest<IsolationTree> for TimeSeriesIsolationForest {
 }
 
 impl OutlierForest for TimeSeriesIsolationForest {
-    fn get_enhanced_anomaly_score(&self) -> bool {
-        self.enhanced_anomaly_score
+    fn get_forest_config(&self) -> &OutlierForestConfig {
+        &self.config.outlier_config
     }
 }

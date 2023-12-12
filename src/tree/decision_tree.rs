@@ -9,46 +9,28 @@ use crate::{
     utils::structures::Sample,
 };
 
-pub struct DecisionTree {
-    root: Node,
-    criterion: Criterion,
-    max_depth: usize,
-    min_samples_split: usize,
-    max_features_: MaxFeatures,
-    max_features: usize,
+pub struct DecisionTreeConfig {
+    pub criterion: Criterion,
+    pub max_depth: usize,
+    pub min_samples_split: usize,
+    pub max_features: MaxFeatures,
 }
 
-impl DecisionTree {
-    pub fn new(
-        criterion: Criterion,
-        max_depth: usize,
-        min_samples_split: usize,
-        max_features: MaxFeatures,
-    ) -> Self {
+pub struct DecisionTree {
+    root: Node,
+    config: DecisionTreeConfig,
+}
+
+impl Tree for DecisionTree {
+    type Config = DecisionTreeConfig;
+    fn new(config: Self::Config) -> Self {
         Self {
-            root: Node::Leaf {
-                class: 0,
-                depth: 0,
-                impurity: f64::MAX,
-                n_samples: 0,
-            },
-            criterion,
-            max_depth,
-            min_samples_split,
-            max_features_: max_features,
-            max_features: 0,
+            root: Node::new(),
+            config,
         }
     }
-}
-impl Tree for DecisionTree {
     fn get_max_depth(&self) -> usize {
-        self.max_depth
-    }
-    fn set_max_features(&mut self, max_features: usize) {
-        self.max_features = max_features;
-    }
-    fn get_max_features(&self) -> MaxFeatures {
-        self.max_features_
+        self.config.max_depth
     }
     fn get_root(&self) -> &Node {
         &self.root
@@ -65,7 +47,8 @@ impl Tree for DecisionTree {
         let mut best_threshold = f64::MAX;
         let mut best_impurity = f64::MAX;
 
-        for &feature_idx in &shuffled_features[..self.max_features] {
+        let n_features = self.config.max_features.convert(samples[0].data.len());
+        for &feature_idx in &shuffled_features[..n_features] {
             let mut feature_values = samples
                 .iter()
                 .map(|v| (v.data[feature_idx], v.target))
@@ -83,13 +66,15 @@ impl Tree for DecisionTree {
                 left_class_counts.entry(class).and_modify(|e| *e -= 1);
                 *right_class_counts.entry(class).or_insert(0) += 1;
 
-                let left_impurity = (self.criterion.to_fn::<DecisionTree>())(&left_class_counts);
-                let right_impurity = (self.criterion.to_fn::<DecisionTree>())(&right_class_counts);
+                let left_impurity =
+                    (self.config.criterion.to_fn::<DecisionTree>())(&left_class_counts);
+                let right_impurity =
+                    (self.config.criterion.to_fn::<DecisionTree>())(&right_class_counts);
 
                 let right_size = (i + 1) as f64;
                 let left_size = n_samples - right_size;
 
-                let impurity = match self.criterion {
+                let impurity = match self.config.criterion {
                     Criterion::Gini => {
                         (left_size / n_samples) * left_impurity
                             + (right_size / n_samples) * right_impurity
@@ -100,7 +85,7 @@ impl Tree for DecisionTree {
                             *class_counts.entry(*target).or_insert(0) += 1;
                         }
                         let parent_entropy =
-                            (self.criterion.to_fn::<DecisionTree>())(&class_counts);
+                            (self.config.criterion.to_fn::<DecisionTree>())(&class_counts);
                         1.0 / (parent_entropy
                             - ((left_size / n_samples) * left_impurity
                                 + (right_size / n_samples) * right_impurity))
@@ -117,7 +102,8 @@ impl Tree for DecisionTree {
     }
     fn pre_split_conditions(&self, samples: &[Sample<'_>], current_depth: usize) -> bool {
         // Base case: not enough samples or max depth reached
-        if samples.len() <= self.min_samples_split || current_depth == self.max_depth {
+        if samples.len() <= self.config.min_samples_split || current_depth == self.config.max_depth
+        {
             return true;
         }
         // Base case: samples are the same object

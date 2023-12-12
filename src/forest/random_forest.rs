@@ -8,66 +8,40 @@ use crate::{
 
 use crate::forest::forest::{ClassificationForest, Forest};
 
+use super::forest::ClassificationForestConfig;
+
+pub type RandomForestConfig = ClassificationForestConfig;
 pub struct RandomForest {
     trees: Vec<DecisionTree>,
-    criterion: Criterion,
-    min_samples_split: usize,
-    n_trees: usize,
-    max_features: MaxFeatures,
-    max_depth: Option<usize>,
-    max_samples: usize,
-}
-impl RandomForest {
-    pub fn new(
-        n_trees: usize,
-        criterion: Criterion,
-        min_samples_split: usize,
-        max_features: MaxFeatures,
-        max_depth: Option<usize>,
-    ) -> Self {
-        Self {
-            trees: Vec::new(),
-            n_trees,
-            criterion,
-            min_samples_split,
-            max_features,
-            max_depth,
-            max_samples: 0,
-        }
-    }
+    config: RandomForestConfig,
 }
 impl Forest<DecisionTree> for RandomForest {
+    type Config = RandomForestConfig;
+    fn new(config: Self::Config) -> Self {
+        Self {
+            trees: Vec::new(),
+            config,
+        }
+    }
+    fn fit(&mut self, data: &mut [Sample<'_>]) {
+        self.fit_(data)
+    }
+    fn predict(&self, data: &[Sample<'_>]) -> Vec<isize> {
+        self.predict_(data)
+    }
     fn compute_intervals(&mut self, _n_features: usize) {}
-    fn get_max_depth(&self) -> Option<usize> {
-        self.max_depth
-    }
-    fn get_max_samples(&self) -> usize {
-        self.max_samples
-    }
-    fn get_n_trees(&self) -> usize {
-        self.n_trees
-    }
     fn get_trees(&self) -> &Vec<DecisionTree> {
         &self.trees
     }
     fn get_trees_mut(&mut self) -> &mut Vec<DecisionTree> {
         &mut self.trees
     }
-    fn set_max_samples(&mut self, max_samples: usize) {
-        self.max_samples = max_samples;
-    }
     fn transform<'a>(&self, data: &[Sample<'a>], _intervals_index: usize) -> Vec<Sample<'a>> {
         data.to_vec()
     }
 }
 impl ClassificationForest for RandomForest {
-    fn get_criterion(&self) -> Criterion {
-        self.criterion
-    }
-    fn get_max_features(&self) -> MaxFeatures {
-        self.max_features
-    }
-    fn get_min_samples_split(&self) -> usize {
-        self.min_samples_split
+    fn get_forest_config(&self) -> &ClassificationForestConfig {
+        &self.config
     }
 }

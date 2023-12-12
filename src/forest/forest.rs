@@ -1,12 +1,12 @@
 use crate::{
     feature_extraction::statistics::EULER_MASCHERONI,
     tree::{
-        decision_tree::DecisionTree,
-        isolation_tree::IsolationTree,
+        decision_tree::{DecisionTree, DecisionTreeConfig},
+        isolation_tree::{IsolationTree, IsolationTreeConfig},
         node::Node,
         tree::{Criterion, MaxFeatures, Tree},
     },
-    utils::structures::Sample,
+    utils::structures::Sample, grid_search_tuning,
 };
 use hashbrown::HashMap;
 use parking_lot::Mutex;
@@ -20,39 +20,46 @@ use std::{
 pub const ANOMALY_SCORE: f64 = 2.0;
 
 pub trait Forest<T: Tree>: Sync + Send {
+    type Config;
     fn compute_intervals(&mut self, n_features: usize);
-    fn get_max_depth(&self) -> Option<usize>;
-    fn get_max_samples(&self) -> usize;
-    fn get_n_trees(&self) -> usize;
     fn get_trees(&self) -> &Vec<T>;
     fn get_trees_mut(&mut self) -> &mut Vec<T>;
-    fn set_max_samples(&mut self, max_samples: usize);
     fn transform<'a>(&self, data: &[Sample<'a>], intervals_index: usize) -> Vec<Sample<'a>>;
+    fn new(config: Self::Config) -> Self;
+    fn fit(&mut self, data: &mut [Sample<'_>]);
+    fn predict(&self, data: &[Sample<'_>]) -> Vec<isize>;
+}
+
+grid_search_tuning!{
+    pub struct ClassificationForestConfig[ClassificationForestConfigTuning] {
+        pub n_trees: usize,
+        pub max_depth: Option<usize>,
+        pub min_samples_split: usize,
+        pub max_features: MaxFeatures,
+        pub criterion: Criterion,
+    }
 }
 
 pub trait ClassificationForest: Forest<DecisionTree> {
-    fn get_criterion(&self) -> Criterion;
-    fn get_max_features(&self) -> MaxFeatures;
-    fn get_min_samples_split(&self) -> usize;
-    fn fit(&mut self, data: &mut [Sample<'_>]) {
+    fn get_forest_config(&self) -> &ClassificationForestConfig;
+    fn fit_(&mut self, data: &mut [Sample<'_>]) {
         let n_samples = data.len();
-        self.set_max_samples(n_samples);
-        let n_trees = self.get_n_trees();
         self.compute_intervals(data[0].data.len());
 
         let mut trees = Vec::new();
-        trees.par_extend((0..n_trees).into_par_iter().map(|i| {
+        let config = self.get_forest_config();
+        trees.par_extend((0..config.n_trees).into_par_iter().map(|i| {
             let transformed_data = self.transform(data, i);
             let bootstrap_indices: Vec<usize> = (0..n_samples)
                 .map(|_| thread_rng().gen_range(0..n_samples))
                 .collect();
 
-            let mut tree = DecisionTree::new(
-                self.get_criterion(),
-                self.get_max_depth().unwrap_or(usize::MAX),
-                self.get_min_samples_split(),
-                self.get_max_features(),
-            );
+            let mut tree = DecisionTree::new(DecisionTreeConfig {
+                criterion: config.criterion,
+                max_depth: config.max_depth.unwrap_or(usize::MAX),
+                min_samples_split: config.min_samples_split,
+                max_features: config.max_features,
+            });
             tree.fit(
                 &mut bootstrap_indices
                     .iter()
@@ -63,7 +70,7 @@ pub trait ClassificationForest: Forest<DecisionTree> {
         }));
         *self.get_trees_mut() = trees;
     }
-    fn predict(&self, data: &[Sample<'_>]) -> Vec<isize> {
+    fn predict_(&self, data: &[Sample<'_>]) -> Vec<isize> {
         let n_samples = data.len();
         let mut predictions = Vec::new();
         // Make predictions for each sample using each tree in the forest
@@ -78,7 +85,7 @@ pub trait ClassificationForest: Forest<DecisionTree> {
 
         for i in 0..n_samples {
             let mut class_counts = HashMap::new();
-            for j in 0..self.get_n_trees() {
+            for j in 0..self.get_forest_config().n_trees {
                 let class = predictions[j][i];
                 *class_counts.entry(class).or_insert(0) += 1;
             }
@@ -128,7 +135,7 @@ pub trait ClassificationForest: Forest<DecisionTree> {
             .into_iter()
             .map(|d| {
                 d.into_iter()
-                    .map(|d| d.into_inner() as f64 / self.get_n_trees() as f64)
+                    .map(|d| d.into_inner() as f64 / self.get_forest_config().n_trees as f64)
                     .collect()
             })
             .collect()
@@ -165,7 +172,7 @@ pub trait ClassificationForest: Forest<DecisionTree> {
             .into_iter()
             .map(|d| {
                 d.into_iter()
-                    .map(|d| d.into_inner() as f64 / self.get_n_trees() as f64)
+                    .map(|d| d.into_inner() as f64 / self.get_forest_config().n_trees as f64)
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<Vec<_>>>()
@@ -202,31 +209,43 @@ pub trait ClassificationForest: Forest<DecisionTree> {
             .into_iter()
             .map(|d| {
                 d.into_iter()
-                    .map(|d| 1.0 - (d.into_inner() as f64 / self.get_n_trees() as f64))
+                    .map(|d| {
+                        1.0 - (d.into_inner() as f64 / self.get_forest_config().n_trees as f64)
+                    })
                     .collect()
             })
             .collect()
     }
 }
 
+
+grid_search_tuning! {
+    pub struct OutlierForestConfig[OutlierForestConfigTuning] {
+        pub n_trees: usize,
+        pub enhanced_anomaly_score: bool,
+        pub max_depth: Option<usize>,
+    }    
+}
+
 pub trait OutlierForest: Forest<IsolationTree> {
-    fn get_enhanced_anomaly_score(&self) -> bool;
-    fn fit(&mut self, data: &[Sample<'_>]) {
-        self.set_max_samples(min(256, data.len()));
+    fn get_forest_config(&self) -> &OutlierForestConfig;
+    fn fit_(&mut self, data: &[Sample<'_>]) {
+        let max_samples = min(256, data.len());
         self.compute_intervals(data[0].data.len());
         let mut trees = Vec::new();
-        trees.par_extend((0..self.get_n_trees()).into_par_iter().map(|i| {
+        let config = self.get_forest_config();
+        trees.par_extend((0..config.n_trees).into_par_iter().map(|i| {
             let transformed_data = self.transform(data, i);
             let mut n_samples: Vec<usize> = (0..data.len()).collect();
             n_samples.shuffle(&mut rand::thread_rng());
 
-            let mut tree = IsolationTree::new(
-                self.get_max_depth()
-                    .unwrap_or(self.get_max_samples().ilog2() as usize + 1),
-                2, // Setted to 2 to avoid empty child when splitting when there are only two samples
-            );
+            let mut tree = IsolationTree::new(IsolationTreeConfig {
+                max_depth: config.max_depth.unwrap_or(max_samples.ilog2() as usize + 1),
+                min_samples_split: 2,
+                // Setted to 2 to avoid empty child when splitting when there are only two samples
+            });
             tree.fit(
-                &mut (0..self.get_max_samples())
+                &mut (0..max_samples)
                     .into_iter()
                     .map(|i| transformed_data[n_samples[i]].to_ref())
                     .collect::<Vec<Sample<'_>>>(),
@@ -235,7 +254,7 @@ pub trait OutlierForest: Forest<IsolationTree> {
         }));
         *self.get_trees_mut() = trees;
     }
-    fn predict(&self, data: &[Sample<'_>]) -> Vec<usize> {
+    fn predict_(&self, data: &[Sample<'_>]) -> Vec<isize> {
         let scores = self.score_samples(data);
         let mut predictions = Vec::new();
         for i in 0..data.len() {
@@ -245,7 +264,9 @@ pub trait OutlierForest: Forest<IsolationTree> {
     }
     fn score_samples(&self, data: &[Sample<'_>]) -> Vec<f64> {
         let mut scores = Vec::new();
-        let denominator = (2.0*(f64::ln(self.get_max_samples() as f64 - 1.0) + EULER_MASCHERONI)) - 2.0 * ((self.get_max_samples() as f64 - 1.0) / self.get_max_samples() as f64);
+        let max_samples = min(256, data.len()) as f64;
+        let denominator = (2.0 * (f64::ln(max_samples - 1.0) + EULER_MASCHERONI))
+            - 2.0 * ((max_samples - 1.0) / max_samples);
         scores.par_extend(data.par_windows(1).map(|sample| {
             let mut average_depth = 0.0;
             let trees: &Vec<IsolationTree> = self.get_trees();
@@ -254,7 +275,7 @@ pub trait OutlierForest: Forest<IsolationTree> {
                 let leaf = tree.predict_leaf(&transformed_x);
                 average_depth += Self::path_length(leaf);
             }
-            average_depth /= self.get_n_trees() as f64;
+            average_depth /= self.get_forest_config().n_trees as f64;
             return ANOMALY_SCORE.powf(-average_depth / denominator);
         }));
         // scores.par_extend(x.par_iter().map(|sample| {

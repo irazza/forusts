@@ -6,12 +6,83 @@ use crate::metrics::classification::roc_auc_score;
 
 use crate::utils::structures::Sample;
 
-pub struct ForestTuning {
-    pub n_trees: usize,
-    pub max_depth: usize,
-    pub n_intervals: usize,
+
+pub trait GridSearch {
+    type Config;
+    fn generate_grid(&self, cb: impl FnMut(Self::Config));
 }
 
+#[macro_export]
+macro_rules! generate_grid_for_loop {
+    ($self_:ident, $first_field: ident [$tuning_impl:ident] => $body:tt) => {
+        use $crate::utils::tuning::GridSearch;
+        $self_.$first_field.generate_grid(|$first_field| {
+            $body
+        });
+    };
+    ($self_:ident, $first_field: ident => $body:tt) => {
+        for $first_field in $self_.$first_field.iter() {
+            $body
+        }
+    };
+    ($self_:ident, $first_field: ident, $($other_fields:ident $([$other_tuning_impl:ident])?),+ => $body:tt) => {
+        for $first_field in $self_.$first_field.iter() {
+            $crate::generate_grid_for_loop!($self_, $($other_fields $([$other_tuning_impl])?),* => $body);
+        }
+    };
+    ($self_:ident, $first_field: ident [$tuning_impl:ident], $($other_fields:ident$([$other_tuning_impl:ident])?),+ => $body:tt) => {
+        use $crate::utils::tuning::GridSearch;
+        $self_.$first_field.generate_grid(|$first_field| {
+            $crate::generate_grid_for_loop!($self_, $($other_fields $([$other_tuning_impl])?),* => $body);
+        });
+    };
+
+}
+
+#[macro_export]
+macro_rules! generate_tuning_type {
+    ($type_:ty) => { Vec<$type_> };
+    ($type_:ty [$tuning_impl:ident]) => { $type_ };
+}
+
+#[macro_export]
+macro_rules! grid_search_tuning {
+    (
+        pub struct $name:ident[$tuning_name:ident] {
+            $(
+                pub $field:ident: $type_:ty $([$tuning_impl:ident])?
+            ),+ $(,)?
+        }
+
+    ) => {
+        #[derive(Clone, Copy)]
+        pub struct $name {
+            $(
+               pub $field: $type_
+            ),+
+        }
+
+        pub struct $tuning_name {
+            $(
+               pub $field: $crate::generate_tuning_type!($type_$([$tuning_impl])?)
+            ),+
+        }
+
+        impl crate::utils::tuning::GridSearch for $tuning_name {
+            type Config = $name;
+            fn generate_grid(&self, mut cb: impl FnMut($name)) {
+
+                $crate::generate_grid_for_loop!(self, $($field$([$tuning_impl])?),+ => {
+                    cb($name {
+                        $(
+                            $field: $field.clone()
+                        ),+
+                    });
+                });
+            }
+        }
+    };
+}
 
 pub fn tuning(ds_train: &[Sample<'_>], ds_test: &[Sample<'_>]) -> HashMap<String, f64> {
     // Set parameters

@@ -2,33 +2,28 @@ use super::{node::Node, tree::MaxFeatures};
 use crate::{tree::tree::Tree, utils::structures::Sample};
 use rand::{thread_rng, Rng};
 
+pub struct IsolationTreeConfig {
+    pub max_depth: usize,
+    pub min_samples_split: usize,
+}
+
 pub struct IsolationTree {
     root: Node,
     max_depth: usize,
     min_samples_split: usize,
-    max_features: usize,
 }
 
-impl IsolationTree {
-    pub fn new(max_depth: usize, min_samples_split: usize) -> Self {
-        let root = Node::new();
+impl Tree for IsolationTree {
+    type Config = IsolationTreeConfig;
+    fn new(config: Self::Config) -> Self {
         Self {
-            root,
-            max_depth,
-            min_samples_split,
-            max_features: 0,
+            root: Node::new(),
+            max_depth: config.max_depth,
+            min_samples_split: config.min_samples_split,
         }
     }
-}
-impl Tree for IsolationTree {
     fn get_max_depth(&self) -> usize {
         self.max_depth
-    }
-    fn set_max_features(&mut self, max_features: usize) {
-        self.max_features = max_features;
-    }
-    fn get_max_features(&self) -> MaxFeatures {
-        MaxFeatures::All
     }
     fn get_root(&self) -> &Node {
         &self.root

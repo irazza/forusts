@@ -8,73 +8,52 @@ use crate::utils::structures::Sample;
 use rand::{thread_rng, Rng};
 use rayon::prelude::*;
 
+use super::forest::ClassificationForestConfig;
+
+pub struct TimeSeriesForestConfig {
+    pub n_intervals: usize,
+    pub min_interval_length: usize,
+    pub classification_config: ClassificationForestConfig,
+}
 pub struct TimeSeriesForest {
     trees: Vec<DecisionTree>,
-    criterion: Criterion,
-    n_trees: usize,
-    n_intervals: usize,
-    min_interval_length: usize,
     intervals: Vec<Vec<(usize, usize)>>,
-    max_features: MaxFeatures,
-    max_samples: usize,
-    min_samples_split: usize,
-    max_depth: Option<usize>,
-}
-
-impl TimeSeriesForest {
-    pub fn new(
-        n_trees: usize,
-        criterion: Criterion,
-        n_intervals: usize,
-        max_features: MaxFeatures,
-        max_depth: Option<usize>,
-        min_samples_split: usize,
-    ) -> Self {
-        Self {
-            trees: Vec::new(),
-            n_trees,
-            criterion,
-            n_intervals,
-            min_interval_length: 3,
-            intervals: Vec::new(),
-            max_features,
-            min_samples_split,
-            max_samples: 256,
-            max_depth,
-        }
-    }
+    config: TimeSeriesForestConfig,
 }
 
 impl Forest<DecisionTree> for TimeSeriesForest {
+    type Config = TimeSeriesForestConfig;
+    fn new(config: Self::Config) -> Self {
+        Self {
+            trees: Vec::new(),
+            intervals: Vec::new(),
+            config,
+        }
+    }
+    fn fit(&mut self, data: &mut [Sample<'_>]) {
+        self.fit_(data);
+    }
+    fn predict(&self, data: &[Sample<'_>]) -> Vec<isize> {
+        self.predict_(data)
+    }
     fn compute_intervals(&mut self, n_features: usize) {
         // Generate n_intervals, with random start and end
-        for _i in 0..self.get_n_trees() {
+        for _i in 0..self.config.classification_config.n_trees {
             let mut intervals = Vec::new();
-            for _j in 0..self.n_intervals {
-                let start = thread_rng().gen_range(0..n_features - self.min_interval_length);
-                let end = thread_rng().gen_range(start + self.min_interval_length..n_features);
+            for _j in 0..self.config.n_intervals {
+                let start = thread_rng().gen_range(0..n_features - self.config.min_interval_length);
+                let end =
+                    thread_rng().gen_range(start + self.config.min_interval_length..n_features);
                 intervals.push((start, end));
             }
             self.intervals.push(intervals);
         }
-    }
-    fn get_max_depth(&self) -> Option<usize> {
-        self.max_depth
-    }
-    fn get_max_samples(&self) -> usize {
-        self.max_samples
-    }
-    fn get_n_trees(&self) -> usize {
-        self.n_trees
     }
     fn get_trees(&self) -> &Vec<DecisionTree> {
         &self.trees
     }
     fn get_trees_mut(&mut self) -> &mut Vec<DecisionTree> {
         &mut self.trees
-    }
-    fn set_max_samples(&mut self, max_samples: usize) {
-        self.max_samples = max_samples;
     }
     fn transform<'a>(&self, data: &[Sample<'a>], intervals_index: usize) -> Vec<Sample<'a>> {
         let n_samples = data.len();
@@ -97,13 +76,7 @@ impl Forest<DecisionTree> for TimeSeriesForest {
 }
 
 impl ClassificationForest for TimeSeriesForest {
-    fn get_criterion(&self) -> Criterion {
-        self.criterion
-    }
-    fn get_max_features(&self) -> MaxFeatures {
-        self.max_features
-    }
-    fn get_min_samples_split(&self) -> usize {
-        self.min_samples_split
+    fn get_forest_config(&self) -> &ClassificationForestConfig {
+        &self.config.classification_config
     }
 }

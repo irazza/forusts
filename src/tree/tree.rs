@@ -43,9 +43,9 @@ impl Criterion {
 }
 
 pub trait Tree {
+    type Config;
+    fn new(init: Self::Config) -> Self;
     fn get_max_depth(&self) -> usize;
-    fn set_max_features(&mut self, max_features: usize);
-    fn get_max_features(&self) -> MaxFeatures;
     fn get_root(&self) -> &Node;
     fn set_root(&mut self, root: Node);
     fn get_split(&self, samples: &[Sample<'_>]) -> (usize, f64, f64);
@@ -53,7 +53,6 @@ pub trait Tree {
     fn post_split_conditions(&self, new_impurity: f64, old_impurity: f64) -> bool;
     fn fit(&mut self, data: &[Sample<'_>]) {
         let n_features = data[0].data.len();
-        self.set_max_features(self.get_max_features().convert(n_features));
         let data = &mut data.to_vec();
         let root = self.build_tree(data, self.get_max_depth(), f64::MAX);
         self.set_root(root);

@@ -1,5 +1,4 @@
 use csv::ReaderBuilder;
-use hashbrown::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
@@ -24,36 +23,6 @@ pub fn read_csv(
         let record: Sample = result.unwrap();
         samples.push(record);
     }
-
-    // let mut targets = Vec::new();
-    // let mut data = Vec::new();
-
-    // let mut class_counter = 0;
-
-    // for result in reader.records() {
-    //     let record = result?;
-    //     let mut row = Vec::new();
-
-    //     // Assuming the first column is the target and the rest are data
-    //     if let Some(target) = record.get(0) {
-    //         let class = target.parse::<f64>()? as isize;
-    //         let remapped_class = if mapping.contains_key(&class) {
-    //             mapping.get(&class).unwrap()
-    //         } else {
-    //             mapping.insert(class, class_counter);
-    //             class_counter += 1;
-    //             mapping.get(&class).unwrap()
-    //         };
-    //         targets.push(*remapped_class as usize);
-    //     }
-
-    //     for value in record.iter().skip(1) {
-    //         row.push(value.parse()?);
-    //     }
-
-    //     data.push(row);
-    // }
-
     Ok(samples)
 }
 

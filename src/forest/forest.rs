@@ -245,31 +245,17 @@ pub trait OutlierForest: Forest<IsolationTree> {
     }
     fn score_samples(&self, data: &[Sample<'_>]) -> Vec<f64> {
         let mut scores = Vec::new();
+        let denominator = (2.0*(f64::ln(self.get_max_samples() as f64 - 1.0) + EULER_MASCHERONI)) - 2.0 * ((self.get_max_samples() as f64 - 1.0) / self.get_max_samples() as f64);
         scores.par_extend(data.par_windows(1).map(|sample| {
             let mut average_depth = 0.0;
-            let mut average_path_length = 0.0;
-            let mut enhnaced_score = 0.0;
-
             let trees: &Vec<IsolationTree> = self.get_trees();
             for (i, tree) in trees.iter().enumerate() {
                 let transformed_x = self.transform(sample, i).into_iter().next().unwrap();
                 let leaf = tree.predict_leaf(&transformed_x);
-                let path_length = Self::path_length(&leaf);
-                let depth = leaf.get_depth() as f64;
-
-                if self.get_enhanced_anomaly_score() {
-                    enhnaced_score += ANOMALY_SCORE.powf(-depth / path_length);
-                } else {
-                    average_depth += depth;
-                    average_path_length += path_length;
-                }
+                average_depth += Self::path_length(leaf);
             }
-
-            if self.get_enhanced_anomaly_score() {
-                return enhnaced_score / self.get_n_trees() as f64;
-            } else {
-                return ANOMALY_SCORE.powf(-average_depth / average_path_length);
-            }
+            average_depth /= self.get_n_trees() as f64;
+            return ANOMALY_SCORE.powf(-average_depth / denominator);
         }));
         // scores.par_extend(x.par_iter().map(|sample| {
         //     let mut transformed_sample = Vec::new();

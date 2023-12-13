@@ -4,6 +4,32 @@ mod bindings{
     include ! {concat ! (env ! ("OUT_DIR"),"/bindings.rs")}
 }
 
+pub fn compute_catch_features(x: &[f64]) -> Vec<f64> {
+    let mut features = Vec::new();
+    features.push(DN_HistogramMode_5(x));
+    features.push(DN_HistogramMode_10(x));
+    features.push(CO_Embed2_Dist_tau_d_expfit_meandiff(x));
+    features.push(CO_f1ecac(x));
+    features.push(CO_FirstMin_ac(x) as f64);
+    features.push(CO_HistogramAMI_even_2_5(x));
+    features.push(CO_trev_1_num(x));
+    features.push(FC_LocalSimple_mean1_tauresrat(x));
+    features.push(FC_LocalSimple_mean3_stderr(x));
+    features.push(IN_AutoMutualInfoStats_40_gaussian_fmmi(x));
+    features.push(MD_hrv_classic_pnn40(x));
+    features.push(SB_BinaryStats_diff_longstretch0(x));
+    features.push(SB_BinaryStats_mean_longstretch1(x));
+    features.push(SB_MotifThree_quantile_hh(x));
+    features.push(SC_FluctAnal_2_rsrangefit_50_1_logi_prop_r1(x));
+    features.push(SC_FluctAnal_2_dfa_50_1_2_logi_prop_r1(x));
+    features.push(SP_Summaries_welch_rect_area_5_1(x));
+    features.push(SP_Summaries_welch_rect_centroid(x));
+    features.push(SB_TransitionMatrix_3ac_sumdiagcov(x));
+    features.push(PD_PeriodicityWang_th0_01(x) as f64);
+    features
+
+}
+
 pub fn DN_OutlierInclude_n_001_mdrmd(x: &[f64]) -> f64 {
     unsafe{bindings::DN_OutlierInclude::DN_OutlierInclude_n_001_mdrmd(x.as_ptr(), x.len() as i32)}
 }

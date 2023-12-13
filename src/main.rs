@@ -1,3 +1,4 @@
+use crate::feature_extraction::catch22::DN_HistogramMode_5;
 use crate::forest::forest::{Forest, OutlierForest, OutlierForestConfig, OutlierForestConfigTuning};
 use crate::forest::time_series_isolation_forest::{
     TimeSeriesIsolationForest, TimeSeriesIsolationForestConfig, TimeSeriesIsolationForestConfigTuning,
@@ -5,6 +6,7 @@ use crate::forest::time_series_isolation_forest::{
 use crate::metrics::classification::roc_auc_score;
 use crate::utils::csv_io::read_csv;
 use crate::utils::tuning::grid_search;
+use core::panic;
 use std::error::Error;
 use std::fs;
 use utils::csv_io::write_csv;
@@ -44,22 +46,22 @@ fn main() -> Result<(), Box<dyn Error>> {
         let mut ds_train = read_csv(train_path, b'\t', false)?;
         let ds_test = read_csv(test_path, b'\t', false)?;
         let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
-
+        println!("{}", DN_HistogramMode_5(&vec![1.0, 2.0, 3.0, 4.0, 5.0]));
         let n_features = ds_train[0].data.len() as f64;
         let config = TimeSeriesIsolationForestConfigTuning {
             n_intervals: (1..=20).step_by(5).collect(),
             outlier_config: OutlierForestConfigTuning {
-                n_trees: (100..=500).step_by(50).collect(),
-                enhanced_anomaly_score: vec![true, false],
+                n_trees: (100..=500).step_by(100).collect(),
+                enhanced_anomaly_score: vec![false],
                 max_depth: (5..=50).step_by(5).map(Some).collect(),
             },
         };
-            hyperparameters.push(grid_search(&mut ds_train, &ds_test, config, 20, roc_auc_score));
+            hyperparameters.push(grid_search(&mut ds_train, &ds_test, config, 1, roc_auc_score));
 
         }
 
         serde_json::to_writer_pretty(
-            std::fs::File::create("admepTSIF_hyperparameters.json")?,
+            std::fs::File::create("admepTSIF_hyperparameters_cazzate.json")?,
             &hyperparameters,
         )?;
 

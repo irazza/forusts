@@ -1,12 +1,13 @@
 use std::{cmp::max, ops::Deref};
 
 use hashbrown::HashMap;
+use serde_derive::{Serialize, Deserialize};
 
 use crate::utils::structures::Sample;
 
 use super::node::Node;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub enum MaxFeatures {
     All,
     Sqrt,
@@ -21,7 +22,7 @@ impl MaxFeatures {
         }
     }
 }
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Serialize, Deserialize)]
 pub enum Criterion {
     Gini,
     Entropy,

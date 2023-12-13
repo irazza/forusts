@@ -17,6 +17,7 @@ pub struct RandomForest {
 }
 impl Forest<DecisionTree> for RandomForest {
     type Config = RandomForestConfig;
+    type TuningType = isize;
     fn new(config: Self::Config) -> Self {
         Self {
             trees: Vec::new(),
@@ -38,6 +39,9 @@ impl Forest<DecisionTree> for RandomForest {
     }
     fn transform<'a>(&self, data: &[Sample<'a>], _intervals_index: usize) -> Vec<Sample<'a>> {
         data.to_vec()
+    }
+    fn tuning_predict(&self, data: &[Sample<'_>]) -> Vec<Self::TuningType> {
+        self.predict(data)
     }
 }
 impl ClassificationForest for RandomForest {

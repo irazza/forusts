@@ -23,6 +23,7 @@ pub struct TimeSeriesForest {
 
 impl Forest<DecisionTree> for TimeSeriesForest {
     type Config = TimeSeriesForestConfig;
+    type TuningType = isize;
     fn new(config: Self::Config) -> Self {
         Self {
             trees: Vec::new(),
@@ -72,6 +73,9 @@ impl Forest<DecisionTree> for TimeSeriesForest {
             });
         }
         transformed_data
+    }
+    fn tuning_predict(&self, data: &[Sample<'_>]) -> Vec<Self::TuningType> {
+        self.predict(data)
     }
 }
 

@@ -1,15 +1,23 @@
 use hashbrown::HashMap;
 
-use crate::forest::forest::{ClassificationForest, OutlierForest};
-use crate::forest::time_series_isolation_forest::TimeSeriesIsolationForest;
+use crate::forest::forest::{ClassificationForest, Forest, OutlierForest, OutlierForestConfig};
+use crate::forest::time_series_isolation_forest::{
+    TimeSeriesIsolationForest, TimeSeriesIsolationForestConfig,
+};
 use crate::metrics::classification::roc_auc_score;
 
+use crate::tree::tree::Tree;
 use crate::utils::structures::Sample;
 
-
 pub trait GridSearch {
-    type Config;
+    type Config: Clone;
     fn generate_grid(&self, cb: impl FnMut(Self::Config));
+    fn compute_n_parameters(&self) -> usize;
+}
+
+pub trait TuningConfig: GridSearch {
+    type Tree: Tree;
+    type Forest: Forest<Self::Tree, Config = Self::Config>;
 }
 
 #[macro_export]
@@ -42,7 +50,13 @@ macro_rules! generate_grid_for_loop {
 #[macro_export]
 macro_rules! generate_tuning_type {
     ($type_:ty) => { Vec<$type_> };
-    ($type_:ty [$tuning_impl:ident]) => { $type_ };
+    ($type_:ty [$tuning_impl:ident]) => { $tuning_impl };
+}
+
+#[macro_export]
+macro_rules! compute_n_parameters {
+    ($field: expr) => { $field.len() };
+    ($field: expr, [$tuning_impl:ident]) => { $field.compute_n_parameters() };
 }
 
 #[macro_export]
@@ -55,7 +69,7 @@ macro_rules! grid_search_tuning {
         }
 
     ) => {
-        #[derive(Clone, Copy)]
+        #[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
         pub struct $name {
             $(
                pub $field: $type_
@@ -80,72 +94,51 @@ macro_rules! grid_search_tuning {
                     });
                 });
             }
+            fn compute_n_parameters(&self) -> usize {
+                let mut n_parameters = 1;
+                $(
+                    n_parameters *= $crate::compute_n_parameters!(self.$field $(, [$tuning_impl])?);
+                )+
+                n_parameters
+            }
         }
     };
 }
 
-pub fn tuning(ds_train: &[Sample<'_>], ds_test: &[Sample<'_>]) -> HashMap<String, f64> {
-    // Set parameters
-    let n_trees = (1..11).into_iter().map(|x| x * 50).collect::<Vec<usize>>();
-    let mut intervals = (1..6).into_iter().map(|x| x * 2).collect::<Vec<i32>>();
-    intervals.push(-1);
-    intervals.push(-2);
-    let mut max_depths = (1..11).into_iter().map(|x| x * 5).collect::<Vec<i32>>();
-    max_depths.push(-1);
-
-    let n_features = ds_train[0].data.len() as f64;
-
-    // Grid search
-    let mut best_parameters: HashMap<String, f64> = HashMap::new();
-    let mut parameters_permutations = Vec::new();
-    for trees in n_trees {
-        for depth in &max_depths {
-            for intervals in &intervals {
-                parameters_permutations.push((trees, *depth, *intervals));
+pub fn grid_search<T: GridSearch + TuningConfig>(
+    ds_train: &mut [Sample<'_>],
+    ds_test: &[Sample<'_>],
+    parameters: T,
+    repetition: usize,
+    metric: fn(&[<T::Forest as Forest<T::Tree>>::TuningType], &[isize]) -> f64,
+) -> Option<(T::Config, f64)> {
+    let mut best_score = None;
+    let n_parameters = parameters.compute_n_parameters();
+    let mut counter = 0;
+    parameters.generate_grid(|config| {
+        let mut score = 0.0;
+        print_loading_bar(counter, n_parameters);
+        counter += 1;
+        for _i in 0..repetition { 
+            let mut forest = T::Forest::new(config.clone());
+            forest.fit(ds_train);
+            let y_pred = forest.tuning_predict(ds_test);
+            score += metric(
+                &y_pred,
+                &ds_test.iter().map(|s| s.target).collect::<Vec<_>>(),
+            );
+        }
+        score /= repetition as f64;
+        if let Some((_, last_best_score)) = &best_score {
+            if score > *last_best_score {
+                best_score = Some((config, score));
             }
-        }
-    }
-
-    // Find best parameters
-    let n_repeats = 20;
-    let mut best_score = 0.0;
-    for (i, (tree, depth, interval)) in parameters_permutations.iter().enumerate() {
-        // Print loading bar
-        print_loading_bar(i, parameters_permutations.len());
-
-        // Store parameters
-        let t = *tree;
-        let d = if *depth == -1 {
-            None
         } else {
-            Some(*depth as usize)
-        };
-        let i = if *interval == -1 {
-            n_features.sqrt() as usize
-        } else if *interval == -2 {
-            n_features.log2() as usize
-        } else {
-            *interval as usize
-        };
-
-        let mut scores = 0.0;
-        for _i in 0..n_repeats {
-            let mut clf = TimeSeriesIsolationForest::new(t, i, false, d);
-            clf.fit(&ds_train);
-            let y_pred = clf.score_samples(&ds_test);
-            scores += roc_auc_score(&y_pred, &ds_test.iter().map(|s| s.target).collect::<Vec<_>>());
+            best_score = Some((config, score));
         }
-        if scores > best_score {
-            best_score = scores;
-            best_parameters.insert("n_trees".to_string(), t as f64);
-            best_parameters.insert("max_depth".to_string(), d.unwrap_or(usize::MAX) as f64);
-            best_parameters.insert("n_intervals".to_string(), i as f64);
-            best_parameters.insert("score".to_string(), scores / n_repeats as f64);
-        }
-    }
-    print_loading_bar(1, 1);
-    println!();
-    best_parameters
+    });
+    print_loading_bar(n_parameters, n_parameters);
+    best_score
 }
 
 fn print_loading_bar(current: usize, total: usize) {
@@ -159,4 +152,7 @@ fn print_loading_bar(current: usize, total: usize) {
         }
     }
     print!("] {}%", progress);
+    if progress == 100 {
+        println!();
+    }
 }

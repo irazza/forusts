@@ -1,12 +1,13 @@
 use crate::{
     feature_extraction::statistics::EULER_MASCHERONI,
+    grid_search_tuning,
     tree::{
         decision_tree::{DecisionTree, DecisionTreeConfig},
         isolation_tree::{IsolationTree, IsolationTreeConfig},
         node::Node,
         tree::{Criterion, MaxFeatures, Tree},
     },
-    utils::structures::Sample, grid_search_tuning,
+    utils::structures::Sample,
 };
 use hashbrown::HashMap;
 use parking_lot::Mutex;
@@ -21,6 +22,7 @@ pub const ANOMALY_SCORE: f64 = 2.0;
 
 pub trait Forest<T: Tree>: Sync + Send {
     type Config;
+    type TuningType;
     fn compute_intervals(&mut self, n_features: usize);
     fn get_trees(&self) -> &Vec<T>;
     fn get_trees_mut(&mut self) -> &mut Vec<T>;
@@ -28,9 +30,10 @@ pub trait Forest<T: Tree>: Sync + Send {
     fn new(config: Self::Config) -> Self;
     fn fit(&mut self, data: &mut [Sample<'_>]);
     fn predict(&self, data: &[Sample<'_>]) -> Vec<isize>;
+    fn tuning_predict(&self, data: &[Sample<'_>]) -> Vec<Self::TuningType>;
 }
 
-grid_search_tuning!{
+grid_search_tuning! {
     pub struct ClassificationForestConfig[ClassificationForestConfigTuning] {
         pub n_trees: usize,
         pub max_depth: Option<usize>,
@@ -218,13 +221,12 @@ pub trait ClassificationForest: Forest<DecisionTree> {
     }
 }
 
-
 grid_search_tuning! {
     pub struct OutlierForestConfig[OutlierForestConfigTuning] {
         pub n_trees: usize,
         pub enhanced_anomaly_score: bool,
         pub max_depth: Option<usize>,
-    }    
+    }
 }
 
 pub trait OutlierForest: Forest<IsolationTree> {

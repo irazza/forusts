@@ -17,6 +17,8 @@ pub struct IsolationForest {
 
 impl Forest<IsolationTree> for IsolationForest {
     type Config = IsolationForestConfig;
+    type TuningType = f64;
+
     fn new(config: Self::Config) -> Self {
         Self {
             trees: Vec::new(),
@@ -38,6 +40,9 @@ impl Forest<IsolationTree> for IsolationForest {
     }
     fn transform<'a>(&self, data: &[Sample<'a>], _intervals_index: usize) -> Vec<Sample<'a>> {
         data.to_vec()
+    }
+    fn tuning_predict(&self, data: &[Sample<'_>]) -> Vec<Self::TuningType> {
+        self.score_samples(data)
     }
 }
 impl OutlierForest for IsolationForest {

@@ -2,20 +2,24 @@ use crate::feature_extraction::statistics::{mean, slope, std};
 use crate::grid_search_tuning;
 use crate::tree::tree::Tree;
 use crate::utils::structures::Sample;
+use crate::utils::tuning::TuningConfig;
 use crate::{
     forest::forest::{Forest, OutlierForest},
     tree::isolation_tree::IsolationTree,
 };
 use rand::{thread_rng, Rng};
 
-use super::forest::OutlierForestConfig;
+use super::forest::{OutlierForestConfig, OutlierForestConfigTuning};
 
-
-grid_search_tuning!{
+grid_search_tuning! {
     pub struct TimeSeriesIsolationForestConfig[TimeSeriesIsolationForestConfigTuning] {
         pub n_intervals: usize,
         pub outlier_config: OutlierForestConfig [OutlierForestConfigTuning],
     }
+}
+impl TuningConfig for TimeSeriesIsolationForestConfigTuning {
+    type Tree = IsolationTree;
+    type Forest = TimeSeriesIsolationForest;
 }
 
 pub struct TimeSeriesIsolationForest {
@@ -27,6 +31,8 @@ pub struct TimeSeriesIsolationForest {
 
 impl Forest<IsolationTree> for TimeSeriesIsolationForest {
     type Config = TimeSeriesIsolationForestConfig;
+    type TuningType = f64;
+
     fn new(config: Self::Config) -> Self {
         Self {
             trees: Vec::new(),
@@ -76,6 +82,9 @@ impl Forest<IsolationTree> for TimeSeriesIsolationForest {
             });
         }
         transformed_data
+    }
+    fn tuning_predict(&self, data: &[Sample<'_>]) -> Vec<Self::TuningType> {
+        self.score_samples(data)
     }
 }
 

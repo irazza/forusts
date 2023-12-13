@@ -1,0 +1,3 @@
+[submodule "catch22"]
+	path = catch22
+	url = https://github.com/DynamicsAndNeuralSystems/catch22

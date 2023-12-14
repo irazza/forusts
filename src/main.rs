@@ -95,7 +95,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .map(|s| s.to_string())
         .collect();
     write_csv(
-        format!("admepTSIF_T{}_R{}.csv", n_trees, n_repetitions),
+        format!("admepCIF_T{}_R{}.csv", n_trees, n_repetitions),
         predictions,
         header,
         index,

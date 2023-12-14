@@ -2,9 +2,9 @@ use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::{env, fs};
 
-fn main() {
-    // println!("cargo:rustc-link-lib=catch22");
+use cmake::Config;
 
+fn main() {
     let paths = fs::read_dir("./catch22/C/").unwrap();
     let filtered_paths = paths
         .filter_map(|path| {
@@ -16,6 +16,8 @@ fn main() {
             }
         })
         .collect::<Vec<_>>();
+
+    println!("cargo:rerun-if-changed=catch22/C/");
 
     let mut header_paths = Vec::new();
 
@@ -63,4 +65,13 @@ fn main() {
         .collect::<Vec<_>>();
 
     cc::Build::new().files(filtered_paths).compile("catch22");
+
+    // Build fftw
+    let dst = Config::new("fftw-3.3.10")
+                .define("BUILD_SHARED_LIBS", "OFF")
+                .build();
+
+    println!("cargo:rustc-link-search=native={}", dst.join("build").display());
+    println!("cargo:rustc-link-lib=static=fftw3");
+
 }

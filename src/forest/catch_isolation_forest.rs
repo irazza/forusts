@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use crate::feature_extraction::catch22::compute_catch_features;
 use crate::grid_search_tuning;
 use crate::tree::tree::Tree;
@@ -71,7 +73,13 @@ impl Forest<IsolationTree> for CatchIsolationForest {
         for j in 0..n_samples {
             let mut sample = Vec::new();
             for (start, end) in self.intervals[intervals_index].iter().copied() {
+                // let time = Instant::now();
+                // for _i in 0..1000 {
+                //     sample.extend(compute_catch_features(&data[j].data[start..end]).into_iter());
+                // }
+                // panic!("N {} Time {:?}", end-start, time.elapsed() / ((end - start) as u32)); 
                 sample.extend(compute_catch_features(&data[j].data[start..end]).into_iter());
+                
             }
             transformed_data.push(Sample {
                 data: std::borrow::Cow::Owned(sample),

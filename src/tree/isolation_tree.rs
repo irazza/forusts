@@ -47,7 +47,7 @@ impl Tree for IsolationTree {
             .iter()
             .map(|f| f.data[best_feature])
             .collect::<Vec<f64>>();
-        thresholds.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
+        thresholds.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let best_threshold = thresholds[thread_rng().gen_range(1..thresholds.len() - 1)];
         let best_impurity = thread_rng().gen_range(f64::EPSILON..1.0);
 

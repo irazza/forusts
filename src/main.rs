@@ -16,10 +16,11 @@ mod tree;
 mod utils;
 
 fn main() -> Result<(), Box<dyn Error>> {
+
     let paths = fs::read_dir("/media/aazzari/DATA/admep/")?;
     let mut predictions = Vec::new();
     // let mut hyperparameters = Vec::new();
-    let n_repetitions = 10;
+    let n_repetitions = 1;
     let n_trees = 100;
 
     let mut datasets: Vec<_> = Vec::new();
@@ -69,14 +70,17 @@ fn main() -> Result<(), Box<dyn Error>> {
                 max_depth: None,
             },
         };
-
+        let mut mean = 0.0;
         for _i in 0..n_repetitions {
             let mut clf = CatchIsolationForest::new(config);
             clf.fit(&mut ds_train);
             let y_score = clf.score_samples(&ds_test);
             let roc_auc = roc_auc_score(&y_score, &y_true);
+            mean += roc_auc;
             predictions.push([roc_auc].to_vec());
+            panic!("ROC-AUC: {}", roc_auc);
         }
+        println!("ROC-AUC: {}", mean/n_repetitions as f64);
     }
     // Create index modifying datasets multiplying by n_repetitions
     let mut index = Vec::new();

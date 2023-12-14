@@ -77,9 +77,8 @@ impl Forest<IsolationTree> for CatchIsolationForest {
                 // for _i in 0..1000 {
                 //     sample.extend(compute_catch_features(&data[j].data[start..end]).into_iter());
                 // }
-                // panic!("N {} Time {:?}", end-start, time.elapsed() / ((end - start) as u32)); 
+                // panic!("N {} Time {:?}", end-start, time.elapsed() / ((end - start) as u32));
                 sample.extend(compute_catch_features(&data[j].data[start..end]).into_iter());
-                
             }
             transformed_data.push(Sample {
                 data: std::borrow::Cow::Owned(sample),

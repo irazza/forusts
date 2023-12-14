@@ -68,10 +68,12 @@ fn main() {
 
     // Build fftw
     let dst = Config::new("fftw-3.3.10")
-                .define("BUILD_SHARED_LIBS", "OFF")
-                .build();
+        .define("BUILD_SHARED_LIBS", "OFF")
+        .build();
 
-    println!("cargo:rustc-link-search=native={}", dst.join("build").display());
+    println!(
+        "cargo:rustc-link-search=native={}",
+        dst.join("build").display()
+    );
     println!("cargo:rustc-link-lib=static=fftw3");
-
 }

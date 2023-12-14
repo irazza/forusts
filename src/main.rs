@@ -1,13 +1,9 @@
-use crate::feature_extraction::catch22::DN_HistogramMode_5;
 use crate::forest::catch_isolation_forest::{CatchIsolationForest, CatchIsolationForestConfig};
-use crate::forest::forest::{Forest, OutlierForest, OutlierForestConfig, OutlierForestConfigTuning};
-use crate::forest::time_series_isolation_forest::{
-    TimeSeriesIsolationForest, TimeSeriesIsolationForestConfig, TimeSeriesIsolationForestConfigTuning,
-};
+use crate::forest::forest::{Forest, OutlierForest, OutlierForestConfig};
+
 use crate::metrics::classification::roc_auc_score;
 use crate::utils::csv_io::read_csv;
-use crate::utils::tuning::grid_search;
-use core::panic;
+
 use std::error::Error;
 use std::fs;
 use utils::csv_io::write_csv;
@@ -71,7 +67,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 n_trees,
                 enhanced_anomaly_score: false,
                 max_depth: None,
-            }
+            },
         };
 
         for _i in 0..n_repetitions {

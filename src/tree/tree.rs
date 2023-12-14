@@ -1,7 +1,7 @@
 use std::{cmp::max, ops::Deref};
 
 use hashbrown::HashMap;
-use serde_derive::{Serialize, Deserialize};
+use serde_derive::{Deserialize, Serialize};
 
 use crate::utils::structures::Sample;
 
@@ -53,7 +53,7 @@ pub trait Tree {
     fn pre_split_conditions(&self, samples: &[Sample<'_>], current_depth: usize) -> bool;
     fn post_split_conditions(&self, new_impurity: f64, old_impurity: f64) -> bool;
     fn fit(&mut self, data: &[Sample<'_>]) {
-        let n_features = data[0].data.len();
+        let _n_features = data[0].data.len();
         let data = &mut data.to_vec();
         let root = self.build_tree(data, self.get_max_depth(), f64::MAX);
         self.set_root(root);

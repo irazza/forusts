@@ -1,8 +1,5 @@
 use crate::{
-    tree::{
-        decision_tree::DecisionTree,
-        tree::{Criterion, MaxFeatures, Tree},
-    },
+    tree::{decision_tree::DecisionTree, tree::Tree},
     utils::structures::Sample,
 };
 

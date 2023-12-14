@@ -1,10 +1,4 @@
-use hashbrown::HashMap;
-
-use crate::forest::forest::{ClassificationForest, Forest, OutlierForest, OutlierForestConfig};
-use crate::forest::time_series_isolation_forest::{
-    TimeSeriesIsolationForest, TimeSeriesIsolationForestConfig,
-};
-use crate::metrics::classification::roc_auc_score;
+use crate::forest::forest::Forest;
 
 use crate::tree::tree::Tree;
 use crate::utils::structures::Sample;
@@ -55,8 +49,12 @@ macro_rules! generate_tuning_type {
 
 #[macro_export]
 macro_rules! compute_n_parameters {
-    ($field: expr) => { $field.len() };
-    ($field: expr, [$tuning_impl:ident]) => { $field.compute_n_parameters() };
+    ($field: expr) => {
+        $field.len()
+    };
+    ($field: expr, [$tuning_impl:ident]) => {
+        $field.compute_n_parameters()
+    };
 }
 
 #[macro_export]
@@ -119,7 +117,7 @@ pub fn grid_search<T: GridSearch + TuningConfig>(
         let mut score = 0.0;
         print_loading_bar(counter, n_parameters);
         counter += 1;
-        for _i in 0..repetition { 
+        for _i in 0..repetition {
             let mut forest = T::Forest::new(config.clone());
             forest.fit(ds_train);
             let y_pred = forest.tuning_predict(ds_test);

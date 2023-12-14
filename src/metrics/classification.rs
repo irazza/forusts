@@ -1,4 +1,4 @@
-use crate::{feature_extraction::statistics::unique, utils::csv_io::vec_to_csv};
+use crate::feature_extraction::statistics::unique;
 
 pub fn accuracy_score(y_pred: &[usize], y_true: &[usize]) -> f64 {
     (y_pred

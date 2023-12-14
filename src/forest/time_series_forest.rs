@@ -1,9 +1,6 @@
 use crate::feature_extraction::statistics::{mean, slope, std};
 use crate::forest::forest::{ClassificationForest, Forest};
-use crate::tree::{
-    decision_tree::DecisionTree,
-    tree::{Criterion, MaxFeatures, Tree},
-};
+use crate::tree::{decision_tree::DecisionTree, tree::Tree};
 use crate::utils::structures::Sample;
 use rand::{thread_rng, Rng};
 use rayon::prelude::*;

@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use super::{node::Node, tree::MaxFeatures};
+use super::node::Node;
 use crate::{tree::tree::Tree, utils::structures::Sample};
 use rand::{thread_rng, Rng};
 

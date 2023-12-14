@@ -1,10 +1,7 @@
 use super::forest::OutlierForestConfig;
 use crate::{
     forest::forest::{Forest, OutlierForest},
-    tree::{
-        isolation_tree::{IsolationTree, IsolationTreeConfig},
-        tree::Tree,
-    },
+    tree::{isolation_tree::IsolationTree, tree::Tree},
     utils::structures::Sample,
 };
 

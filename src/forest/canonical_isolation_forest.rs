@@ -13,6 +13,8 @@ use rand::{thread_rng, Rng};
 
 use super::forest::{OutlierForestConfig, OutlierForestConfigTuning};
 
+pub const MIN_INTERVAL_LENGTH : usize = 10;
+
 grid_search_tuning! {
     pub struct CanonicalIsolationForestConfig[CanonicalIsolationForestConfigTuning] {
         pub n_intervals: usize,
@@ -38,7 +40,7 @@ impl Forest<IsolationTree> for CanonicalIsolationForest {
     fn new(config: Self::Config) -> Self {
         Self {
             trees: Vec::new(),
-            min_interval_length: 3,
+            min_interval_length: MIN_INTERVAL_LENGTH,
             intervals: Vec::new(),
             config,
         }

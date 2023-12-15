@@ -21,6 +21,9 @@ codegen-units = 1
 lto = "fat"
 panic = "abort"
 
+[profile.bench]
+debug = true
+
 [build-dependencies]
 bindgen = "0.69.1"
 cc = "1.0.83"

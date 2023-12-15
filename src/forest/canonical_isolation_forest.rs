@@ -14,25 +14,25 @@ use rand::{thread_rng, Rng};
 use super::forest::{OutlierForestConfig, OutlierForestConfigTuning};
 
 grid_search_tuning! {
-    pub struct CatchIsolationForestConfig[CatchIsolationForestConfigTuning] {
+    pub struct CanonicalIsolationForestConfig[CanonicalIsolationForestConfigTuning] {
         pub n_intervals: usize,
         pub outlier_config: OutlierForestConfig [OutlierForestConfigTuning],
     }
 }
-impl TuningConfig for CatchIsolationForestConfigTuning {
+impl TuningConfig for CanonicalIsolationForestConfigTuning {
     type Tree = IsolationTree;
-    type Forest = CatchIsolationForest;
+    type Forest = CanonicalIsolationForest;
 }
 
-pub struct CatchIsolationForest {
+pub struct CanonicalIsolationForest {
     trees: Vec<IsolationTree>,
     min_interval_length: usize,
     intervals: Vec<Vec<(usize, usize)>>,
-    config: CatchIsolationForestConfig,
+    config: CanonicalIsolationForestConfig,
 }
 
-impl Forest<IsolationTree> for CatchIsolationForest {
-    type Config = CatchIsolationForestConfig;
+impl Forest<IsolationTree> for CanonicalIsolationForest {
+    type Config = CanonicalIsolationForestConfig;
     type TuningType = f64;
 
     fn new(config: Self::Config) -> Self {
@@ -92,7 +92,7 @@ impl Forest<IsolationTree> for CatchIsolationForest {
     }
 }
 
-impl OutlierForest for CatchIsolationForest {
+impl OutlierForest for CanonicalIsolationForest {
     fn get_forest_config(&self) -> &OutlierForestConfig {
         &self.config.outlier_config
     }

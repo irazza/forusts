@@ -1,5 +1,5 @@
 pub mod canonical_interval_forest;
-pub mod catch_isolation_forest;
+pub mod canonical_isolation_forest;
 pub mod forest;
 pub mod isolation_forest;
 pub mod random_forest;

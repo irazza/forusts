@@ -1,4 +1,4 @@
-use crate::forest::catch_isolation_forest::{CatchIsolationForest, CatchIsolationForestConfig};
+use crate::forest::canonical_isolation_forest::{CanonicalIsolationForest, CanonicalIsolationForestConfig};
 use crate::forest::forest::{Forest, OutlierForest, OutlierForestConfig};
 
 use crate::metrics::classification::roc_auc_score;
@@ -61,7 +61,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         //     &hyperparameters,
         // )?;
 
-        let config = CatchIsolationForestConfig {
+        let config = CanonicalIsolationForestConfig {
             n_intervals: n_features.sqrt() as usize,
             outlier_config: OutlierForestConfig {
                 n_trees,
@@ -71,7 +71,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         };
 
         for _i in 0..n_repetitions {
-            let mut clf = CatchIsolationForest::new(config);
+            let mut clf = CanonicalIsolationForest::new(config);
             clf.fit(&mut ds_train);
             let y_score = clf.score_samples(&ds_test);
             let roc_auc = roc_auc_score(&y_score, &y_true);

@@ -237,10 +237,9 @@ pub trait OutlierForest: Forest<IsolationTree> {
         let mut trees = Vec::new();
         let config = self.get_forest_config();
         trees.par_extend((0..config.n_trees).into_par_iter().map(|i| {
-            let transformed_data = self.transform(data, i);
             let mut n_samples: Vec<usize> = (0..data.len()).collect();
             n_samples.shuffle(&mut rand::thread_rng());
-
+            let transformed_data = self.transform(data, i);
             let mut tree = IsolationTree::new(IsolationTreeConfig {
                 max_depth: config.max_depth.unwrap_or(max_samples.ilog2() as usize + 1),
                 min_samples_split: 2,

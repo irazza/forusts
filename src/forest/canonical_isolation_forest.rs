@@ -52,6 +52,18 @@ impl Forest<IsolationTree> for CanonicalIsolationForest {
         self.predict_(data)
     }
     fn compute_intervals(&mut self, n_features: usize) {
+        // let interval_length = n_features / self.config.n_intervals;
+        // let mut intervals = Vec::new();
+        // for j in 0..self.config.n_intervals {
+        //     let start = j * interval_length;
+        //     let end = if j == self.config.n_intervals - 1 {
+        //         n_features
+        //     } else {
+        //         (j + 1) * interval_length
+        //     };
+        //     intervals.push((start, end));
+        // }
+        // self.intervals.push(intervals);
         // Generate n_intervals, with random start and end
         let min_interval_length = (n_features as f64 * self.min_interval_perc as f64 / 100.0).round() as usize;
         for _i in 0..self.config.outlier_config.n_trees {
@@ -76,11 +88,6 @@ impl Forest<IsolationTree> for CanonicalIsolationForest {
         for j in 0..n_samples {
             let mut sample = Vec::new();
             for (start, end) in self.intervals[intervals_index].iter().copied() {
-                // let time = Instant::now();
-                // for _i in 0..1000 {
-                //     sample.extend(compute_catch_features(&data[j].data[start..end]).into_iter());
-                // }
-                // panic!("N {} Time {:?}", end-start, time.elapsed() / ((end - start) as u32));
                 sample.extend(compute_catch_features(&data[j].data[start..end]).into_iter());
             }
             transformed_data.push(Sample {

@@ -1,8 +1,7 @@
 use std::cmp::Ordering;
-
+use rand::{seq::SliceRandom, thread_rng, Rng};
 use super::node::Node;
 use crate::{tree::tree::Tree, utils::structures::Sample};
-use rand::{thread_rng, Rng};
 
 pub struct IsolationTreeConfig {
     pub max_depth: usize,
@@ -41,7 +40,9 @@ impl Tree for IsolationTree {
         return false;
     }
     fn get_split(&self, samples: &[Sample<'_>]) -> (usize, f64, f64) {
-        let best_feature = thread_rng().gen_range(0..samples[0].data.len());
+        let mut shuffled_features: Vec<usize> = (0..samples[0].data.len()).collect();
+        shuffled_features.shuffle(&mut thread_rng());
+        let best_feature = shuffled_features[thread_rng().gen_range(0..8)];
         // Exclude first and last thresholds, avoiding a split on the min and max values (could move all samples on the left or right child)
         let mut thresholds = samples
             .iter()

@@ -25,8 +25,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let paths = fs::read_dir("/Users/albertoazzari/Desktop/MEP_cascade/admep/")?;
     let mut predictions = Vec::new();
     // let mut hyperparameters = Vec::new();
-    let n_repetitions = 20;
-    let n_trees = 100;
+    let n_repetitions = 1;
+    let n_trees = 200;
 
     let mut datasets: Vec<_> = Vec::new();
     for entry in paths {
@@ -75,15 +75,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             },
             n_intervals: n_features.log10() as usize,
         };
-        
+        let mut mean_roc = 0.0;
         for _i in 0..n_repetitions {
             let mut clf = CanonicalIsolationForest::new(config);
             clf.fit(&mut ds_train);
             let y_score = clf.score_samples(&ds_test);
             let roc_auc = roc_auc_score(&y_score, &y_true);
-            //println!("ROC-AUC: {}", roc_auc);
+            mean_roc += roc_auc;
             predictions.push([roc_auc].to_vec());
         }
+        println!("ROC-AUC: {}", mean_roc/n_repetitions as f64);
     }
     // Create index modifying datasets multiplying by n_repetitions
     let mut index = Vec::new();

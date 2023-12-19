@@ -1,9 +1,15 @@
+use crate::feature_extraction::catch22::compute_catch_features;
+use crate::feature_extraction::mep::compute_mep_features;
 use crate::forest::canonical_isolation_forest::{CanonicalIsolationForest, CanonicalIsolationForestConfig};
 use crate::forest::forest::{Forest, OutlierForest, OutlierForestConfig};
 
+use crate::forest::isolation_forest::{IsolationForestConfig, IsolationForest};
+use crate::forest::mep_isolation_forest::{MEPIsolationForestConfig, MEPIsolationForest};
 use crate::metrics::classification::roc_auc_score;
 use crate::utils::csv_io::read_csv;
+use crate::utils::structures::Sample;
 
+use std::borrow::Cow;
 use std::error::Error;
 use std::fs;
 use utils::csv_io::write_csv;
@@ -16,7 +22,7 @@ mod tree;
 mod utils;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let paths = fs::read_dir("/media/aazzari/DATA/admep/")?;
+    let paths = fs::read_dir("/Users/albertoazzari/Desktop/MEP_cascade/admep/")?;
     let mut predictions = Vec::new();
     // let mut hyperparameters = Vec::new();
     let n_repetitions = 20;
@@ -62,19 +68,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         // )?;
 
         let config = CanonicalIsolationForestConfig {
-            n_intervals: n_features.sqrt() as usize,
             outlier_config: OutlierForestConfig {
                 n_trees,
                 enhanced_anomaly_score: false,
                 max_depth: None,
             },
+            n_intervals: n_features.log10() as usize,
         };
-
+        
         for _i in 0..n_repetitions {
             let mut clf = CanonicalIsolationForest::new(config);
             clf.fit(&mut ds_train);
             let y_score = clf.score_samples(&ds_test);
             let roc_auc = roc_auc_score(&y_score, &y_true);
+            //println!("ROC-AUC: {}", roc_auc);
             predictions.push([roc_auc].to_vec());
         }
     }

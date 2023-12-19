@@ -66,16 +66,13 @@ fn main() {
 
     cc::Build::new()
         .files(filtered_paths)
-        .std("c99")
         .opt_level(3)
         .compile("catch22");
 
     // Build fftw
     let dst = Config::new("fftw-3.3.10")
         .define("BUILD_SHARED_LIBS", "OFF")
-        .define("ENABLE_AVX2", "ON")
         .define("ENABLE_THREADS", "ON")
-        .define("WITH_COMBINED_THREADS", "ON")
         .build();
 
     println!(

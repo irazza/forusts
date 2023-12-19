@@ -184,6 +184,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "find_peaks"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17ba6fe8df99019a8cb0c712414e10081b3bbdb10d8f7ab95719863ced5db982"
+
+[[package]]
 name = "forests"
 version = "0.0.1"
 dependencies = [
@@ -191,6 +197,7 @@ dependencies = [
  "cc",
  "cmake",
  "csv",
+ "find_peaks",
  "hashbrown",
  "parking_lot",
  "rand",

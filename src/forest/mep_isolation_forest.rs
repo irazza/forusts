@@ -1,6 +1,4 @@
-use std::time::Instant;
-
-use crate::feature_extraction::catch22::compute_catch_features;
+use crate::feature_extraction::mep::compute_mep_features;
 use crate::grid_search_tuning;
 use crate::tree::tree::Tree;
 use crate::utils::structures::Sample;
@@ -13,28 +11,28 @@ use rand::{thread_rng, Rng};
 
 use super::forest::{OutlierForestConfig, OutlierForestConfigTuning};
 
-pub const MIN_INTERVAL_PERC : usize = 10;
+pub const MIN_INTERVAL_PERC : usize = 100;
 
 grid_search_tuning! {
-    pub struct CanonicalIsolationForestConfig[CanonicalIsolationForestConfigTuning] {
+    pub struct MEPIsolationForestConfig[MEPIsolationForestConfigTuning] {
         pub n_intervals: usize,
         pub outlier_config: OutlierForestConfig [OutlierForestConfigTuning],
     }
 }
-impl TuningConfig for CanonicalIsolationForestConfigTuning {
+impl TuningConfig for MEPIsolationForestConfigTuning {
     type Tree = IsolationTree;
-    type Forest = CanonicalIsolationForest;
+    type Forest = MEPIsolationForest;
 }
 
-pub struct CanonicalIsolationForest {
+pub struct MEPIsolationForest {
     trees: Vec<IsolationTree>,
     min_interval_perc: usize,
     intervals: Vec<Vec<(usize, usize)>>,
-    config: CanonicalIsolationForestConfig,
+    config: MEPIsolationForestConfig,
 }
 
-impl Forest<IsolationTree> for CanonicalIsolationForest {
-    type Config = CanonicalIsolationForestConfig;
+impl Forest<IsolationTree> for MEPIsolationForest {
+    type Config = MEPIsolationForestConfig;
     type TuningType = f64;
 
     fn new(config: Self::Config) -> Self {
@@ -76,12 +74,7 @@ impl Forest<IsolationTree> for CanonicalIsolationForest {
         for j in 0..n_samples {
             let mut sample = Vec::new();
             for (start, end) in self.intervals[intervals_index].iter().copied() {
-                // let time = Instant::now();
-                // for _i in 0..1000 {
-                //     sample.extend(compute_catch_features(&data[j].data[start..end]).into_iter());
-                // }
-                // panic!("N {} Time {:?}", end-start, time.elapsed() / ((end - start) as u32));
-                sample.extend(compute_catch_features(&data[j].data[start..end]).into_iter());
+                sample.extend(compute_mep_features(&data[j].data[start..end]).into_iter());
             }
             transformed_data.push(Sample {
                 data: std::borrow::Cow::Owned(sample),
@@ -95,7 +88,7 @@ impl Forest<IsolationTree> for CanonicalIsolationForest {
     }
 }
 
-impl OutlierForest for CanonicalIsolationForest {
+impl OutlierForest for MEPIsolationForest {
     fn get_forest_config(&self) -> &OutlierForestConfig {
         &self.config.outlier_config
     }

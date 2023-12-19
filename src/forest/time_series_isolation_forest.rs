@@ -11,6 +11,8 @@ use rand::{thread_rng, Rng};
 
 use super::forest::{OutlierForestConfig, OutlierForestConfigTuning};
 
+pub const MIN_INTERVAL_PERC : usize = 10;
+
 grid_search_tuning! {
     pub struct TimeSeriesIsolationForestConfig[TimeSeriesIsolationForestConfigTuning] {
         pub n_intervals: usize,
@@ -24,7 +26,7 @@ impl TuningConfig for TimeSeriesIsolationForestConfigTuning {
 
 pub struct TimeSeriesIsolationForest {
     trees: Vec<IsolationTree>,
-    min_interval_length: usize,
+    min_interval_perc: usize,
     intervals: Vec<Vec<(usize, usize)>>,
     config: TimeSeriesIsolationForestConfig,
 }
@@ -36,7 +38,7 @@ impl Forest<IsolationTree> for TimeSeriesIsolationForest {
     fn new(config: Self::Config) -> Self {
         Self {
             trees: Vec::new(),
-            min_interval_length: 3,
+            min_interval_perc: MIN_INTERVAL_PERC,
             intervals: Vec::new(),
             config,
         }
@@ -49,11 +51,12 @@ impl Forest<IsolationTree> for TimeSeriesIsolationForest {
     }
     fn compute_intervals(&mut self, n_features: usize) {
         // Generate n_intervals, with random start and end
+        let min_interval_length = (n_features as f64 * self.min_interval_perc as f64 / 100.0).round() as usize;
         for _i in 0..self.config.outlier_config.n_trees {
             let mut intervals = Vec::new();
             for _j in 0..self.config.n_intervals {
-                let start = thread_rng().gen_range(0..n_features - self.min_interval_length);
-                let end = thread_rng().gen_range(start + self.min_interval_length..n_features);
+                let start = thread_rng().gen_range(0..n_features - min_interval_length);
+                let end = thread_rng().gen_range(start + min_interval_length..n_features);
                 intervals.push((start, end));
             }
             self.intervals.push(intervals);

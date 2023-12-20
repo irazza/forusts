@@ -1,13 +1,14 @@
-use std::cmp::Ordering;
-use rand::{seq::SliceRandom, thread_rng, Rng};
 use super::node::Node;
 use crate::{tree::tree::Tree, utils::structures::Sample};
+use rand::{seq::SliceRandom, thread_rng, Rng};
+use std::cmp::Ordering;
 
 pub struct IsolationTreeConfig {
     pub max_depth: usize,
     pub min_samples_split: usize,
 }
 
+#[derive(Clone, Debug)]
 pub struct IsolationTree {
     root: Node,
     max_depth: usize,

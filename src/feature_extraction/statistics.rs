@@ -197,3 +197,9 @@ pub fn f_entropy(a: &[f64]) -> f64 {
     }
     return -1.0 * f;
 }
+
+pub fn zscore(x: &[f64]) -> Vec<f64> {
+    let mean = mean(x);
+    let std = std(x);
+    x.iter().map(|x| (x - mean) / std).collect()
+}

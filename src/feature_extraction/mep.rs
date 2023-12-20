@@ -2,7 +2,6 @@ use find_peaks::PeakFinder;
 
 use super::statistics::max;
 
-
 pub fn compute_mep_features(x: &[f64]) -> Vec<f64> {
     let mut features = Vec::new();
 
@@ -16,7 +15,6 @@ pub fn compute_mep_features(x: &[f64]) -> Vec<f64> {
         return vec![0.0; 8];
     }
 
-    
     peaks.sort_by(|a, b| a.position.start.partial_cmp(&b.position.start).unwrap());
 
     // First 4 peaks are ignored, because ...
@@ -29,13 +27,16 @@ pub fn compute_mep_features(x: &[f64]) -> Vec<f64> {
     let peaks = peaks[4..].to_vec();
 
     // Amplitude: Max amplitude
-    features.push(max(&peaks.iter().map(|p| p.height.unwrap_or(0.0)).collect::<Vec<_>>()));
+    features.push(max(&peaks
+        .iter()
+        .map(|p| p.height.unwrap_or(0.0))
+        .collect::<Vec<_>>()));
 
     // Area: Total area within duration
     features.push(x.iter().map(|v| f64::abs(*v)).sum::<f64>());
 
     // Duration: length of the signal response
-    features.push((peaks[peaks.len()-1].position.end - peaks[0].position.start) as f64);
+    features.push((peaks[peaks.len() - 1].position.end - peaks[0].position.start) as f64);
 
     // Thickness: Area / Amplitude
     features.push(features[1] / features[0]);
@@ -49,8 +50,8 @@ pub fn compute_mep_features(x: &[f64]) -> Vec<f64> {
 
     // No. of phases: zero-crossing + 1
     let mut zc = 0;
-    for i in 0..x.len()-1 {
-        if x[i]*x[i+1] < 0.0 {
+    for i in 0..x.len() - 1 {
+        if x[i] * x[i + 1] < 0.0 {
             zc += 1;
         }
     }

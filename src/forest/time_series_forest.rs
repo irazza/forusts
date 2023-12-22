@@ -1,20 +1,31 @@
 use crate::feature_extraction::statistics::{mean, slope, std};
 use crate::forest::forest::{ClassificationForest, Forest};
+use crate::grid_search_tuning;
 use crate::tree::{decision_tree::DecisionTree, tree::Tree};
 use crate::utils::structures::Sample;
+use crate::utils::tuning::TuningConfig;
 use rand::{thread_rng, Rng};
 use rayon::prelude::*;
 
-use super::forest::ClassificationForestConfig;
+use super::forest::{ClassificationForestConfig, ClassificationForestConfigTuning};
 
-pub struct TimeSeriesForestConfig {
+pub const MIN_INTERVAL_PERC: usize = 10;
+
+grid_search_tuning! {
+pub struct TimeSeriesForestConfig [TimeSeriesForestConfigTuning]{
     pub n_intervals: usize,
     pub min_interval_length: usize,
-    pub classification_config: ClassificationForestConfig,
+    pub classification_config: ClassificationForestConfig [ClassificationForestConfigTuning],
+}
+}
+impl TuningConfig for TimeSeriesForestConfigTuning {
+    type Tree = DecisionTree;
+    type Forest = TimeSeriesForest;
 }
 pub struct TimeSeriesForest {
     trees: Vec<DecisionTree>,
     intervals: Vec<Vec<(usize, usize)>>,
+    min_interval_perc: usize,
     config: TimeSeriesForestConfig,
 }
 
@@ -25,6 +36,7 @@ impl Forest<DecisionTree> for TimeSeriesForest {
         Self {
             trees: Vec::new(),
             intervals: Vec::new(),
+            min_interval_perc: MIN_INTERVAL_PERC,
             config,
         }
     }
@@ -36,12 +48,13 @@ impl Forest<DecisionTree> for TimeSeriesForest {
     }
     fn compute_intervals(&mut self, n_features: usize) {
         // Generate n_intervals, with random start and end
+        let min_interval_length = 3;
+            //(n_features as f64 * self.min_interval_perc as f64 / 100.0).round() as usize;
         for _i in 0..self.config.classification_config.n_trees {
             let mut intervals = Vec::new();
             for _j in 0..self.config.n_intervals {
-                let start = thread_rng().gen_range(0..n_features - self.config.min_interval_length);
-                let end =
-                    thread_rng().gen_range(start + self.config.min_interval_length..n_features);
+                let start = thread_rng().gen_range(0..n_features - min_interval_length);
+                let end = thread_rng().gen_range(start + min_interval_length..n_features);
                 intervals.push((start, end));
             }
             self.intervals.push(intervals);

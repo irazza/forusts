@@ -1,0 +1,144 @@
+use crate::feature_extraction::catch22::compute_catch_features;
+use crate::feature_extraction::mep::compute_mep_features;
+use crate::feature_extraction::statistics::zscore;
+use crate::forest::canonical_isolation_forest::{
+    CanonicalIsolationForest, CanonicalIsolationForestConfig,
+};
+use crate::forest::forest::{Forest, OutlierForest, OutlierForestConfig};
+
+use crate::forest::isolation_forest::{IsolationForest, IsolationForestConfig};
+use crate::forest::mep_isolation_forest::{MEPIsolationForest, MEPIsolationForestConfig};
+use crate::metrics::classification::roc_auc_score;
+use crate::utils::csv_io::read_csv;
+use crate::utils::structures::Sample;
+
+use std::borrow::Cow;
+use std::error::Error;
+use std::fs;
+use utils::csv_io::write_csv;
+
+mod feature_extraction;
+mod forest;
+mod metrics;
+mod neighbors;
+mod tree;
+mod utils;
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let paths = fs::read_dir("/media/aazzari/DATA/admep/")?;
+    let mut predictions = Vec::new();
+    // let mut hyperparameters = Vec::new();
+    let n_repetitions = 5;
+    let n_trees = 100;
+
+    let mut datasets: Vec<_> = Vec::new();
+    for entry in paths {
+        // Unwrap the entry or handle the error, if any.
+        let entry = entry?;
+        if entry.file_type()?.is_dir() {
+            datasets.push(entry);
+        }
+    }
+    datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
+    for path in &datasets {
+        println!("Processing {}", path.file_name().to_string_lossy());
+        let train_path = path
+            .path()
+            .join(format!("{}_TRAIN.tsv", path.file_name().to_string_lossy()));
+        let test_path = path
+            .path()
+            .join(format!("{}_TEST.tsv", path.file_name().to_string_lossy()));
+
+        let mut ds_train = read_csv(train_path, b'\t', false)?;
+        let mut ds_test = read_csv(test_path, b'\t', false)?;
+        let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
+        let n_features = ds_train[0].data.len() as f64;
+        // let config = TimeSeriesIsolationForestConfigTuning {
+        //     n_intervals: (1..=20).step_by(5).collect(),
+        //     outlier_config: OutlierForestConfigTuning {
+        //         n_trees: (100..=500).step_by(100).collect(),
+        //         enhanced_anomaly_score: vec![false],
+        //         max_depth: (5..=50).step_by(5).map(Some).collect(),
+        //     },
+        // };
+        //     hyperparameters.push(grid_search(&mut ds_train, &ds_test, config, 1, roc_auc_score));
+
+        // }
+
+        // serde_json::to_writer_pretty(
+        //     std::fs::File::create("admepTSIF_hyperparameters.json")?,
+        //     &hyperparameters,
+        // )?;
+
+        let config = CanonicalIsolationForestConfig {
+            outlier_config: OutlierForestConfig {
+                n_trees,
+                enhanced_anomaly_score: false,
+                max_depth: None,
+            },
+            n_intervals: n_features.ln() as usize,
+        };
+        let mut best_model2 = None;
+        let mut best_model3 = None;
+
+        let mut best_sep2 = 0.0;
+        let mut best_sep3 = 0.0;
+
+        let anomaly_presence = ds_train
+            .iter()
+            .filter(|Sample { data: _, target: n }| *n == 1)
+            .count();
+        for _i in 0..n_repetitions {
+            let mut clf = CanonicalIsolationForest::new(config);
+            clf.fit(&mut ds_train);
+
+            let mut scores = clf.score_samples(&ds_train);
+            scores.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+            let sep2 = scores[scores.len() - anomaly_presence]
+                - scores[scores.len() - anomaly_presence - 1];
+            let sep3 = scores[scores.len() - 1] - scores[0];
+
+            if sep2 > best_sep2 {
+                best_sep2 = sep2;
+                best_model2 = Some(clf.clone());
+            }
+            if sep3 > best_sep3 {
+                best_sep3 = sep3;
+                best_model3 = Some(clf.clone());
+            }
+        }
+
+        let y_score2 = best_model2.unwrap().score_samples(&ds_test);
+        let roc_auc2 = roc_auc_score(&y_score2, &y_true);
+
+        let y_score3 = best_model3.unwrap().score_samples(&ds_test);
+        let roc_auc3 = roc_auc_score(&y_score3, &y_true);
+
+        println!(
+            "\tROC-AUC method 2 : {} \n\tROC-AUC method 3 : {} ",
+            roc_auc2, roc_auc3
+        );
+        predictions.push(vec![roc_auc2, roc_auc3]);
+    }
+    // Create index modifying datasets multiplying by n_repetitions
+    let mut index = Vec::new();
+    for i in 0..datasets.len() {
+        for _j in 0..n_repetitions {
+            index.push(datasets[i].file_name().to_string_lossy().to_string());
+        }
+    }
+
+    let header = vec!["Dataset", "ROC-AUC T2", "ROC-AUC T3"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    write_csv(
+        format!("admepCIF_T{}_R{}.csv", n_trees, n_repetitions),
+        predictions,
+        header,
+        index,
+    )?;
+
+    Ok(())
+}

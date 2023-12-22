@@ -6,7 +6,7 @@ use crate::{
         node::Node,
         tree::{Criterion, MaxFeatures, Tree},
     },
-    utils::structures::Sample,
+    utils::structures::Sample, feature_extraction::statistics::unique,
 };
 
 pub struct DecisionTreeConfig {
@@ -39,62 +39,66 @@ impl Tree for DecisionTree {
         self.root = root;
     }
     fn get_split(&self, samples: &[Sample<'_>]) -> (usize, f64, f64) {
-        let n_samples = samples.len() as f64;
-        let mut shuffled_features: Vec<usize> = (0..samples[0].data.len()).collect();
-        shuffled_features.shuffle(&mut thread_rng());
-
+        // Initialize the best split
         let mut best_feature = usize::MAX;
         let mut best_threshold = f64::MAX;
         let mut best_impurity = f64::MAX;
 
-        let n_features = self.config.max_features.convert(samples[0].data.len());
-        for &feature_idx in &shuffled_features[..n_features] {
-            let mut feature_values = samples
-                .iter()
-                .map(|v| (v.data[feature_idx], v.target))
-                .collect::<Vec<_>>();
-            feature_values.sort_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap());
+        // Generate a random subsample (MaxFeatures) of features (length of sample)
+        let mut features_subsample = (0..samples[0].data.len()).collect::<Vec<_>>();
+        features_subsample.shuffle(&mut thread_rng());
+        let features_subsample = features_subsample[..self.config.max_features.convert(samples[0].data.len())].to_vec();
 
-            let mut left_class_counts = HashMap::new();
-            let mut right_class_counts = HashMap::new();
+        for feature_idx in features_subsample {
+            // Extract the thresholds and the classes for the current feature
+            let thresholds = samples.iter().map(|s| s.data[feature_idx]).collect::<Vec<_>>();
 
-            for (_, class) in &feature_values {
-                *left_class_counts.entry(*class).or_insert(0) += 1;
-            }
+            for threshold in thresholds {
+                // Split the samples based on the current threshold
+                let mut left = HashMap::new();
+                let mut right = HashMap::new();
+                
+                for sample in samples {
+                    if sample.data[feature_idx] <= threshold {
+                        *left.entry(sample.target).or_insert(0) += 1;
+                    } else {
+                        *right.entry(sample.target).or_insert(0) += 1;
+                    }
+                }
 
-            for (i, &(threshold, class)) in feature_values.iter().enumerate() {
-                left_class_counts.entry(class).and_modify(|e| *e -= 1);
-                *right_class_counts.entry(class).or_insert(0) += 1;
+                // Compute the impurity of the split
+                let left_impurity = self.config.criterion.to_fn::<DecisionTree>()(&left);
+                let right_impurity = self.config.criterion.to_fn::<DecisionTree>()(&right);
 
-                let left_impurity =
-                    (self.config.criterion.to_fn::<DecisionTree>())(&left_class_counts);
-                let right_impurity =
-                    (self.config.criterion.to_fn::<DecisionTree>())(&right_class_counts);
-
-                let right_size = (i + 1) as f64;
-                let left_size = n_samples - right_size;
-
+                // Compute the weighted impurity of the split
                 let impurity = match self.config.criterion {
                     Criterion::Gini => {
-                        (left_size / n_samples) * left_impurity
-                            + (right_size / n_samples) * right_impurity
+                        (left_impurity * left.values().sum::<usize>() as f64
+                            + right_impurity * right.values().sum::<usize>() as f64)
+                            / samples.len() as f64
                     }
                     Criterion::Entropy => {
                         let mut class_counts = HashMap::new();
                         for Sample { target, .. } in samples {
                             *class_counts.entry(*target).or_insert(0) += 1;
                         }
-                        let parent_entropy =
-                            (self.config.criterion.to_fn::<DecisionTree>())(&class_counts);
-                        1.0 / (parent_entropy
-                            - ((left_size / n_samples) * left_impurity
-                                + (right_size / n_samples) * right_impurity))
+                        let parent = (self.config.criterion.to_fn::<DecisionTree>())(&class_counts);
+                        let impurity = parent - (left_impurity * left.values().sum::<usize>() as f64
+                            + right_impurity * right.values().sum::<usize>() as f64)
+                            / samples.len() as f64;
+                        1.0 / impurity
                     }
                 };
+                
+                // (left_impurity * left.values().sum::<usize>() as f64
+                //     + right_impurity * right.values().sum::<usize>() as f64)
+                //     / samples.len() as f64;
+
+                // Update the best split if the current split is better
                 if impurity < best_impurity {
-                    best_impurity = impurity;
                     best_feature = feature_idx;
                     best_threshold = threshold;
+                    best_impurity = impurity;
                 }
             }
         }
@@ -118,12 +122,10 @@ impl Tree for DecisionTree {
         if is_all_same_target {
             return true;
         }
-
         return false;
     }
     fn post_split_conditions(&self, new_impurity: f64, old_impurity: f64) -> bool {
         new_impurity <= f64::EPSILON
-            || new_impurity.is_nan()
-            || new_impurity - old_impurity <= f64::EPSILON
+            || old_impurity <= new_impurity
     }
 }

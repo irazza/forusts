@@ -46,28 +46,23 @@ grid_search_tuning! {
 pub trait ClassificationForest: Forest<DecisionTree> {
     fn get_forest_config(&self) -> &ClassificationForestConfig;
     fn fit_(&mut self, data: &mut [Sample<'_>]) {
-        let n_samples = data.len();
         self.compute_intervals(data[0].data.len());
-
         let mut trees = Vec::new();
         let config = self.get_forest_config();
         trees.par_extend((0..config.n_trees).into_par_iter().map(|i| {
             let transformed_data = self.transform(data, i);
-            let bootstrap_indices: Vec<usize> = (0..n_samples)
-                .map(|_| thread_rng().gen_range(0..n_samples))
-                .collect();
-
             let mut tree = DecisionTree::new(DecisionTreeConfig {
                 criterion: config.criterion,
                 max_depth: config.max_depth.unwrap_or(usize::MAX),
                 min_samples_split: config.min_samples_split,
                 max_features: config.max_features,
             });
+            let bootstrap_indices = (0..transformed_data.len()).collect::<Vec<_>>().iter().map(|_| thread_rng().gen_range(0..transformed_data.len())).collect::<Vec<_>>();
             tree.fit(
                 &mut bootstrap_indices
                     .iter()
-                    .map(|i| transformed_data[*i].to_ref())
-                    .collect::<Vec<Sample<'_>>>(),
+                    .map(|idx| transformed_data[*idx].to_ref())
+                    .collect::<Vec<Sample<'_>>>()
             );
             tree
         }));
@@ -279,28 +274,6 @@ pub trait OutlierForest: Forest<IsolationTree> {
             average_depth /= self.get_forest_config().n_trees as f64;
             return ANOMALY_SCORE.powf(-average_depth / denominator);
         }));
-        // scores.par_extend(x.par_iter().map(|sample| {
-        //     let mut transformed_sample = Vec::new();
-        //     let mut depths = Vec::new();
-        //     for (i, tree) in self.get_trees().iter().enumerate() {
-        //         transformed_sample = self.transform(&vec![sample.clone()], i)[0].clone();
-        //         let leaf = tree.predict_leaf(&transformed_sample);
-        //         depths.push(leaf.get_depth() as f64);
-        //     }
-        // // ERROR PATH LENGHT ALWAYS USE THE LAST TRANSFORMED SAMPLE
-        //     let path_length = self.path_length(&transformed_sample);
-        //     if self.get_enhanced_anomaly_score() {
-        //         let mut enhanced_scores = Vec::new();
-        //         for (pl, d) in path_length.iter().zip(depths.iter()) {
-        //             enhanced_scores.push(2.0f64.powf(-d/pl));
-        //         }
-        //         return mean(&enhanced_scores[..]);
-        //     } else {
-        //         let average_path_length = mean(&path_length[..]);
-        //         let average_depth = mean(&depths[..]);
-        //         return 2.0f64.powf(-average_depth / average_path_length);
-        //     }
-        // }));
         scores
     }
     fn path_length(leaf: &Node) -> f64 {

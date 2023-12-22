@@ -1,6 +1,6 @@
 use crate::feature_extraction::statistics::unique;
 
-pub fn accuracy_score(y_pred: &[usize], y_true: &[usize]) -> f64 {
+pub fn accuracy_score(y_pred: &[isize], y_true: &[isize]) -> f64 {
     (y_pred
         .iter()
         .zip(y_true.iter())

@@ -51,3 +51,19 @@ pub fn vec_to_csv(path: impl AsRef<Path>, data: &[f64]) -> Result<(), Box<dyn Er
     csv_writer.flush()?;
     Ok(())
 }
+
+pub fn read_csv_to_vec(path: impl AsRef<Path>) -> Result<Vec<f64>, Box<dyn Error>> {
+    let reader = BufReader::new(File::open(path)?);
+    let mut reader = ReaderBuilder::new()
+        .has_headers(false)
+        .delimiter(b',')
+        .from_reader(reader);
+
+    let mut samples = Vec::new();
+
+    for result in reader.deserialize() {
+        let record: f64 = result.unwrap();
+        samples.push(record);
+    }
+    Ok(samples)
+}

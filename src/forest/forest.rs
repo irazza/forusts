@@ -286,4 +286,115 @@ pub trait OutlierForest: Forest<IsolationTree> {
             return leaf.get_depth() as f64;
         }
     }
+    fn pairwise_breiman(&self, x1: &[Sample<'_>], x2: &[Sample<'_>]) -> Vec<Vec<f64>> {
+        let distance_matrix: Vec<Vec<_>> = (0..x1.len())
+            .map(|_| (0..x2.len()).map(|_| AtomicUsize::new(0)).collect())
+            .collect();
+        let trees: &Vec<IsolationTree> = self.get_trees();
+        trees.par_iter().enumerate().for_each(|(i, tree)| {
+            let transformed_x1 = self.transform(&x1, i);
+            let transformed_x2 = self.transform(&x2, i);
+            let x1_nodes = transformed_x1
+                .iter()
+                .map(|x| tree.predict_leaf(x))
+                .collect::<Vec<_>>();
+            let x2_nodes = transformed_x2
+                .iter()
+                .map(|x| tree.predict_leaf(x))
+                .collect::<Vec<_>>();
+
+            for (i, &x1_node) in x1_nodes.iter().enumerate() {
+                for (j, &x2_node) in x2_nodes.iter().enumerate() {
+                    distance_matrix[i][j].fetch_add(
+                        ((x1_node as *const Node) != (x2_node as *const Node)) as usize,
+                        Ordering::Relaxed,
+                    );
+                }
+            }
+        });
+        distance_matrix
+            .into_iter()
+            .map(|d| {
+                d.into_iter()
+                    .map(|d| d.into_inner() as f64 / self.get_forest_config().n_trees as f64)
+                    .collect()
+            })
+            .collect()
+    }
+    fn pairwise_ancestor(&self, x1: &[Sample<'_>], x2: &[Sample<'_>]) -> Vec<Vec<f64>> {
+        let distance_matrix: Vec<Vec<_>> = (0..x1.len())
+            .map(|_| (0..x2.len()).map(|_| Mutex::new(0.0)).collect())
+            .collect();
+        let trees: &Vec<IsolationTree> = self.get_trees();
+        trees.par_iter().enumerate().for_each(|(i, tree)| {
+            let transformed_x1 = self.transform(&x1, i);
+            let transformed_x2 = self.transform(&x2, i);
+            let x1_nodes = transformed_x1
+                .iter()
+                .map(|x| tree.predict_leaf(x))
+                .collect::<Vec<_>>();
+            let x2_nodes = transformed_x2
+                .iter()
+                .map(|x| tree.predict_leaf(x))
+                .collect::<Vec<_>>();
+
+            for (i, &x1_node) in x1_nodes.iter().enumerate() {
+                let distances = tree.compute_ancestor(x1_node);
+
+                for (j, &x2_node) in x2_nodes.iter().enumerate() {
+                    *distance_matrix[i][j].lock() += (x1_node.get_depth() + x2_node.get_depth()
+                        - 2 * distances[&(x2_node as *const Node)].get_depth())
+                        as f64
+                        / max(x1_node.get_depth(), x2_node.get_depth()) as f64;
+                }
+            }
+        });
+        distance_matrix
+            .into_iter()
+            .map(|d| {
+                d.into_iter()
+                    .map(|d| d.into_inner() as f64 / self.get_forest_config().n_trees as f64)
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<Vec<_>>>()
+    }
+    fn pairwise_zhu(&self, x1: &[Sample<'_>], x2: &[Sample<'_>]) -> Vec<Vec<f64>> {
+        let distance_matrix: Vec<Vec<_>> = (0..x1.len())
+            .map(|_| (0..x2.len()).map(|_| Mutex::new(0.0)).collect())
+            .collect();
+        let trees: &Vec<IsolationTree> = self.get_trees();
+        trees.par_iter().enumerate().for_each(|(i, tree)| {
+            let transformed_x1 = self.transform(&x1, i);
+            let transformed_x2 = self.transform(&x2, i);
+            let x1_nodes = transformed_x1
+                .iter()
+                .map(|x| tree.predict_leaf(x))
+                .collect::<Vec<_>>();
+            let x2_nodes = transformed_x2
+                .iter()
+                .map(|x| tree.predict_leaf(x))
+                .collect::<Vec<_>>();
+
+            for (i, &x1_node) in x1_nodes.iter().enumerate() {
+                let distances = tree.compute_ancestor(x1_node);
+
+                for (j, &x2_node) in x2_nodes.iter().enumerate() {
+                    *distance_matrix[i][j].lock() += distances[&(x2_node as *const Node)]
+                        .get_depth() as f64
+                        / max(x1_node.get_depth(), x2_node.get_depth()) as f64;
+                }
+            }
+        });
+
+        distance_matrix
+            .into_iter()
+            .map(|d| {
+                d.into_iter()
+                    .map(|d| {
+                        1.0 - (d.into_inner() as f64 / self.get_forest_config().n_trees as f64)
+                    })
+                    .collect()
+            })
+            .collect()
+    }
 }

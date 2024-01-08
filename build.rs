@@ -1,7 +1,6 @@
 use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::{env, fs};
-
 use cmake::Config;
 
 fn main() {
@@ -69,12 +68,14 @@ fn main() {
         .opt_level(3)
         .compile("catch22");
 
-    // Build fftw
-    let dst = Config::new("fftw-3.3.10")
+    
+    // Run the configure script
+    let dst = Config::new("catch22/fftw-3.3.10")
         .define("BUILD_SHARED_LIBS", "OFF")
-        .define("ENABLE_THREADS", "ON")
         .build();
-
+    
+    // Pass `-fopenmp` to the linker.
+    println!("cargo:rustc-link-arg=-fopenmp");
     println!(
         "cargo:rustc-link-search=native={}",
         dst.join("build").display()

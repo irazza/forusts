@@ -1,5 +1,5 @@
 use crate::feature_extraction::catch22::CATCH22;
-use crate::feature_extraction::statistics::{mean, slope, std};
+use crate::feature_extraction::statistics::{mean, slope, std, zscore};
 use crate::forest::forest::{ClassificationForest, Forest};
 use crate::grid_search_tuning;
 use crate::tree::{decision_tree::DecisionTree, tree::Tree};
@@ -79,7 +79,7 @@ impl Forest<DecisionTree> for CanonicalIntervalForest {
             for (start, end) in self.intervals[intervals_index].iter().copied() {
                 for i in 0..8 {
                     sample.extend(
-                        [CATCH22::get(self.attributes[i])(&data[j].data[start..end])].iter(),
+                        [CATCH22::get(self.attributes[i])(&zscore(&data[j].data[start..end]))].iter(),
                     );
                 }
             }

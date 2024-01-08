@@ -1,20 +1,16 @@
-use crate::feature_extraction::catch22::compute_catch_features;
-use crate::feature_extraction::mep::compute_mep_features;
-use crate::feature_extraction::statistics::zscore;
 use crate::forest::canonical_isolation_forest::{
     CanonicalIsolationForest, CanonicalIsolationForestConfig,
 };
 use crate::forest::forest::{Forest, OutlierForest, OutlierForestConfig};
-
-use crate::forest::isolation_forest::{IsolationForest, IsolationForestConfig};
-use crate::forest::mep_isolation_forest::{MEPIsolationForest, MEPIsolationForestConfig};
+use crate::feature_extraction::statistics::{mean, std};
 use crate::metrics::classification::roc_auc_score;
-use crate::utils::csv_io::read_csv;
+use crate::utils::csv_io::{read_csv, vec_to_csv};
 use crate::utils::structures::Sample;
 
 use std::borrow::Cow;
 use std::error::Error;
-use std::fs;
+use std::fs::{self, File};
+use csv::WriterBuilder;
 use utils::csv_io::write_csv;
 
 mod feature_extraction;
@@ -26,9 +22,11 @@ mod utils;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let paths = fs::read_dir("/media/aazzari/DATA/admep/")?;
+    // Store ROC-AUC results
     let mut predictions = Vec::new();
+    let mut training_scores = Vec::new();
     // let mut hyperparameters = Vec::new();
-    let n_repetitions = 5;
+    let n_repetitions = 30;
     let n_trees = 200;
     let mut config = CanonicalIsolationForestConfig {
         outlier_config: OutlierForestConfig {
@@ -58,79 +56,34 @@ fn main() -> Result<(), Box<dyn Error>> {
             .join(format!("{}_TEST.tsv", path.file_name().to_string_lossy()));
 
         let mut ds_train = read_csv(train_path, b'\t', false)?;
-        let mut ds_test = read_csv(test_path, b'\t', false)?;
+        let ds_test = read_csv(test_path, b'\t', false)?;
         let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
         let n_features = ds_train[0].data.len() as f64;
-        config.n_intervals = n_features.sqrt() as usize;
-        // let config = TimeSeriesIsolationForestConfigTuning {
-        //     n_intervals: (1..=20).step_by(5).collect(),
-        //     outlier_config: OutlierForestConfigTuning {
-        //         n_trees: (100..=500).step_by(100).collect(),
-        //         enhanced_anomaly_score: vec![false],
-        //         max_depth: (5..=50).step_by(5).map(Some).collect(),
-        //     },
-        // };
-        //     hyperparameters.push(grid_search(&mut ds_train, &ds_test, config, 1, roc_auc_score));
+        config.n_intervals = n_features.log10() as usize;
 
-        // }
-
-        // serde_json::to_writer_pretty(
-        //     std::fs::File::create("admepTSIF_hyperparameters.json")?,
-        //     &hyperparameters,
-        // )?;
-
-        let mut best_model2 = None;
-        let mut best_model3 = None;
-
-        let mut best_sep2 = 0.0;
-        let mut best_sep3 = 0.0;
-
-        let anomaly_presence = ds_train
-            .iter()
-            .filter(|Sample { data: _, target: n }| *n == 1)
-            .count();
+        let mut mean_roc = 0.0;
         for _i in 0..n_repetitions {
             let mut clf = CanonicalIsolationForest::new(config);
             clf.fit(&mut ds_train);
 
-            let mut scores = clf.score_samples(&ds_train);
-            scores.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            let scores = clf.score_samples(&ds_train);
+            training_scores.push(scores);
 
-            let sep2 = scores[scores.len() - anomaly_presence]
-                - scores[scores.len() - anomaly_presence - 1];
-            let sep3 = scores[scores.len() - 1] - scores[0];
-
-            if sep2 > best_sep2 {
-                best_sep2 = sep2;
-                best_model2 = Some(clf.clone());
-            }
-            if sep3 > best_sep3 {
-                best_sep3 = sep3;
-                best_model3 = Some(clf.clone());
-            }
+            let roc_auc = roc_auc_score(&clf.score_samples(&ds_test), &y_true);
+            mean_roc += roc_auc;
+            predictions.push([roc_auc].to_vec());
         }
-
-        let y_score2 = best_model2.unwrap().score_samples(&ds_test);
-        let roc_auc2 = roc_auc_score(&y_score2, &y_true);
-
-        let y_score3 = best_model3.unwrap().score_samples(&ds_test);
-        let roc_auc3 = roc_auc_score(&y_score3, &y_true);
-
-        println!(
-            "\tROC-AUC method 2 : {} \n\tROC-AUC method 3 : {} ",
-            roc_auc2, roc_auc3
-        );
-        predictions.push(vec![roc_auc2, roc_auc3]);
+        mean_roc /= n_repetitions as f64;
+        println!("\tMean ROC-AUC: {}", mean_roc);
     }
-    // Create index modifying datasets multiplying by n_repetitions
+    // Create index
     let mut index = Vec::new();
     for i in 0..datasets.len() {
         for _j in 0..n_repetitions {
             index.push(datasets[i].file_name().to_string_lossy().to_string());
         }
     }
-
-    let header = vec!["Dataset", "ROC-AUC T2", "ROC-AUC T3"]
+    let header = vec!["Dataset", "ROC-AUC"]
         .iter()
         .map(|s| s.to_string())
         .collect();
@@ -138,8 +91,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         format!("experimental_results/admepCIF_T{}_R{}_I{}.csv", n_trees, n_repetitions,config.n_intervals),
         predictions,
         header,
-        index,
+        index.clone(),
     )?;
+    
+    let file = File::create(format!("experimental_results/admepCIF_T{}_R{}_I{}_scores.csv", n_trees, n_repetitions,config.n_intervals))?;
+    let mut csv_writer = WriterBuilder::new().flexible(true).from_writer(file);
+    for record in &training_scores {
+        csv_writer.serialize(record)?;
+    }
+    csv_writer.flush()?;
+
 
     Ok(())
 }

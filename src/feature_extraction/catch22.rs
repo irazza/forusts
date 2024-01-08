@@ -121,7 +121,6 @@ pub fn compute_catch_features(x: &[f64]) -> Vec<f64> {
 }
 
 pub fn dn_outlier_include_n_001_mdrmd(x: &[f64]) -> f64 {
-    let x = zscore(x);
     unsafe {
         let result =
             bindings::DN_OutlierInclude::DN_OutlierInclude_n_001_mdrmd(x.as_ptr(), x.len() as i32);
@@ -134,7 +133,6 @@ pub fn dn_outlier_include_n_001_mdrmd(x: &[f64]) -> f64 {
 }
 
 pub fn dn_outlier_include_p_001_mdrmd(x: &[f64]) -> f64 {
-    let x = zscore(x);
     unsafe {
         let result =
             bindings::DN_OutlierInclude::DN_OutlierInclude_p_001_mdrmd(x.as_ptr(), x.len() as i32);

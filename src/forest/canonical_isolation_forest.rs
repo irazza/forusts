@@ -14,7 +14,9 @@ use rand::{seq::SliceRandom, thread_rng, Rng};
 
 use super::forest::{OutlierForestConfig, OutlierForestConfigTuning};
 
-pub const MIN_INTERVAL_PERC: usize = 10;
+pub const MIN_INTERVAL: usize = 10;
+pub const TOTAL_ATTRIBUTES: usize = 25;
+pub const N_ATTRIBUTES: usize = 8;
 
 grid_search_tuning! {
     pub struct CanonicalIsolationForestConfig[CanonicalIsolationForestConfigTuning] {
@@ -30,9 +32,8 @@ impl TuningConfig for CanonicalIsolationForestConfigTuning {
 #[derive(Clone)]
 pub struct CanonicalIsolationForest {
     trees: Vec<IsolationTree>,
-    min_interval_perc: usize,
     intervals: Vec<Vec<(usize, usize)>>,
-    attributes: Vec<usize>,
+    attributes: Vec<Vec<usize>>,
     config: CanonicalIsolationForestConfig,
 }
 
@@ -43,7 +44,6 @@ impl Forest<IsolationTree> for CanonicalIsolationForest {
     fn new(config: Self::Config) -> Self {
         Self {
             trees: Vec::new(),
-            min_interval_perc: MIN_INTERVAL_PERC,
             intervals: Vec::new(),
             attributes: Vec::new(),
             config,
@@ -57,19 +57,20 @@ impl Forest<IsolationTree> for CanonicalIsolationForest {
     }
     fn compute_intervals(&mut self, n_features: usize) {
         // Generate n_intervals, with random start and end
-        let min_interval_length =
-            (n_features as f64 * self.min_interval_perc as f64 / 100.0).round() as usize;
         for _i in 0..self.config.outlier_config.n_trees {
             let mut intervals = Vec::new();
             for _j in 0..self.config.n_intervals {
-                let start = thread_rng().gen_range(0..n_features - min_interval_length);
-                let end = thread_rng().gen_range(start + min_interval_length..n_features);
+                let start = thread_rng().gen_range(0..n_features - MIN_INTERVAL);
+                let end = thread_rng().gen_range(start + MIN_INTERVAL..n_features);
                 intervals.push((start, end));
             }
+            // We leverage the larger total feature space and inject additional diversity into the ensemble by randomly sampling the 25 features for each tree.
+            let mut attributes = (0..TOTAL_ATTRIBUTES).collect::<Vec<_>>();
+            attributes.shuffle(&mut thread_rng());
+            self.attributes.push(attributes[..N_ATTRIBUTES].to_vec());
+
             self.intervals.push(intervals);
         }
-        self.attributes = (0..22).collect();
-        self.attributes.shuffle(&mut thread_rng());
     }
     fn get_trees(&self) -> &Vec<IsolationTree> {
         &self.trees
@@ -77,15 +78,15 @@ impl Forest<IsolationTree> for CanonicalIsolationForest {
     fn get_trees_mut(&mut self) -> &mut Vec<IsolationTree> {
         &mut self.trees
     }
-    fn transform<'a>(&self, data: &[Sample<'a>], intervals_index: usize) -> Vec<Sample<'a>> {
+    fn transform<'a>(&self, data: &[Sample<'a>], tree_index: usize) -> Vec<Sample<'a>> {
         let n_samples = data.len();
         let mut transformed_data: Vec<Sample<'_>> = Vec::new();
         for j in 0..n_samples {
             let mut sample = Vec::new();
-            for (start, end) in self.intervals[intervals_index].iter().copied() {
-                for i in 0..8 {
+            for (start, end) in self.intervals[tree_index].iter().copied() {
+                for i in 0..N_ATTRIBUTES {
                     sample.extend(
-                        [CATCH22::get(self.attributes[i])(&zscore(&data[j].data[start..end]))].iter(),
+                        [CATCH22::get(self.attributes[tree_index][i])(&data[j].data[start..end])].iter(),
                     );
                 }
             }

@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut predictions = Vec::new();
     let mut training_scores = Vec::new();
     // let mut hyperparameters = Vec::new();
-    let n_repetitions = 30;
+    let n_repetitions = 5;
     let n_trees = 200;
     let mut config = CanonicalIsolationForestConfig {
         outlier_config: OutlierForestConfig {
@@ -59,7 +59,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let ds_test = read_csv(test_path, b'\t', false)?;
         let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
         let n_features = ds_train[0].data.len() as f64;
-        config.n_intervals = n_features.log10() as usize;
+        config.n_intervals = n_features.ln() as usize;
 
         let mut mean_roc = 0.0;
         for _i in 0..n_repetitions {

@@ -1,4 +1,4 @@
-use super::statistics::zscore;
+use super::statistics::{mean, std, slope};
 
 mod bindings {
     #![allow(warnings)]
@@ -31,38 +31,6 @@ pub enum CATCH22 {
     PD_PeriodicityWang_th0_01,
 }
 impl CATCH22 {
-    pub fn to_fn(self) -> fn(&[f64]) -> f64 {
-        match self {
-            CATCH22::DN_OutlierInclude_n_001_mdrmd => dn_outlier_include_n_001_mdrmd,
-            CATCH22::DN_OutlierInclude_p_001_mdrmd => dn_outlier_include_p_001_mdrmd,
-            CATCH22::DN_HistogramMode_5 => dn_histogram_mode_5,
-            CATCH22::DN_HistogramMode_10 => dn_histogram_mode_10,
-            CATCH22::CO_Embed2_Dist_tau_d_expfit_meandiff => co_embed2_dist_tau_d_expfit_meandiff,
-            CATCH22::CO_f1ecac => co_f1ecac,
-            CATCH22::CO_FirstMin_ac => co_first_min_ac,
-            CATCH22::CO_HistogramAMI_even_2_5 => co_histogram_ami_even_2_5,
-            CATCH22::CO_trev_1_num => co_trev_1_num,
-            CATCH22::FC_LocalSimple_mean1_tauresrat => fc_localsimple_mean1_tauresrat,
-            CATCH22::FC_LocalSimple_mean3_stderr => fc_localsimple_mean3_stderr,
-            CATCH22::IN_AutoMutualInfoStats_40_gaussian_fmmi => {
-                in_auto_mutual_info_stats_40_gaussian_fmmi
-            }
-            CATCH22::MD_hrv_classic_pnn40 => md_hrv_classic_pnn40,
-            CATCH22::SB_BinaryStats_diff_longstretch0 => sb_binarystats_diff_longstretch0,
-            CATCH22::SB_BinaryStats_mean_longstretch1 => sb_binary_stats_mean_longstretch1,
-            CATCH22::SB_MotifThree_quantile_hh => sb_motifthree_quantile_hh,
-            CATCH22::SC_FluctAnal_2_rsrangefit_50_1_logi_prop_r1 => {
-                sc_fluct_anal_2_rsrangefit_50_1_logi_prop_r1
-            }
-            CATCH22::SC_FluctAnal_2_dfa_50_1_2_logi_prop_r1 => {
-                sc_fluct_anal_2_dfa_50_1_2_logi_prop_r1
-            }
-            CATCH22::SP_Summaries_welch_rect_area_5_1 => sp_summaries_welch_rect_area_5_1,
-            CATCH22::SP_Summaries_welch_rect_centroid => sp_summaries_welch_rect_centroid,
-            CATCH22::SB_TransitionMatrix_3ac_sumdiagcov => sb_transition_matrix_3ac_sumdiagcov,
-            CATCH22::PD_PeriodicityWang_th0_01 => pd_periodicity_wang_th0_01,
-        }
-    }
     pub fn get(i: usize) -> fn(&[f64]) -> f64 {
         match i {
             0 => dn_outlier_include_n_001_mdrmd,
@@ -87,16 +55,17 @@ impl CATCH22 {
             19 => sp_summaries_welch_rect_centroid,
             20 => sb_transition_matrix_3ac_sumdiagcov,
             21 => pd_periodicity_wang_th0_01,
-            _ => panic!("Invalid index for CATCH22 (valide range 0..22)"),
+            22 => mean,
+            23 => std,
+            24 => slope,
+            _ => panic!("Invalid index for CATCH22 (valide range 0..25)"),
         }
     }
 }
 pub fn compute_catch_features(x: &[f64]) -> Vec<f64> {
     let mut features = Vec::new();
-    let mut x_zscored = vec![0.0; x.len()];
-    unsafe { bindings::stats::zscore_norm2(x.as_ptr(), x.len() as i32, x_zscored.as_mut_ptr()) };
-    features.push(dn_outlier_include_n_001_mdrmd(&x_zscored));
-    features.push(dn_outlier_include_p_001_mdrmd(&x_zscored));
+    features.push(dn_outlier_include_n_001_mdrmd(x));
+    features.push(dn_outlier_include_p_001_mdrmd(x));
     features.push(dn_histogram_mode_5(x));
     features.push(dn_histogram_mode_10(x));
     features.push(co_embed2_dist_tau_d_expfit_meandiff(x));
@@ -121,9 +90,11 @@ pub fn compute_catch_features(x: &[f64]) -> Vec<f64> {
 }
 
 pub fn dn_outlier_include_n_001_mdrmd(x: &[f64]) -> f64 {
+    let mut x_zscored = vec![0.0; x.len()];
+    unsafe { bindings::stats::zscore_norm2(x.as_ptr(), x.len() as i32, x_zscored.as_mut_ptr()) };
     unsafe {
         let result =
-            bindings::DN_OutlierInclude::DN_OutlierInclude_n_001_mdrmd(x.as_ptr(), x.len() as i32);
+            bindings::DN_OutlierInclude::DN_OutlierInclude_n_001_mdrmd(x_zscored.as_ptr(), x_zscored.len() as i32);
         if result.is_finite() {
             result
         } else {
@@ -133,9 +104,11 @@ pub fn dn_outlier_include_n_001_mdrmd(x: &[f64]) -> f64 {
 }
 
 pub fn dn_outlier_include_p_001_mdrmd(x: &[f64]) -> f64 {
+    let mut x_zscored = vec![0.0; x.len()];
+    unsafe { bindings::stats::zscore_norm2(x.as_ptr(), x.len() as i32, x_zscored.as_mut_ptr()) };
     unsafe {
         let result =
-            bindings::DN_OutlierInclude::DN_OutlierInclude_p_001_mdrmd(x.as_ptr(), x.len() as i32);
+            bindings::DN_OutlierInclude::DN_OutlierInclude_p_001_mdrmd(x_zscored.as_ptr(), x_zscored.len() as i32);
         if result.is_finite() {
             result
         } else {

@@ -80,7 +80,10 @@ impl Forest<DecisionTree> for CanonicalIntervalForest {
             for (start, end) in self.intervals[tree_index].iter().copied() {
                 for i in 0..N_ATTRIBUTES {
                     sample.extend(
-                        [CATCH22::get(self.attributes[tree_index][i])(&data[j].data[start..end])].iter(),
+                        [CATCH22::get(self.attributes[tree_index][i])(
+                            &data[j].data[start..end],
+                        )]
+                        .iter(),
                     );
                 }
             }
@@ -101,4 +104,3 @@ impl ClassificationForest for CanonicalIntervalForest {
         &self.config.classification_config
     }
 }
-

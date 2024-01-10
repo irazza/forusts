@@ -49,7 +49,7 @@ impl Forest<DecisionTree> for TimeSeriesForest {
     fn compute_intervals(&mut self, n_features: usize) {
         // Generate n_intervals, with random start and end
         let min_interval_length = 3;
-            //(n_features as f64 * self.min_interval_perc as f64 / 100.0).round() as usize;
+        //(n_features as f64 * self.min_interval_perc as f64 / 100.0).round() as usize;
         for _i in 0..self.config.classification_config.n_trees {
             let mut intervals = Vec::new();
             for _j in 0..self.config.n_intervals {

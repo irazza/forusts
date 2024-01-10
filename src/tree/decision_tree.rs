@@ -2,11 +2,12 @@ use hashbrown::HashMap;
 use rand::{seq::SliceRandom, thread_rng};
 
 use crate::{
+    feature_extraction::statistics::unique,
     tree::{
         node::Node,
         tree::{Criterion, MaxFeatures, Tree},
     },
-    utils::structures::Sample, feature_extraction::statistics::unique,
+    utils::structures::Sample,
 };
 
 pub struct DecisionTreeConfig {
@@ -47,17 +48,21 @@ impl Tree for DecisionTree {
         // Generate a random subsample (MaxFeatures) of features (length of sample)
         let mut features_subsample = (0..samples[0].data.len()).collect::<Vec<_>>();
         features_subsample.shuffle(&mut thread_rng());
-        let features_subsample = features_subsample[..self.config.max_features.convert(samples[0].data.len())].to_vec();
+        let features_subsample =
+            features_subsample[..self.config.max_features.convert(samples[0].data.len())].to_vec();
 
         for feature_idx in features_subsample {
             // Extract the thresholds and the classes for the current feature
-            let thresholds = samples.iter().map(|s| s.data[feature_idx]).collect::<Vec<_>>();
+            let thresholds = samples
+                .iter()
+                .map(|s| s.data[feature_idx])
+                .collect::<Vec<_>>();
 
             for threshold in thresholds {
                 // Split the samples based on the current threshold
                 let mut left = HashMap::new();
                 let mut right = HashMap::new();
-                
+
                 for sample in samples {
                     if sample.data[feature_idx] <= threshold {
                         *left.entry(sample.target).or_insert(0) += 1;
@@ -83,13 +88,14 @@ impl Tree for DecisionTree {
                             *class_counts.entry(*target).or_insert(0) += 1;
                         }
                         let parent = (self.config.criterion.to_fn::<DecisionTree>())(&class_counts);
-                        let impurity = parent - (left_impurity * left.values().sum::<usize>() as f64
-                            + right_impurity * right.values().sum::<usize>() as f64)
-                            / samples.len() as f64;
+                        let impurity = parent
+                            - (left_impurity * left.values().sum::<usize>() as f64
+                                + right_impurity * right.values().sum::<usize>() as f64)
+                                / samples.len() as f64;
                         1.0 / impurity
                     }
                 };
-                
+
                 // (left_impurity * left.values().sum::<usize>() as f64
                 //     + right_impurity * right.values().sum::<usize>() as f64)
                 //     / samples.len() as f64;
@@ -125,7 +131,6 @@ impl Tree for DecisionTree {
         return false;
     }
     fn post_split_conditions(&self, new_impurity: f64, old_impurity: f64) -> bool {
-        new_impurity <= f64::EPSILON
-            || old_impurity <= new_impurity
+        new_impurity <= f64::EPSILON || old_impurity <= new_impurity
     }
 }

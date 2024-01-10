@@ -1,4 +1,4 @@
-use super::statistics::{mean, std, slope};
+use super::statistics::{mean, slope, std};
 
 mod bindings {
     #![allow(warnings)]
@@ -93,8 +93,10 @@ pub fn dn_outlier_include_n_001_mdrmd(x: &[f64]) -> f64 {
     let mut x_zscored = vec![0.0; x.len()];
     unsafe { bindings::stats::zscore_norm2(x.as_ptr(), x.len() as i32, x_zscored.as_mut_ptr()) };
     unsafe {
-        let result =
-            bindings::DN_OutlierInclude::DN_OutlierInclude_n_001_mdrmd(x_zscored.as_ptr(), x_zscored.len() as i32);
+        let result = bindings::DN_OutlierInclude::DN_OutlierInclude_n_001_mdrmd(
+            x_zscored.as_ptr(),
+            x_zscored.len() as i32,
+        );
         if result.is_finite() {
             result
         } else {
@@ -107,8 +109,10 @@ pub fn dn_outlier_include_p_001_mdrmd(x: &[f64]) -> f64 {
     let mut x_zscored = vec![0.0; x.len()];
     unsafe { bindings::stats::zscore_norm2(x.as_ptr(), x.len() as i32, x_zscored.as_mut_ptr()) };
     unsafe {
-        let result =
-            bindings::DN_OutlierInclude::DN_OutlierInclude_p_001_mdrmd(x_zscored.as_ptr(), x_zscored.len() as i32);
+        let result = bindings::DN_OutlierInclude::DN_OutlierInclude_p_001_mdrmd(
+            x_zscored.as_ptr(),
+            x_zscored.len() as i32,
+        );
         if result.is_finite() {
             result
         } else {

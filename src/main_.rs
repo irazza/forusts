@@ -121,7 +121,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .map(|s| s.to_string())
         .collect();
     write_csv(
-        format!("experimental_results/ucrCIF_T{}_R{}_I{}_scores.csv", config.outlier_config.n_trees, n_repetitions, config.n_intervals),
+        format!("experimental_results/ucrCIF_T{}_R{}_I{}.csv", config.outlier_config.n_trees, n_repetitions, config.n_intervals),
         predictions,
         header,
         index,

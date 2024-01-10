@@ -1,16 +1,17 @@
+use crate::feature_extraction::statistics::{mean, std};
 use crate::forest::canonical_isolation_forest::{
     CanonicalIsolationForest, CanonicalIsolationForestConfig,
 };
 use crate::forest::forest::{Forest, OutlierForest, OutlierForestConfig};
-use crate::feature_extraction::statistics::{mean, std};
 use crate::metrics::classification::roc_auc_score;
 use crate::utils::csv_io::{read_csv, vec_to_csv};
 use crate::utils::structures::Sample;
 
+use core::panic;
+use csv::WriterBuilder;
 use std::borrow::Cow;
 use std::error::Error;
 use std::fs::{self, File};
-use csv::WriterBuilder;
 use utils::csv_io::write_csv;
 
 mod feature_extraction;
@@ -26,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut predictions = Vec::new();
     let mut training_scores = Vec::new();
     // let mut hyperparameters = Vec::new();
-    let n_repetitions = 5;
+    let n_repetitions = 30;
     let n_trees = 200;
     let mut config = CanonicalIsolationForestConfig {
         outlier_config: OutlierForestConfig {
@@ -88,19 +89,24 @@ fn main() -> Result<(), Box<dyn Error>> {
         .map(|s| s.to_string())
         .collect();
     write_csv(
-        format!("experimental_results/admepCIF_T{}_R{}_I{}.csv", n_trees, n_repetitions,config.n_intervals),
+        format!(
+            "experimental_results/admepCIF_T{}_R{}_I{}.csv",
+            n_trees, n_repetitions, config.n_intervals
+        ),
         predictions,
         header,
         index.clone(),
     )?;
-    
-    let file = File::create(format!("experimental_results/admepCIF_T{}_R{}_I{}_scores.csv", n_trees, n_repetitions,config.n_intervals))?;
+
+    let file = File::create(format!(
+        "experimental_results/admepCIF_T{}_R{}_I{}_scores.csv",
+        n_trees, n_repetitions, config.n_intervals
+    ))?;
     let mut csv_writer = WriterBuilder::new().flexible(true).from_writer(file);
     for record in &training_scores {
         csv_writer.serialize(record)?;
     }
     csv_writer.flush()?;
-
 
     Ok(())
 }

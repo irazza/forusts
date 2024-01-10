@@ -57,12 +57,16 @@ pub trait ClassificationForest: Forest<DecisionTree> {
                 min_samples_split: config.min_samples_split,
                 max_features: config.max_features,
             });
-            let bootstrap_indices = (0..transformed_data.len()).collect::<Vec<_>>().iter().map(|_| thread_rng().gen_range(0..transformed_data.len())).collect::<Vec<_>>();
+            let bootstrap_indices = (0..transformed_data.len())
+                .collect::<Vec<_>>()
+                .iter()
+                .map(|_| thread_rng().gen_range(0..transformed_data.len()))
+                .collect::<Vec<_>>();
             tree.fit(
                 &mut bootstrap_indices
                     .iter()
                     .map(|idx| transformed_data[*idx].to_ref())
-                    .collect::<Vec<Sample<'_>>>()
+                    .collect::<Vec<Sample<'_>>>(),
             );
             tree
         }));

@@ -1,7 +1,7 @@
+use cmake::Config;
 use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::{env, fs};
-use cmake::Config;
 
 fn main() {
     let paths = fs::read_dir("./catch22/C/").unwrap();
@@ -68,13 +68,11 @@ fn main() {
         .opt_level(3)
         .compile("catch22");
 
-    
     // Run the configure script
     let dst = Config::new("catch22/fftw-3.3.10")
         .define("BUILD_SHARED_LIBS", "OFF")
+        .define("ENABLE_OPENMP", "ON")
         .build();
-    
-    // Pass `-fopenmp` to the linker.
     println!("cargo:rustc-link-arg=-fopenmp");
     println!(
         "cargo:rustc-link-search=native={}",

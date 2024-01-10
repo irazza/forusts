@@ -85,9 +85,9 @@ impl Forest<IsolationTree> for CanonicalIsolationForest {
             let mut sample = Vec::new();
             for (start, end) in self.intervals[tree_index].iter().copied() {
                 for i in 0..N_ATTRIBUTES {
-                    sample.extend(
-                        [CATCH22::get(self.attributes[tree_index][i])(&data[j].data[start..end])].iter(),
-                    );
+                    sample.push(CATCH22::get(self.attributes[tree_index][i])(
+                        &data[j].data[start..end],
+                    ));
                 }
             }
             transformed_data.push(Sample {

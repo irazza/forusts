@@ -26,6 +26,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Store ROC-AUC results
     let mut predictions = Vec::new();
     let mut training_scores = Vec::new();
+    let mut testing_scores = Vec::new();
     // let mut hyperparameters = Vec::new();
     let n_repetitions = 30;
     let n_trees = 200;
@@ -60,17 +61,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         let ds_test = read_csv(test_path, b'\t', false)?;
         let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
         let n_features = ds_train[0].data.len() as f64;
-        config.n_intervals = n_features.ln() as usize;
+        config.n_intervals = n_features.log10() as usize;
 
         let mut mean_roc = 0.0;
         for _i in 0..n_repetitions {
             let mut clf = CanonicalIsolationForest::new(config);
             clf.fit(&mut ds_train);
 
-            let scores = clf.score_samples(&ds_train);
-            training_scores.push(scores);
+            let train_scores = clf.score_samples(&ds_train);
+            training_scores.push(train_scores);
 
-            let roc_auc = roc_auc_score(&clf.score_samples(&ds_test), &y_true);
+            let test_scores = clf.score_samples(&ds_test);
+            testing_scores.push(test_scores.clone());
+
+            let roc_auc = roc_auc_score(&test_scores, &y_true);
             mean_roc += roc_auc;
             predictions.push([roc_auc].to_vec());
         }
@@ -99,11 +103,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
 
     let file = File::create(format!(
-        "experimental_results/admepCIF_T{}_R{}_I{}_scores.csv",
+        "experimental_results/admepCIF_T{}_R{}_I{}_training_scores.csv",
         n_trees, n_repetitions, config.n_intervals
     ))?;
     let mut csv_writer = WriterBuilder::new().flexible(true).from_writer(file);
     for record in &training_scores {
+        csv_writer.serialize(record)?;
+    }
+    csv_writer.flush()?;
+
+    let file = File::create(format!(
+        "experimental_results/admepCIF_T{}_R{}_I{}_testing_scores.csv",
+        n_trees, n_repetitions, config.n_intervals
+    ))?;
+    let mut csv_writer = WriterBuilder::new().flexible(true).from_writer(file);
+    for record in &testing_scores {
         csv_writer.serialize(record)?;
     }
     csv_writer.flush()?;

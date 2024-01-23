@@ -1,46 +1,43 @@
-use std::borrow::Cow;
-
 use crate::feature_extraction::catch22::CATCH22;
-use crate::feature_extraction::statistics::zscore;
+use crate::feature_extraction::statistics::{mean, slope, std, zscore};
+use crate::forest::forest::{DistanceForest, Forest};
 use crate::grid_search_tuning;
+use crate::neighbors::nearest_neighbor::k_nearest_neighbor;
+use crate::tree::extra_tree::ExtraTree;
 use crate::tree::tree::Tree;
 use crate::utils::structures::Sample;
 use crate::utils::tuning::TuningConfig;
-use crate::{
-    forest::forest::{Forest, OutlierForest},
-    tree::isolation_tree::IsolationTree,
-};
 use rand::{seq::SliceRandom, thread_rng, Rng};
+use rayon::prelude::*;
 
-use super::forest::{OutlierForestConfig, OutlierForestConfigTuning};
+use super::forest::{DistanceForestConfig, DistanceForestConfigTuning};
 
 pub const MIN_INTERVAL: usize = 10;
 pub const TOTAL_ATTRIBUTES: usize = 25;
-pub const N_ATTRIBUTES: usize = 16;
+pub const N_ATTRIBUTES: usize = 8;
 
 grid_search_tuning! {
-    pub struct CanonicalIsolationForestConfig[CanonicalIsolationForestConfigTuning] {
-        pub n_intervals: usize,
-        pub outlier_config: OutlierForestConfig [OutlierForestConfigTuning],
-    }
+pub struct ExtraCanonicalForestConfig [ExtraCanonicalForestConfigTuning]{
+    pub n_intervals: usize,
+    pub classification_config: DistanceForestConfig [DistanceForestConfigTuning],
 }
-impl TuningConfig for CanonicalIsolationForestConfigTuning {
-    type Tree = IsolationTree;
-    type Forest = CanonicalIsolationForest;
+}
+impl TuningConfig for ExtraCanonicalForestConfigTuning {
+    type Tree = ExtraTree;
+    type Forest = ExtraCanonicalForest;
 }
 
-#[derive(Clone)]
-pub struct CanonicalIsolationForest {
-    trees: Vec<IsolationTree>,
+#[derive(Clone, Debug)]
+pub struct ExtraCanonicalForest {
+    trees: Vec<ExtraTree>,
     intervals: Vec<Vec<(usize, usize)>>,
     attributes: Vec<Vec<usize>>,
-    config: CanonicalIsolationForestConfig,
+    config: ExtraCanonicalForestConfig,
 }
 
-impl Forest<IsolationTree> for CanonicalIsolationForest {
-    type Config = CanonicalIsolationForestConfig;
-    type TuningType = f64;
-
+impl Forest<ExtraTree> for ExtraCanonicalForest {
+    type Config = ExtraCanonicalForestConfig;
+    type TuningType = isize;
     fn new(config: Self::Config) -> Self {
         Self {
             trees: Vec::new(),
@@ -50,14 +47,14 @@ impl Forest<IsolationTree> for CanonicalIsolationForest {
         }
     }
     fn fit(&mut self, data: &mut [Sample<'_>]) {
-        self.fit_(&data);
+        self.fit_(data);
     }
     fn predict(&self, data: &[Sample<'_>]) -> Vec<isize> {
         self.predict_(data)
     }
     fn compute_intervals(&mut self, n_features: usize) {
         // Generate n_intervals, with random start and end
-        for _i in 0..self.config.outlier_config.n_trees {
+        for _i in 0..self.config.classification_config.n_trees {
             let mut intervals = Vec::new();
             for _j in 0..self.config.n_intervals {
                 let start = thread_rng().gen_range(0..n_features - MIN_INTERVAL);
@@ -72,10 +69,10 @@ impl Forest<IsolationTree> for CanonicalIsolationForest {
             self.intervals.push(intervals);
         }
     }
-    fn get_trees(&self) -> &Vec<IsolationTree> {
+    fn get_trees(&self) -> &Vec<ExtraTree> {
         &self.trees
     }
-    fn get_trees_mut(&mut self) -> &mut Vec<IsolationTree> {
+    fn get_trees_mut(&mut self) -> &mut Vec<ExtraTree> {
         &mut self.trees
     }
     fn transform<'a>(&self, data: &[Sample<'a>], tree_index: usize) -> Vec<Sample<'a>> {
@@ -98,12 +95,13 @@ impl Forest<IsolationTree> for CanonicalIsolationForest {
         transformed_data
     }
     fn tuning_predict(&self, ds_train: &[Sample<'_>], ds_test: &[Sample<'_>]) -> Vec<Self::TuningType> {
-        self.score_samples(ds_test)
+        let breiman_distance = self.pairwise_breiman(&ds_test, &ds_train);
+        k_nearest_neighbor(1, &ds_train.iter().map(|v| v.target).collect::<Vec<_>>(), &breiman_distance)
     }
 }
 
-impl OutlierForest for CanonicalIsolationForest {
-    fn get_forest_config(&self) -> &OutlierForestConfig {
-        &self.config.outlier_config
+impl DistanceForest for ExtraCanonicalForest {
+    fn get_forest_config(&self) -> &DistanceForestConfig {
+        &self.config.classification_config
     }
 }

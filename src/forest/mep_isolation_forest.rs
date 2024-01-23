@@ -84,8 +84,8 @@ impl Forest<IsolationTree> for MEPIsolationForest {
         }
         transformed_data
     }
-    fn tuning_predict(&self, data: &[Sample<'_>]) -> Vec<Self::TuningType> {
-        self.score_samples(data)
+    fn tuning_predict(&self, ds_train: &[Sample<'_>], ds_test: &[Sample<'_>]) -> Vec<Self::TuningType> {
+        self.score_samples(ds_test)
     }
 }
 

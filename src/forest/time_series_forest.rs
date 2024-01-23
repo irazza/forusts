@@ -84,8 +84,8 @@ impl Forest<DecisionTree> for TimeSeriesForest {
         }
         transformed_data
     }
-    fn tuning_predict(&self, data: &[Sample<'_>]) -> Vec<Self::TuningType> {
-        self.predict(data)
+    fn tuning_predict(&self, ds_train: &[Sample<'_>], ds_test: &[Sample<'_>]) -> Vec<Self::TuningType> {
+        self.predict(ds_test)
     }
 }
 

@@ -1,13 +1,14 @@
-use std::{cmp::max, ops::Deref};
+use std::{cmp::max, ops::Deref, os::unix::thread};
 
 use hashbrown::HashMap;
+use rand::{thread_rng, Rng};
 use serde_derive::{Deserialize, Serialize};
 
 use crate::utils::structures::Sample;
 
 use super::node::Node;
 
-#[derive(Clone, Copy, Serialize, Deserialize)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub enum MaxFeatures {
     All,
     Sqrt,
@@ -22,16 +23,18 @@ impl MaxFeatures {
         }
     }
 }
-#[derive(Copy, Clone, Serialize, Deserialize)]
+#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 pub enum Criterion {
     Gini,
     Entropy,
+    Random
 }
 impl Criterion {
     pub fn to_string(self) -> &'static str {
         match self {
             Criterion::Gini => "gini",
             Criterion::Entropy => "entropy",
+            Criterion::Random => "random",
         }
     }
 
@@ -39,6 +42,7 @@ impl Criterion {
         match self {
             Criterion::Gini => T::gini_impurity,
             Criterion::Entropy => T::entropy_impurity,
+            Criterion::Random => T::random_impurity,
         }
     }
 }
@@ -83,6 +87,7 @@ pub trait Tree {
 
         let (left_data, right_data) = Self::split(samples, best_feature, best_threshold);
 
+        assert!(left_data.len() > 0 && right_data.len() > 0, "{} {}", left_data.len(), right_data.len());
         // Split the data and recursively build the left and right subtrees
         let left_subtree = self.build_tree(left_data, max_depth - 1, best_impurity);
         let right_subtree = self.build_tree(right_data, max_depth - 1, best_impurity);
@@ -266,5 +271,8 @@ pub trait Tree {
         }
 
         impurity
+    }
+    fn random_impurity(class_counts: &HashMap<isize, usize>) -> f64 {
+        return thread_rng().gen_range(0.0..1.0);
     }
 }

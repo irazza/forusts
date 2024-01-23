@@ -1,17 +1,16 @@
-use crate::feature_extraction::statistics::{mean, std};
-use crate::forest::canonical_isolation_forest::{
-    CanonicalIsolationForest, CanonicalIsolationForestConfig,
-};
-use crate::forest::forest::{Forest, OutlierForest, OutlierForestConfig};
-use crate::metrics::classification::roc_auc_score;
-use crate::utils::csv_io::{read_csv, vec_to_csv};
-use crate::utils::structures::Sample;
 
+use crate::forest::extra_canonical_forest::{ExtraCanonicalForest, ExtraCanonicalForestConfigTuning};
+use crate::forest::forest::{DistanceForest, DistanceForestConfigTuning, Forest};
+use crate::metrics::classification::accuracy_score;
+use crate::neighbors::nearest_neighbor::k_nearest_neighbor;
+use crate::utils::csv_io::read_csv;
+use crate::utils::tuning::grid_search;
+use forest::extra_canonical_forest::ExtraCanonicalForestConfig;
+use forest::forest::{DistanceForestConfig};
+use hashbrown::HashMap;
 use core::panic;
-use csv::WriterBuilder;
-use std::borrow::Cow;
 use std::error::Error;
-use std::fs::{self, File};
+use std::fs::{self};
 use utils::csv_io::write_csv;
 
 mod feature_extraction;
@@ -22,24 +21,22 @@ mod tree;
 mod utils;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let paths = fs::read_dir("/media/aazzari/DATA/admep/")?;
-    // Store ROC-AUC results
-    let mut predictions = Vec::new();
-    let mut training_scores = Vec::new();
-    let mut testing_scores = Vec::new();
-    // let mut hyperparameters = Vec::new();
-    let n_repetitions = 30;
-    let n_trees = 200;
-    let mut config = CanonicalIsolationForestConfig {
-        outlier_config: OutlierForestConfig {
-            n_trees,
-            enhanced_anomaly_score: false,
-            max_depth: None,
-        },
+    // Settings for the experiments
+    let mut best_parameters = Vec::new(); 
+    let mut config = ExtraCanonicalForestConfig {
         n_intervals: 0,
+        classification_config: DistanceForestConfig {
+            n_trees: 300,
+            max_depth: None,
+            min_samples_split: 2,
+            max_features: tree::tree::MaxFeatures::Sqrt,
+        }
+        
     };
+    let n_repetitions = 10;
+    let paths = fs::read_dir("../UCRArchive_2018/")?;
 
-    let mut datasets: Vec<_> = Vec::new();
+    let mut datasets = Vec::new();
     for entry in paths {
         // Unwrap the entry or handle the error, if any.
         let entry = entry?;
@@ -48,6 +45,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
     datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
+
+    //let mut predictions = Vec::new();
     for path in &datasets {
         println!("Processing {}", path.file_name().to_string_lossy());
         let train_path = path
@@ -57,70 +56,105 @@ fn main() -> Result<(), Box<dyn Error>> {
             .path()
             .join(format!("{}_TEST.tsv", path.file_name().to_string_lossy()));
 
+        
         let mut ds_train = read_csv(train_path, b'\t', false)?;
         let ds_test = read_csv(test_path, b'\t', false)?;
         let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
+
         let n_features = ds_train[0].data.len() as f64;
-        config.n_intervals = n_features.log10() as usize;
 
-        let mut mean_roc = 0.0;
-        for _i in 0..n_repetitions {
-            let mut clf = CanonicalIsolationForest::new(config);
-            clf.fit(&mut ds_train);
+        let parameters = ExtraCanonicalForestConfigTuning {
+            n_intervals: [  n_features.log10().ceil() as usize,
+                            n_features.ln().ceil() as usize,  
+                            n_features.log2().ceil() as usize,
+                            n_features.sqrt().ceil() as usize,
+                          ].to_vec(),
+            classification_config: DistanceForestConfigTuning {
+                n_trees: (100..=500).step_by(100).collect(),
+                max_depth: [Some(n_features.log2().ceil() as usize)].to_vec(),
+                min_samples_split: [2].to_vec(),
+                max_features: [tree::tree::MaxFeatures::Sqrt].to_vec(),
+            },
+        };
+        let parameters = grid_search(&mut ds_train, &ds_test, parameters, n_repetitions, accuracy_score);
+        println!("Best parameters: {:?}", parameters);
+        best_parameters.push(parameters.unwrap());
+        // let mut mean_accuracy_breiman = 0.0;
+        // let mut max_accuracy_breiman = 0.0;
+        // let mut mean_accuracy_ancestor = 0.0;
+        // let mut max_accuracy_ancestor = 0.0;
+        // let mut mean_accuracy_zhu = 0.0;
+        // let mut max_accuracy_zhu = 0.0;
 
-            let train_scores = clf.score_samples(&ds_train);
-            training_scores.push(train_scores);
+        // for _i in 0..n_repetitions {
+        //     let mut model = ExtraCanonicalForest::new(config);
+        //     model.fit(&mut ds_train);
 
-            let test_scores = clf.score_samples(&ds_test);
-            testing_scores.push(test_scores.clone());
+        //     let breiman_distance =
+        //         model.pairwise_breiman(&ds_test, &ds_train);
+        //     let prediction_breiman =
+        //         k_nearest_neighbor(1, &ds_train.iter().map(|v| v.target).collect::<Vec<_>>(), &breiman_distance);
+        //     let accuracy_breiman = accuracy_score(&prediction_breiman, &y_true);
 
-            let roc_auc = roc_auc_score(&test_scores, &y_true);
-            mean_roc += roc_auc;
-            predictions.push([roc_auc].to_vec());
-        }
-        mean_roc /= n_repetitions as f64;
-        println!("\tMean ROC-AUC: {}", mean_roc);
+        //     let ancestor_distance =
+        //         model.pairwise_ancestor(&ds_test, &ds_train);
+        //     let prediction_ancestor =
+        //         k_nearest_neighbor(1, &ds_train.iter().map(|v| v.target).collect::<Vec<_>>(), &ancestor_distance);
+        //     let accuracy_ancestor = accuracy_score(&prediction_ancestor, &y_true);
+
+        //     let zhu_distance =
+        //         model.pairwise_zhu(&ds_test, &ds_train);
+        //     let prediction_zhu = k_nearest_neighbor(1, &ds_train.iter().map(|v| v.target).collect::<Vec<_>>(), &zhu_distance);
+        //     let accuracy_zhu = accuracy_score(&prediction_zhu, &y_true);
+
+        //     predictions.push(
+        //         [
+        //             accuracy_breiman,
+        //             accuracy_ancestor,
+        //             accuracy_zhu,
+        //         ]
+        //         .to_vec(),
+        //     );
+
+        //     mean_accuracy_breiman += accuracy_breiman;
+        //     mean_accuracy_ancestor += accuracy_ancestor;
+        //     mean_accuracy_zhu += accuracy_zhu;
+
+        //     if accuracy_breiman > max_accuracy_breiman {
+        //         max_accuracy_breiman = accuracy_breiman;
+        //     }
+        //     if accuracy_ancestor > max_accuracy_ancestor {
+        //         max_accuracy_ancestor = accuracy_ancestor;
+        //     }
+        //     if accuracy_zhu > max_accuracy_zhu {
+        //         max_accuracy_zhu = accuracy_zhu;
+        //     }
+        // }
+        // println!(
+        //     "MEAN\tBreiman: {}, Ancestor: {}, Zhu: {}\nMAX\tBreiman: {}, Ancestor: {}, Zhu: {}",
+        //         mean_accuracy_breiman/n_repetitions as f64, mean_accuracy_ancestor/n_repetitions as f64, mean_accuracy_zhu/n_repetitions as f64, max_accuracy_breiman, max_accuracy_ancestor, max_accuracy_zhu);
     }
-    // Create index
-    let mut index = Vec::new();
-    for i in 0..datasets.len() {
-        for _j in 0..n_repetitions {
-            index.push(datasets[i].file_name().to_string_lossy().to_string());
-        }
-    }
-    let header = vec!["Dataset", "ROC-AUC"]
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
-    write_csv(
-        format!(
-            "experimental_results/admepCIF_T{}_R{}_I{}.csv",
-            n_trees, n_repetitions, config.n_intervals
-        ),
-        predictions,
-        header,
-        index.clone(),
+
+    serde_json::to_writer_pretty(
+        std::fs::File::create("experimental_results/ucrCIF_best_parameters.json")?,
+        &best_parameters,
     )?;
-
-    let file = File::create(format!(
-        "experimental_results/admepCIF_T{}_R{}_I{}_training_scores.csv",
-        n_trees, n_repetitions, config.n_intervals
-    ))?;
-    let mut csv_writer = WriterBuilder::new().flexible(true).from_writer(file);
-    for record in &training_scores {
-        csv_writer.serialize(record)?;
-    }
-    csv_writer.flush()?;
-
-    let file = File::create(format!(
-        "experimental_results/admepCIF_T{}_R{}_I{}_testing_scores.csv",
-        n_trees, n_repetitions, config.n_intervals
-    ))?;
-    let mut csv_writer = WriterBuilder::new().flexible(true).from_writer(file);
-    for record in &testing_scores {
-        csv_writer.serialize(record)?;
-    }
-    csv_writer.flush()?;
-
+    // Create index modifying datasets multiplyng by n_repetitions
+    // let mut index = Vec::new();
+    // for i in 0..datasets.len() {
+    //     for _j in 0..n_repetitions {
+    //         index.push(datasets[i].file_name().to_string_lossy().to_string());
+    //     }
+    // }
+    // let header = vec!["Dataset", "Breiman", "Ancestor", "Zhu"]
+    //     .iter()
+    //     .map(|s| s.to_string())
+    //     .collect();
+    // write_csv(
+    //     format!("experimental_results/ucrCIF_T{}_R{}_I{}.csv", config.classification_config.n_trees, n_repetitions, config.n_intervals),
+    //     predictions,
+    //     header,
+    //     index,
+    // )?;
     Ok(())
 }

@@ -1,0 +1,14 @@
+[
+  [
+    {
+      "n_intervals": 8,
+      "classification_config": {
+        "n_trees": 500,
+        "max_depth": 11,
+        "min_samples_split": 2,
+        "max_features": "Sqrt"
+      }
+    },
+    0.8100000000000002
+  ]
+]

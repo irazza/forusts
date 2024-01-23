@@ -1,8 +1,9 @@
 use super::node::Node;
-use crate::{tree::tree::Tree, utils::structures::Sample};
+use crate::{tree::tree::Tree, utils::structures::Sample, feature_extraction::statistics::unique};
 use rand::{seq::SliceRandom, thread_rng, Rng};
 use std::cmp::Ordering;
 
+#[derive(Clone, Debug)]
 pub struct IsolationTreeConfig {
     pub max_depth: usize,
     pub min_samples_split: usize,
@@ -11,8 +12,7 @@ pub struct IsolationTreeConfig {
 #[derive(Clone, Debug)]
 pub struct IsolationTree {
     root: Node,
-    max_depth: usize,
-    min_samples_split: usize,
+    config: IsolationTreeConfig,
 }
 
 impl Tree for IsolationTree {
@@ -20,12 +20,11 @@ impl Tree for IsolationTree {
     fn new(config: Self::Config) -> Self {
         Self {
             root: Node::new(),
-            max_depth: config.max_depth,
-            min_samples_split: config.min_samples_split,
+            config,
         }
     }
     fn get_max_depth(&self) -> usize {
-        self.max_depth
+        self.config.max_depth
     }
     fn get_root(&self) -> &Node {
         &self.root
@@ -35,24 +34,47 @@ impl Tree for IsolationTree {
     }
     fn pre_split_conditions(&self, samples: &[Sample<'_>], current_depth: usize) -> bool {
         // Base case: not enough samples or max depth reached
-        return samples.len() <= self.min_samples_split || current_depth >= self.max_depth;
+        if samples.len() <= self.config.min_samples_split || current_depth == self.config.max_depth
+        {
+            return true;
+        }
+        // Base case: samples are the same object
+        let first_sample = &samples[0];
+        let is_all_same_data = samples.iter().all(|v| v == first_sample);
+        if is_all_same_data {
+            return true;
+        }
+        return false;
     }
     fn post_split_conditions(&self, _new_impurity: f64, _old_impurity: f64) -> bool {
         return false;
     }
     fn get_split(&self, samples: &[Sample<'_>]) -> (usize, f64, f64) {
-        let mut shuffled_features: Vec<usize> = (0..samples[0].data.len()).collect();
-        shuffled_features.shuffle(&mut thread_rng());
-        let best_feature = shuffled_features[thread_rng().gen_range(0..8)];
-        // Exclude first and last thresholds, avoiding a split on the min and max values (could move all samples on the left or right child)
+        let mut best_feature = thread_rng().gen_range(0..samples[0].data.len());
         let mut thresholds = samples
             .iter()
             .map(|f| f.data[best_feature])
             .collect::<Vec<f64>>();
         thresholds.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        let best_threshold = thresholds[thread_rng().gen_range(1..thresholds.len() - 1)];
-        let best_impurity = thread_rng().gen_range(f64::EPSILON..1.0);
-
+        thresholds.dedup();
+        if thresholds.len() == 1 {
+            for i in 0..samples[0].data.len()
+            {
+                thresholds = samples
+                    .iter()
+                    .map(|f| f.data[i])
+                    .collect::<Vec<f64>>();
+                thresholds.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                thresholds.dedup();
+                if thresholds.len() > 1 {
+                    best_feature = i;
+                    break;
+                }
+            }
+        }
+        
+        let best_threshold = if thresholds.len() == 2 {thresholds[1]} else {thresholds[thread_rng().gen_range(1..thresholds.len() - 1)]};
+        let best_impurity = f64::NAN;
         (best_feature, best_threshold, best_impurity)
     }
 }

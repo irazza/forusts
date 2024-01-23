@@ -23,4 +23,12 @@ impl<'a> Sample<'a> {
         }
         samples
     }
+    pub fn equal(&self, other: &Sample) -> bool {
+        for i in 0..self.data.len() {
+            if self.data[i] != other.data[i] {
+                return false;
+            }
+        }
+        return true;
+    }
 }

@@ -67,7 +67,7 @@ macro_rules! grid_search_tuning {
         }
 
     ) => {
-        #[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
+        #[derive(Clone, Copy, serde::Serialize, serde::Deserialize, Debug)]
         pub struct $name {
             $(
                pub $field: $type_
@@ -120,7 +120,7 @@ pub fn grid_search<T: GridSearch + TuningConfig>(
         for _i in 0..repetition {
             let mut forest = T::Forest::new(config.clone());
             forest.fit(ds_train);
-            let y_pred = forest.tuning_predict(ds_test);
+            let y_pred = forest.tuning_predict(ds_train, ds_test);
             score += metric(
                 &y_pred,
                 &ds_test.iter().map(|s| s.target).collect::<Vec<_>>(),

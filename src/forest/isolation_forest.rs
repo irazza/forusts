@@ -38,8 +38,8 @@ impl Forest<IsolationTree> for IsolationForest {
     fn transform<'a>(&self, data: &[Sample<'a>], _intervals_index: usize) -> Vec<Sample<'a>> {
         data.to_vec()
     }
-    fn tuning_predict(&self, data: &[Sample<'_>]) -> Vec<Self::TuningType> {
-        self.score_samples(data)
+    fn tuning_predict(&self, ds_train: &[Sample<'_>], ds_test: &[Sample<'_>]) -> Vec<Self::TuningType> {
+        self.score_samples(ds_test)
     }
 }
 impl OutlierForest for IsolationForest {

@@ -94,6 +94,10 @@ impl Tree for DecisionTree {
                                 / samples.len() as f64;
                         1.0 / impurity
                     }
+                    Criterion::Random => {
+                        1.0
+                    }
+
                 };
 
                 // (left_impurity * left.values().sum::<usize>() as f64

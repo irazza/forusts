@@ -139,7 +139,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
         println!(
-            "MEAN\tBreiman: {}, Ancestor: {}, Zhu: {}, RatioRR: {}\nMAX\tBreiman: {}, Ancestor: {}, Zhu: {}, RatioRF: {}",
+            "MEAN\tBreiman: {}, Ancestor: {}, Zhu: {}, RatioRF: {}\nMAX\tBreiman: {}, Ancestor: {}, Zhu: {}, RatioRF: {}",
                 mean_accuracy_breiman/n_repetitions as f64, mean_accuracy_ancestor/n_repetitions as f64, mean_accuracy_zhu/n_repetitions as f64, mean_accuracy_ratiorf/n_repetitions as f64, max_accuracy_breiman, max_accuracy_ancestor, max_accuracy_zhu, max_accuracy_ratiorf);
     }
 

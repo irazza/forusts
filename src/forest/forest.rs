@@ -204,7 +204,6 @@ pub trait DistanceForest: Forest<ExtraTree> {
                 }
             }
         });
-
         distance_matrix
             .into_iter()
             .map(|d| {
@@ -240,7 +239,7 @@ pub trait DistanceForest: Forest<ExtraTree> {
                     });
                     union.dedup_by(|a, b| a == b);
                     let agree = union.iter().filter(|(f, t)| (x1.data[*f] > *t) == (x2.data[*f] > *t)).count() as f64;
-                    *distance_matrix[i][j].lock() += 1.0 - agree/union.len() as f64;
+                    *distance_matrix[i][j].lock() += 1.0 - if union.len() == 0 {1.0} else {agree/union.len() as f64};
                 }
             }
         });

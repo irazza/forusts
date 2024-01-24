@@ -122,7 +122,6 @@ pub trait Tree {
     fn get_splits(&self, x: &Sample<'_>) -> Vec<(usize, f64)> {
         let mut path = Vec::new();
         let mut node = self.get_root();
-
         while let Node::Split {
             feature,
             threshold,

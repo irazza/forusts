@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         },
     };
     // Settings for the experiments
-    let n_repetitions = 10;
+    let n_repetitions = 1;
     let paths = fs::read_dir("/media/aazzari/DATA/UCRArchive_2018/")?;
 
     let mut datasets = Vec::new();

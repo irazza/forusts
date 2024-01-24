@@ -107,6 +107,41 @@ pub trait Tree {
             .map(|sample| self.predict_leaf(sample).get_class())
             .collect()
     }
+    fn get_diameter(n: &Node) -> (usize, usize) {
+        match n {
+            Node::Leaf {..} => (1, 1),
+            Node::Split {left, right, ..} => {
+                let (left_diameter, left_height) = Self::get_diameter(left);
+                let (right_diameter, right_height) = Self::get_diameter(right);
+                let current_diameter = left_height + right_height;
+
+                (max(current_diameter, max(left_diameter, right_diameter)), 1 + max(left_height, right_height))
+            }
+        }
+    }
+    fn get_splits(&self, x: &Sample<'_>) -> Vec<(usize, f64)> {
+        let mut path = Vec::new();
+        let mut node = self.get_root();
+
+        while let Node::Split {
+            feature,
+            threshold,
+            left,
+            right,
+            depth: _,
+            impurity: _,
+            n_samples: _,
+        } = node
+        {
+            path.push((*feature, *threshold));
+            if x.data[*feature] <= *threshold {
+                node = left;
+            } else {
+                node = right;
+            }
+        }
+        path
+    }
     fn predict_leaf(&self, x: &Sample<'_>) -> &Node {
         let mut node = self.get_root();
 

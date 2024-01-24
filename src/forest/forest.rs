@@ -164,8 +164,7 @@ pub trait DistanceForest: Forest<ExtraTree> {
                 for (j, &x2_node) in x2_nodes.iter().enumerate() {
                     *distance_matrix[i][j].lock() += (x1_node.get_depth() + x2_node.get_depth()
                         - 2 * distances[&(x2_node as *const Node)].get_depth())
-                        as f64
-                        / max(x1_node.get_depth(), x2_node.get_depth()) as f64;
+                        as f64 / ExtraTree::get_diameter(tree.get_root()).0 as f64;
                 }
             }
         });
@@ -199,9 +198,9 @@ pub trait DistanceForest: Forest<ExtraTree> {
                 let distances = tree.compute_ancestor(x1_node);
 
                 for (j, &x2_node) in x2_nodes.iter().enumerate() {
-                    *distance_matrix[i][j].lock() += distances[&(x2_node as *const Node)]
+                    *distance_matrix[i][j].lock() += 1.0 - (distances[&(x2_node as *const Node)]
                         .get_depth() as f64
-                        / max(x1_node.get_depth(), x2_node.get_depth()) as f64;
+                        / max(x1_node.get_depth(), x2_node.get_depth()) as f64);
                 }
             }
         });
@@ -211,7 +210,46 @@ pub trait DistanceForest: Forest<ExtraTree> {
             .map(|d| {
                 d.into_iter()
                     .map(|d| {
-                        1.0 - (d.into_inner() as f64 / self.get_forest_config().n_trees as f64)
+                        d.into_inner() as f64 / self.get_forest_config().n_trees as f64
+                    })
+                    .collect()
+            })
+            .collect()
+    }
+    fn pairwise_ratiorf(&self, x1: &[Sample<'_>], x2: &[Sample<'_>]) -> Vec<Vec<f64>> {
+        let distance_matrix: Vec<Vec<_>> = (0..x1.len())
+            .map(|_| (0..x2.len()).map(|_| Mutex::new(0.0)).collect())
+            .collect();
+
+        let trees: &Vec<ExtraTree> = self.get_trees();
+        trees.par_iter().enumerate().for_each(|(i, tree)| {
+            let transformed_x1 = self.transform(&x1, i);
+            let transformed_x2 = self.transform(&x2, i);
+
+            for (i, x1) in transformed_x1.iter().enumerate() {
+                for (j, x2) in transformed_x2.iter().enumerate() {
+                    let mut union = Vec::new();
+                    union.extend(tree.get_splits(x1).into_iter());
+                    union.extend(tree.get_splits(x2).into_iter());
+                    // Remove duplicates based on feature and threshold
+                    union.sort_by(|(f1, t1), (f2, t2)| {
+                       f1
+                            .partial_cmp(f2)
+                            .unwrap_or(std::cmp::Ordering::Equal) // If the feature is the same, compare the threshold
+                            .then(t1.partial_cmp(t2).unwrap())
+                    });
+                    union.dedup_by(|a, b| a == b);
+                    let agree = union.iter().filter(|(f, t)| (x1.data[*f] > *t) == (x2.data[*f] > *t)).count() as f64;
+                    *distance_matrix[i][j].lock() += 1.0 - agree/union.len() as f64;
+                }
+            }
+        });
+        distance_matrix
+            .into_iter()
+            .map(|d| {
+                d.into_iter()
+                    .map(|d| {
+                        d.into_inner() as f64 / self.get_forest_config().n_trees as f64
                     })
                     .collect()
             })

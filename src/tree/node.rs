@@ -26,6 +26,44 @@ impl Node {
             n_samples: 0,
         }
     }
+    pub fn get_feature(&self) -> usize {
+        match self {
+            Node::Leaf {
+                class: _,
+                depth: _,
+                impurity: _,
+                n_samples: _,
+            } => panic!("Cannot get feature of a leaf node"),
+            Node::Split {
+                feature,
+                threshold: _,
+                left: _,
+                right: _,
+                depth: _,
+                impurity: _,
+                n_samples: _,
+            } => return *feature,
+        }
+    }
+    pub fn get_threshold(&self) -> f64 {
+        match self {
+            Node::Leaf {
+                class: _,
+                depth: _,
+                impurity: _,
+                n_samples: _,
+            } => panic!("Cannot get threshold of a leaf node"),
+            Node::Split {
+                feature: _,
+                threshold,
+                left: _,
+                right: _,
+                depth: _,
+                impurity: _,
+                n_samples: _,
+            } => return *threshold,
+        }
+    }
     pub fn get_depth(&self) -> usize {
         match self {
             Node::Leaf {

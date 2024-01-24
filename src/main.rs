@@ -19,22 +19,23 @@ mod metrics;
 mod neighbors;
 mod tree;
 mod utils;
+mod distance;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // Settings for the experiments
-    let mut best_parameters = Vec::new(); 
+
+    let mut predictions = Vec::new();
     let mut config = ExtraCanonicalForestConfig {
         n_intervals: 0,
         classification_config: DistanceForestConfig {
-            n_trees: 300,
+            n_trees: 0,
             max_depth: None,
             min_samples_split: 2,
             max_features: tree::tree::MaxFeatures::Sqrt,
-        }
-        
+        },
     };
+    // Settings for the experiments
     let n_repetitions = 10;
-    let paths = fs::read_dir("../UCRArchive_2018/")?;
+    let paths = fs::read_dir("/media/aazzari/DATA/UCRArchive_2018/")?;
 
     let mut datasets = Vec::new();
     for entry in paths {
@@ -63,98 +64,101 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         let n_features = ds_train[0].data.len() as f64;
 
-        let parameters = ExtraCanonicalForestConfigTuning {
-            n_intervals: [  n_features.log10().ceil() as usize,
-                            n_features.ln().ceil() as usize,  
-                            n_features.log2().ceil() as usize,
-                            n_features.sqrt().ceil() as usize,
-                          ].to_vec(),
-            classification_config: DistanceForestConfigTuning {
-                n_trees: (100..=500).step_by(100).collect(),
-                max_depth: [Some(n_features.log2().ceil() as usize)].to_vec(),
-                min_samples_split: [2].to_vec(),
-                max_features: [tree::tree::MaxFeatures::Sqrt].to_vec(),
+        
+        let mut mean_accuracy_breiman = 0.0;
+        let mut max_accuracy_breiman = 0.0;
+        let mut mean_accuracy_ancestor = 0.0;
+        let mut max_accuracy_ancestor = 0.0;
+        let mut mean_accuracy_zhu = 0.0;
+        let mut max_accuracy_zhu = 0.0;
+        let mut mean_accuracy_ratiorf = 0.0;
+        let mut max_accuracy_ratiorf = 0.0;
+
+        config = ExtraCanonicalForestConfig {
+            n_intervals: n_features.log2() as usize,
+            classification_config: DistanceForestConfig {
+                n_trees: 200,
+                max_depth: None,
+                min_samples_split: 2,
+                max_features: tree::tree::MaxFeatures::Sqrt,
             },
         };
-        let parameters = grid_search(&mut ds_train, &ds_test, parameters, n_repetitions, accuracy_score);
-        println!("Best parameters: {:?}", parameters);
-        best_parameters.push(parameters.unwrap());
-        // let mut mean_accuracy_breiman = 0.0;
-        // let mut max_accuracy_breiman = 0.0;
-        // let mut mean_accuracy_ancestor = 0.0;
-        // let mut max_accuracy_ancestor = 0.0;
-        // let mut mean_accuracy_zhu = 0.0;
-        // let mut max_accuracy_zhu = 0.0;
 
-        // for _i in 0..n_repetitions {
-        //     let mut model = ExtraCanonicalForest::new(config);
-        //     model.fit(&mut ds_train);
+        for _i in 0..n_repetitions {
+            let mut model = ExtraCanonicalForest::new(config);
+            model.fit(&mut ds_train);
 
-        //     let breiman_distance =
-        //         model.pairwise_breiman(&ds_test, &ds_train);
-        //     let prediction_breiman =
-        //         k_nearest_neighbor(1, &ds_train.iter().map(|v| v.target).collect::<Vec<_>>(), &breiman_distance);
-        //     let accuracy_breiman = accuracy_score(&prediction_breiman, &y_true);
+            let breiman_distance =
+                model.pairwise_breiman(&ds_test, &ds_train);
+            let prediction_breiman =
+                k_nearest_neighbor(1, &ds_train.iter().map(|v| v.target).collect::<Vec<_>>(), &breiman_distance);
+            let accuracy_breiman = accuracy_score(&prediction_breiman, &y_true);
+            
+            let ancestor_distance =
+                model.pairwise_ancestor(&ds_test, &ds_train);
+            let prediction_ancestor =
+                k_nearest_neighbor(1, &ds_train.iter().map(|v| v.target).collect::<Vec<_>>(), &ancestor_distance);
+            let accuracy_ancestor = accuracy_score(&prediction_ancestor, &y_true);
 
-        //     let ancestor_distance =
-        //         model.pairwise_ancestor(&ds_test, &ds_train);
-        //     let prediction_ancestor =
-        //         k_nearest_neighbor(1, &ds_train.iter().map(|v| v.target).collect::<Vec<_>>(), &ancestor_distance);
-        //     let accuracy_ancestor = accuracy_score(&prediction_ancestor, &y_true);
+            let zhu_distance =
+                model.pairwise_zhu(&ds_test, &ds_train);
+            let prediction_zhu = k_nearest_neighbor(1, &ds_train.iter().map(|v| v.target).collect::<Vec<_>>(), &zhu_distance);
+            let accuracy_zhu = accuracy_score(&prediction_zhu, &y_true);
 
-        //     let zhu_distance =
-        //         model.pairwise_zhu(&ds_test, &ds_train);
-        //     let prediction_zhu = k_nearest_neighbor(1, &ds_train.iter().map(|v| v.target).collect::<Vec<_>>(), &zhu_distance);
-        //     let accuracy_zhu = accuracy_score(&prediction_zhu, &y_true);
+            let ratiorf_distance =
+                model.pairwise_ratiorf(&ds_test, &ds_train);
+            let prediction_ratiorf = k_nearest_neighbor(1, &ds_train.iter().map(|v| v.target).collect::<Vec<_>>(), &ratiorf_distance);
+            let accuracy_ratiorf = accuracy_score(&prediction_ratiorf, &y_true);
 
-        //     predictions.push(
-        //         [
-        //             accuracy_breiman,
-        //             accuracy_ancestor,
-        //             accuracy_zhu,
-        //         ]
-        //         .to_vec(),
-        //     );
+            predictions.push(
+                [
+                    accuracy_breiman,
+                    accuracy_ancestor,
+                    accuracy_zhu,
+                    accuracy_ratiorf,
+                ]
+                .to_vec(),
+            );
 
-        //     mean_accuracy_breiman += accuracy_breiman;
-        //     mean_accuracy_ancestor += accuracy_ancestor;
-        //     mean_accuracy_zhu += accuracy_zhu;
+            mean_accuracy_breiman += accuracy_breiman;
+            mean_accuracy_ancestor += accuracy_ancestor;
+            mean_accuracy_zhu += accuracy_zhu;
+            mean_accuracy_ratiorf += accuracy_ratiorf;
 
-        //     if accuracy_breiman > max_accuracy_breiman {
-        //         max_accuracy_breiman = accuracy_breiman;
-        //     }
-        //     if accuracy_ancestor > max_accuracy_ancestor {
-        //         max_accuracy_ancestor = accuracy_ancestor;
-        //     }
-        //     if accuracy_zhu > max_accuracy_zhu {
-        //         max_accuracy_zhu = accuracy_zhu;
-        //     }
-        // }
-        // println!(
-        //     "MEAN\tBreiman: {}, Ancestor: {}, Zhu: {}\nMAX\tBreiman: {}, Ancestor: {}, Zhu: {}",
-        //         mean_accuracy_breiman/n_repetitions as f64, mean_accuracy_ancestor/n_repetitions as f64, mean_accuracy_zhu/n_repetitions as f64, max_accuracy_breiman, max_accuracy_ancestor, max_accuracy_zhu);
+            if accuracy_breiman > max_accuracy_breiman {
+                max_accuracy_breiman = accuracy_breiman;
+            }
+            if accuracy_ancestor > max_accuracy_ancestor {
+                max_accuracy_ancestor = accuracy_ancestor;
+            }
+            if accuracy_zhu > max_accuracy_zhu {
+                max_accuracy_zhu = accuracy_zhu;
+            }
+            if accuracy_ratiorf > max_accuracy_ratiorf {
+                max_accuracy_ratiorf = accuracy_ratiorf;
+            }
+        }
+        println!(
+            "MEAN\tBreiman: {}, Ancestor: {}, Zhu: {}, RatioRR: {}\nMAX\tBreiman: {}, Ancestor: {}, Zhu: {}, RatioRF: {}",
+                mean_accuracy_breiman/n_repetitions as f64, mean_accuracy_ancestor/n_repetitions as f64, mean_accuracy_zhu/n_repetitions as f64, mean_accuracy_ratiorf/n_repetitions as f64, max_accuracy_breiman, max_accuracy_ancestor, max_accuracy_zhu, max_accuracy_ratiorf);
     }
 
-    serde_json::to_writer_pretty(
-        std::fs::File::create("experimental_results/ucrCIF_best_parameters.json")?,
-        &best_parameters,
-    )?;
     // Create index modifying datasets multiplyng by n_repetitions
-    // let mut index = Vec::new();
-    // for i in 0..datasets.len() {
-    //     for _j in 0..n_repetitions {
-    //         index.push(datasets[i].file_name().to_string_lossy().to_string());
-    //     }
-    // }
-    // let header = vec!["Dataset", "Breiman", "Ancestor", "Zhu"]
-    //     .iter()
-    //     .map(|s| s.to_string())
-    //     .collect();
-    // write_csv(
-    //     format!("experimental_results/ucrCIF_T{}_R{}_I{}.csv", config.classification_config.n_trees, n_repetitions, config.n_intervals),
-    //     predictions,
-    //     header,
-    //     index,
-    // )?;
+    let mut index = Vec::new();
+    for i in 0..datasets.len() {
+        for _j in 0..n_repetitions {
+            index.push(datasets[i].file_name().to_string_lossy().to_string());
+        }
+    }
+    let header = vec!["Dataset", "Breiman", "Ancestor", "Zhu"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    write_csv(
+        format!("experimental_results/ucrCIF_T{}_R{}_I{}.csv", config.classification_config.n_trees, n_repetitions, config.n_intervals),
+        predictions,
+        header,
+        index,
+    )?;
     Ok(())
 }

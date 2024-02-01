@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     // Settings for the experiments
     let n_repetitions = 1;
-    let paths = fs::read_dir("/media/aazzari/DATA/UCRArchive_2018/")?;
+    let paths = fs::read_dir("../UCRArchive_2018/")?;
 
     let mut datasets = Vec::new();
     for entry in paths {
@@ -46,45 +46,45 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
     datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
+    let mut wtr = csv::Writer::from_path("ercif_heavy.csv")?;
+    wtr.write_record(&[
+        "Dataset",
+        "Breiman",
+        "Ancestor",
+        "Zhu",
+        "RatioRF",
+    ])?;
+    wtr.flush()?;
+    for i in 0..n_repetitions {
+        println!("Repetition {}", i+1);
+        //let mut predictions = Vec::new();
+        for path in &datasets {
+            println!("\tProcessing {}", path.file_name().to_string_lossy());
+            let train_path = path
+                .path()
+                .join(format!("{}_TRAIN.tsv", path.file_name().to_string_lossy()));
+            let test_path = path
+                .path()
+                .join(format!("{}_TEST.tsv", path.file_name().to_string_lossy()));
 
-    //let mut predictions = Vec::new();
-    for path in &datasets {
-        println!("Processing {}", path.file_name().to_string_lossy());
-        let train_path = path
-            .path()
-            .join(format!("{}_TRAIN.tsv", path.file_name().to_string_lossy()));
-        let test_path = path
-            .path()
-            .join(format!("{}_TEST.tsv", path.file_name().to_string_lossy()));
+            
+            let mut ds_train = read_csv(train_path, b'\t', false)?;
+            let ds_test = read_csv(test_path, b'\t', false)?;
+            let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
 
-        
-        let mut ds_train = read_csv(train_path, b'\t', false)?;
-        let ds_test = read_csv(test_path, b'\t', false)?;
-        let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
+            let n_features = ds_train[0].data.len() as f64;
 
-        let n_features = ds_train[0].data.len() as f64;
+            config = ExtraCanonicalForestConfig {
+                n_intervals: n_features.sqrt() as usize,
+                classification_config: DistanceForestConfig {
+                    n_trees: 500,
+                    max_depth: None,
+                    min_samples_split: 2,
+                    max_features: tree::tree::MaxFeatures::Sqrt,
+                },
+            };
 
-        
-        let mut mean_accuracy_breiman = 0.0;
-        let mut max_accuracy_breiman = 0.0;
-        let mut mean_accuracy_ancestor = 0.0;
-        let mut max_accuracy_ancestor = 0.0;
-        let mut mean_accuracy_zhu = 0.0;
-        let mut max_accuracy_zhu = 0.0;
-        let mut mean_accuracy_ratiorf = 0.0;
-        let mut max_accuracy_ratiorf = 0.0;
-
-        config = ExtraCanonicalForestConfig {
-            n_intervals: n_features.log2() as usize,
-            classification_config: DistanceForestConfig {
-                n_trees: 200,
-                max_depth: None,
-                min_samples_split: 2,
-                max_features: tree::tree::MaxFeatures::Sqrt,
-            },
-        };
-
-        for _i in 0..n_repetitions {
+            
             let mut model = ExtraCanonicalForest::new(config);
             model.fit(&mut ds_train);
 
@@ -119,46 +119,19 @@ fn main() -> Result<(), Box<dyn Error>> {
                 ]
                 .to_vec(),
             );
-
-            mean_accuracy_breiman += accuracy_breiman;
-            mean_accuracy_ancestor += accuracy_ancestor;
-            mean_accuracy_zhu += accuracy_zhu;
-            mean_accuracy_ratiorf += accuracy_ratiorf;
-
-            if accuracy_breiman > max_accuracy_breiman {
-                max_accuracy_breiman = accuracy_breiman;
-            }
-            if accuracy_ancestor > max_accuracy_ancestor {
-                max_accuracy_ancestor = accuracy_ancestor;
-            }
-            if accuracy_zhu > max_accuracy_zhu {
-                max_accuracy_zhu = accuracy_zhu;
-            }
-            if accuracy_ratiorf > max_accuracy_ratiorf {
-                max_accuracy_ratiorf = accuracy_ratiorf;
-            }
-        }
-        println!(
-            "MEAN\tBreiman: {}, Ancestor: {}, Zhu: {}, RatioRF: {}\nMAX\tBreiman: {}, Ancestor: {}, Zhu: {}, RatioRF: {}",
-                mean_accuracy_breiman/n_repetitions as f64, mean_accuracy_ancestor/n_repetitions as f64, mean_accuracy_zhu/n_repetitions as f64, mean_accuracy_ratiorf/n_repetitions as f64, max_accuracy_breiman, max_accuracy_ancestor, max_accuracy_zhu, max_accuracy_ratiorf);
-    }
-
-    // Create index modifying datasets multiplyng by n_repetitions
-    let mut index = Vec::new();
-    for i in 0..datasets.len() {
-        for _j in 0..n_repetitions {
-            index.push(datasets[i].file_name().to_string_lossy().to_string());
+            println!(
+                "Breiman: {}, Ancestor: {}, Zhu: {}, RatioRF: {}",
+                accuracy_breiman, accuracy_ancestor, accuracy_zhu, accuracy_ratiorf
+            );
+            wtr.write_record(&[
+                path.file_name().to_string_lossy().to_string(),
+                accuracy_breiman.to_string(),
+                accuracy_ancestor.to_string(),
+                accuracy_zhu.to_string(),
+                accuracy_ratiorf.to_string(),
+            ])?;
+            wtr.flush()?;
         }
     }
-    let header = vec!["Dataset", "Breiman", "Ancestor", "Zhu"]
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
-    write_csv(
-        format!("experimental_results/ucrCIF_T{}_R{}_I{}.csv", config.classification_config.n_trees, n_repetitions, config.n_intervals),
-        predictions,
-        header,
-        index,
-    )?;
     Ok(())
 }

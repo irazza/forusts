@@ -27,10 +27,4 @@ bindgen = "0.69.1"
 cc = "1.0.83"
 cmake = "0.1.50"
 
-[rust]
-debuginfo-level = 1
-
-[build]
-rustflags = ["-C", "symbol-mangling-version=v0", "target-cpu=native"]
-
 

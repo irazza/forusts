@@ -1,6 +1,5 @@
 use crate::utils::structures::Sample;
 
-
 pub fn euclidean(ds_train: &[Sample], ds_test: &[Sample]) -> Vec<Vec<f64>> {
     let mut distance = Vec::new();
     for i in 0..ds_test.len() {
@@ -14,5 +13,5 @@ pub fn euclidean(ds_train: &[Sample], ds_test: &[Sample]) -> Vec<Vec<f64>> {
         }
         distance.push(row);
     }
-    distance    
+    distance
 }

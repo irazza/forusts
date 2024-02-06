@@ -2,7 +2,7 @@ use hashbrown::HashMap;
 use rand::{seq::SliceRandom, thread_rng};
 
 use crate::{
-    feature_extraction::statistics::unique,
+    forest::forest::{ClassificationForestConfig, ClassificationTree},
     tree::{
         node::Node,
         tree::{Criterion, MaxFeatures, Tree},
@@ -20,6 +20,17 @@ pub struct DecisionTreeConfig {
 pub struct DecisionTree {
     root: Node,
     config: DecisionTreeConfig,
+}
+
+impl ClassificationTree for DecisionTree {
+    fn from_classification_config(config: &ClassificationForestConfig) -> Self {
+        Self::new(DecisionTreeConfig {
+            criterion: config.criterion,
+            max_depth: config.max_depth.unwrap_or(usize::MAX),
+            min_samples_split: config.min_samples_split,
+            max_features: config.max_features,
+        })
+    }
 }
 
 impl Tree for DecisionTree {
@@ -94,10 +105,7 @@ impl Tree for DecisionTree {
                                 / samples.len() as f64;
                         1.0 / impurity
                     }
-                    Criterion::Random => {
-                        1.0
-                    }
-
+                    Criterion::Random => 1.0,
                 };
 
                 // (left_impurity * left.values().sum::<usize>() as f64

@@ -1,9 +1,5 @@
-use std::borrow::Cow;
-
-use crate::feature_extraction::catch22::CATCH22;
-use crate::feature_extraction::statistics::zscore;
+use crate::feature_extraction::catch22::compute_catch;
 use crate::grid_search_tuning;
-use crate::tree::tree::Tree;
 use crate::utils::structures::Sample;
 use crate::utils::tuning::TuningConfig;
 use crate::{
@@ -85,7 +81,7 @@ impl Forest<IsolationTree> for CanonicalIsolationForest {
             let mut sample = Vec::new();
             for (start, end) in self.intervals[tree_index].iter().copied() {
                 for i in 0..N_ATTRIBUTES {
-                    sample.push(CATCH22::get(self.attributes[tree_index][i])(
+                    sample.push(compute_catch(self.attributes[tree_index][i])(
                         &data[j].data[start..end],
                     ));
                 }
@@ -97,12 +93,16 @@ impl Forest<IsolationTree> for CanonicalIsolationForest {
         }
         transformed_data
     }
-    fn tuning_predict(&self, ds_train: &[Sample<'_>], ds_test: &[Sample<'_>]) -> Vec<Self::TuningType> {
+    fn tuning_predict(
+        &self,
+        ds_train: &[Sample<'_>],
+        ds_test: &[Sample<'_>],
+    ) -> Vec<Self::TuningType> {
         self.score_samples(ds_test)
     }
 }
 
-impl OutlierForest for CanonicalIsolationForest {
+impl OutlierForest<IsolationTree> for CanonicalIsolationForest {
     fn get_forest_config(&self) -> &OutlierForestConfig {
         &self.config.outlier_config
     }

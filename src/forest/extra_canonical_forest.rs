@@ -1,16 +1,15 @@
-use crate::feature_extraction::catch22::CATCH22;
-use crate::feature_extraction::statistics::{mean, slope, std, zscore};
-use crate::forest::forest::{DistanceForest, Forest};
+use crate::feature_extraction::catch22::compute_catch;
+use crate::forest::forest::Forest;
 use crate::grid_search_tuning;
 use crate::neighbors::nearest_neighbor::k_nearest_neighbor;
 use crate::tree::extra_tree::ExtraTree;
-use crate::tree::tree::Tree;
 use crate::utils::structures::Sample;
 use crate::utils::tuning::TuningConfig;
 use rand::{seq::SliceRandom, thread_rng, Rng};
-use rayon::prelude::*;
 
-use super::forest::{DistanceForestConfig, DistanceForestConfigTuning};
+use super::forest::{
+    ClassificationForest, ClassificationForestConfig, ClassificationForestConfigTuning,
+};
 
 pub const MIN_INTERVAL: usize = 10;
 pub const TOTAL_ATTRIBUTES: usize = 25;
@@ -19,7 +18,7 @@ pub const N_ATTRIBUTES: usize = 8;
 grid_search_tuning! {
 pub struct ExtraCanonicalForestConfig [ExtraCanonicalForestConfigTuning]{
     pub n_intervals: usize,
-    pub classification_config: DistanceForestConfig [DistanceForestConfigTuning],
+    pub classification_config: ClassificationForestConfig [ClassificationForestConfigTuning],
 }
 }
 impl TuningConfig for ExtraCanonicalForestConfigTuning {
@@ -82,7 +81,7 @@ impl Forest<ExtraTree> for ExtraCanonicalForest {
             let mut sample = Vec::new();
             for (start, end) in self.intervals[tree_index].iter().copied() {
                 for i in 0..N_ATTRIBUTES {
-                    sample.push(CATCH22::get(self.attributes[tree_index][i])(
+                    sample.push(compute_catch(self.attributes[tree_index][i])(
                         &data[j].data[start..end],
                     ));
                 }
@@ -94,14 +93,22 @@ impl Forest<ExtraTree> for ExtraCanonicalForest {
         }
         transformed_data
     }
-    fn tuning_predict(&self, ds_train: &[Sample<'_>], ds_test: &[Sample<'_>]) -> Vec<Self::TuningType> {
+    fn tuning_predict(
+        &self,
+        ds_train: &[Sample<'_>],
+        ds_test: &[Sample<'_>],
+    ) -> Vec<Self::TuningType> {
         let breiman_distance = self.pairwise_breiman(&ds_test, &ds_train);
-        k_nearest_neighbor(1, &ds_train.iter().map(|v| v.target).collect::<Vec<_>>(), &breiman_distance)
+        k_nearest_neighbor(
+            1,
+            &ds_train.iter().map(|v| v.target).collect::<Vec<_>>(),
+            &breiman_distance,
+        )
     }
 }
 
-impl DistanceForest for ExtraCanonicalForest {
-    fn get_forest_config(&self) -> &DistanceForestConfig {
+impl ClassificationForest<ExtraTree> for ExtraCanonicalForest {
+    fn get_forest_config(&self) -> &ClassificationForestConfig {
         &self.config.classification_config
     }
 }

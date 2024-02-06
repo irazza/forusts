@@ -1,12 +1,10 @@
-use crate::feature_extraction::catch22::CATCH22;
-use crate::feature_extraction::statistics::{mean, slope, std, zscore};
+use crate::feature_extraction::catch22::compute_catch;
 use crate::forest::forest::{ClassificationForest, Forest};
 use crate::grid_search_tuning;
-use crate::tree::{decision_tree::DecisionTree, tree::Tree};
+use crate::tree::decision_tree::DecisionTree;
 use crate::utils::structures::Sample;
 use crate::utils::tuning::TuningConfig;
 use rand::{seq::SliceRandom, thread_rng, Rng};
-use rayon::prelude::*;
 
 use super::forest::{ClassificationForestConfig, ClassificationForestConfigTuning};
 
@@ -79,12 +77,9 @@ impl Forest<DecisionTree> for CanonicalIntervalForest {
             let mut sample = Vec::new();
             for (start, end) in self.intervals[tree_index].iter().copied() {
                 for i in 0..N_ATTRIBUTES {
-                    sample.extend(
-                        [CATCH22::get(self.attributes[tree_index][i])(
-                            &data[j].data[start..end],
-                        )]
-                        .iter(),
-                    );
+                    sample.push(compute_catch(self.attributes[tree_index][i])(
+                        &data[j].data[start..end],
+                    ));
                 }
             }
             transformed_data.push(Sample {
@@ -94,12 +89,16 @@ impl Forest<DecisionTree> for CanonicalIntervalForest {
         }
         transformed_data
     }
-    fn tuning_predict(&self, ds_train: &[Sample<'_>], ds_test: &[Sample<'_>]) -> Vec<Self::TuningType> {
+    fn tuning_predict(
+        &self,
+        ds_train: &[Sample<'_>],
+        ds_test: &[Sample<'_>],
+    ) -> Vec<Self::TuningType> {
         self.predict(ds_test)
     }
 }
 
-impl ClassificationForest for CanonicalIntervalForest {
+impl ClassificationForest<DecisionTree> for CanonicalIntervalForest {
     fn get_forest_config(&self) -> &ClassificationForestConfig {
         &self.config.classification_config
     }

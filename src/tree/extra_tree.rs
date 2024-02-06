@@ -1,11 +1,12 @@
-use rand::{seq::SliceRandom, thread_rng, Rng};
 use crate::{
+    forest::forest::{ClassificationForestConfig, ClassificationTree},
     tree::{
         node::Node,
         tree::{MaxFeatures, Tree},
     },
     utils::structures::Sample,
 };
+use rand::{seq::SliceRandom, thread_rng, Rng};
 
 #[derive(Clone, Debug)]
 pub struct ExtraTreeConfig {
@@ -18,6 +19,16 @@ pub struct ExtraTreeConfig {
 pub struct ExtraTree {
     root: Node,
     config: ExtraTreeConfig,
+}
+
+impl ClassificationTree for ExtraTree {
+    fn from_classification_config(config: &ClassificationForestConfig) -> Self {
+        Self::new(ExtraTreeConfig {
+            max_depth: config.max_depth.unwrap_or(usize::MAX),
+            min_samples_split: config.min_samples_split,
+            max_features: config.max_features,
+        })
+    }
 }
 
 impl Tree for ExtraTree {
@@ -44,7 +55,7 @@ impl Tree for ExtraTree {
         let features_subsample =
             features_subsample[..self.config.max_features.convert(samples[0].data.len())].to_vec();
         let mut feature_counter = 0;
-        
+
         let mut thresholds = [f64::NAN].to_vec();
         while thresholds.len() == 1 && feature_counter < features_subsample.len() {
             thresholds = samples
@@ -59,11 +70,14 @@ impl Tree for ExtraTree {
             // No split found
             return (usize::MAX, f64::MAX, f64::MAX);
         }
-        let best_feature = features_subsample[feature_counter-1];
-        let best_threshold = if thresholds.len() == 2 {thresholds[1]} else {thresholds[thread_rng().gen_range(1..thresholds.len() - 1)]};
+        let best_feature = features_subsample[feature_counter - 1];
+        let best_threshold = if thresholds.len() == 2 {
+            thresholds[1]
+        } else {
+            thresholds[thread_rng().gen_range(1..thresholds.len() - 1)]
+        };
         let best_impurity = f64::NAN;
         (best_feature, best_threshold, best_impurity)
-    
     }
     fn pre_split_conditions(&self, samples: &[Sample<'_>], current_depth: usize) -> bool {
         // Base case: not enough samples or max depth reached

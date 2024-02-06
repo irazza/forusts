@@ -1,6 +1,5 @@
 use crate::feature_extraction::mep::compute_mep_features;
 use crate::grid_search_tuning;
-use crate::tree::tree::Tree;
 use crate::utils::structures::Sample;
 use crate::utils::tuning::TuningConfig;
 use crate::{
@@ -84,12 +83,16 @@ impl Forest<IsolationTree> for MEPIsolationForest {
         }
         transformed_data
     }
-    fn tuning_predict(&self, ds_train: &[Sample<'_>], ds_test: &[Sample<'_>]) -> Vec<Self::TuningType> {
+    fn tuning_predict(
+        &self,
+        ds_train: &[Sample<'_>],
+        ds_test: &[Sample<'_>],
+    ) -> Vec<Self::TuningType> {
         self.score_samples(ds_test)
     }
 }
 
-impl OutlierForest for MEPIsolationForest {
+impl OutlierForest<IsolationTree> for MEPIsolationForest {
     fn get_forest_config(&self) -> &OutlierForestConfig {
         &self.config.outlier_config
     }

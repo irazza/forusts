@@ -1,4 +1,4 @@
-use std::{cmp::max, ops::Deref, os::unix::thread};
+use std::{cmp::max, ops::Deref};
 
 use hashbrown::HashMap;
 use rand::{thread_rng, Rng};
@@ -27,7 +27,7 @@ impl MaxFeatures {
 pub enum Criterion {
     Gini,
     Entropy,
-    Random
+    Random,
 }
 impl Criterion {
     pub fn to_string(self) -> &'static str {
@@ -47,7 +47,7 @@ impl Criterion {
     }
 }
 
-pub trait Tree {
+pub trait Tree: Sync + Send {
     type Config;
     fn new(init: Self::Config) -> Self;
     fn get_max_depth(&self) -> usize;
@@ -87,7 +87,12 @@ pub trait Tree {
 
         let (left_data, right_data) = Self::split(samples, best_feature, best_threshold);
 
-        assert!(left_data.len() > 0 && right_data.len() > 0, "{} {}", left_data.len(), right_data.len());
+        assert!(
+            left_data.len() > 0 && right_data.len() > 0,
+            "{} {}",
+            left_data.len(),
+            right_data.len()
+        );
         // Split the data and recursively build the left and right subtrees
         let left_subtree = self.build_tree(left_data, max_depth - 1, best_impurity);
         let right_subtree = self.build_tree(right_data, max_depth - 1, best_impurity);
@@ -109,13 +114,16 @@ pub trait Tree {
     }
     fn get_diameter(n: &Node) -> (usize, usize) {
         match n {
-            Node::Leaf {..} => (1, 1),
-            Node::Split {left, right, ..} => {
+            Node::Leaf { .. } => (1, 1),
+            Node::Split { left, right, .. } => {
                 let (left_diameter, left_height) = Self::get_diameter(left);
                 let (right_diameter, right_height) = Self::get_diameter(right);
                 let current_diameter = left_height + right_height;
 
-                (max(current_diameter, max(left_diameter, right_diameter)), 1 + max(left_height, right_height))
+                (
+                    max(current_diameter, max(left_diameter, right_diameter)),
+                    1 + max(left_height, right_height),
+                )
             }
         }
     }

@@ -1,7 +1,7 @@
 use super::forest::OutlierForestConfig;
 use crate::{
     forest::forest::{Forest, OutlierForest},
-    tree::{isolation_tree::IsolationTree, tree::Tree},
+    tree::isolation_tree::IsolationTree,
     utils::structures::Sample,
 };
 
@@ -38,11 +38,15 @@ impl Forest<IsolationTree> for IsolationForest {
     fn transform<'a>(&self, data: &[Sample<'a>], _intervals_index: usize) -> Vec<Sample<'a>> {
         data.to_vec()
     }
-    fn tuning_predict(&self, ds_train: &[Sample<'_>], ds_test: &[Sample<'_>]) -> Vec<Self::TuningType> {
+    fn tuning_predict(
+        &self,
+        ds_train: &[Sample<'_>],
+        ds_test: &[Sample<'_>],
+    ) -> Vec<Self::TuningType> {
         self.score_samples(ds_test)
     }
 }
-impl OutlierForest for IsolationForest {
+impl OutlierForest<IsolationTree> for IsolationForest {
     fn get_forest_config(&self) -> &OutlierForestConfig {
         &self.config
     }

@@ -17,7 +17,6 @@ pub trait TuningConfig: GridSearch {
 #[macro_export]
 macro_rules! generate_grid_for_loop {
     ($self_:ident, $first_field: ident [$tuning_impl:ident] => $body:tt) => {
-        use $crate::utils::tuning::GridSearch;
         $self_.$first_field.generate_grid(|$first_field| {
             $body
         });

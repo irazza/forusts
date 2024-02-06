@@ -1,11 +1,10 @@
 use crate::feature_extraction::statistics::{mean, slope, std};
 use crate::forest::forest::{ClassificationForest, Forest};
 use crate::grid_search_tuning;
-use crate::tree::{decision_tree::DecisionTree, tree::Tree};
+use crate::tree::decision_tree::DecisionTree;
 use crate::utils::structures::Sample;
 use crate::utils::tuning::TuningConfig;
 use rand::{thread_rng, Rng};
-use rayon::prelude::*;
 
 use super::forest::{ClassificationForestConfig, ClassificationForestConfigTuning};
 
@@ -84,12 +83,16 @@ impl Forest<DecisionTree> for TimeSeriesForest {
         }
         transformed_data
     }
-    fn tuning_predict(&self, ds_train: &[Sample<'_>], ds_test: &[Sample<'_>]) -> Vec<Self::TuningType> {
+    fn tuning_predict(
+        &self,
+        ds_train: &[Sample<'_>],
+        ds_test: &[Sample<'_>],
+    ) -> Vec<Self::TuningType> {
         self.predict(ds_test)
     }
 }
 
-impl ClassificationForest for TimeSeriesForest {
+impl ClassificationForest<DecisionTree> for TimeSeriesForest {
     fn get_forest_config(&self) -> &ClassificationForestConfig {
         &self.config.classification_config
     }

@@ -4,7 +4,7 @@ use crate::{
     tree::tree::Tree,
     utils::structures::Sample,
 };
-use rand::{thread_rng, Rng};
+use rand::{seq::SliceRandom, thread_rng, Rng};
 
 #[derive(Clone, Debug)]
 pub struct IsolationTreeConfig {
@@ -59,29 +59,31 @@ impl Tree for IsolationTree {
         }
         return false;
     }
-    fn post_split_conditions(&self, _new_impurity: f64, _old_impurity: f64) -> bool {
-        return false;
+    fn post_split_conditions(&self, new_impurity: f64, _old_impurity: f64) -> bool {
+        // Base case: no split found
+        return new_impurity == f64::MAX;
     }
     fn get_split(&self, samples: &[Sample<'_>]) -> (usize, f64, f64) {
-        let mut best_feature = thread_rng().gen_range(0..samples[0].data.len());
-        let mut thresholds = samples
-            .iter()
-            .map(|f| f.data[best_feature])
-            .collect::<Vec<f64>>();
-        thresholds.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        thresholds.dedup();
-        if thresholds.len() == 1 {
-            for i in 0..samples[0].data.len() {
-                thresholds = samples.iter().map(|f| f.data[i]).collect::<Vec<f64>>();
-                thresholds.sort_by(|a, b| a.partial_cmp(b).unwrap());
-                thresholds.dedup();
-                if thresholds.len() > 1 {
-                    best_feature = i;
-                    break;
-                }
-            }
-        }
+        // Generate a random subsample (MaxFeatures) of features (length of sample)
+        let mut features_subsample = (0..samples[0].data.len()).collect::<Vec<_>>();
+        features_subsample.shuffle(&mut thread_rng());
+        let mut feature_counter = 0;
 
+        let mut thresholds = [f64::NAN].to_vec();
+        while thresholds.len() == 1 && feature_counter < features_subsample.len() {
+            thresholds = samples
+                .iter()
+                .map(|f| f.data[features_subsample[feature_counter]])
+                .collect::<Vec<f64>>();
+            thresholds.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            thresholds.dedup();
+            feature_counter += 1;
+        }
+        if feature_counter == features_subsample.len() {
+            // No split found
+            return (usize::MAX, f64::MAX, f64::MAX);
+        }
+        let best_feature = features_subsample[feature_counter - 1];
         let best_threshold = if thresholds.len() == 2 {
             thresholds[1]
         } else {

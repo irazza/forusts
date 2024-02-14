@@ -52,6 +52,15 @@ pub fn vec_to_csv(path: impl AsRef<Path>, data: &[f64]) -> Result<(), Box<dyn Er
     Ok(())
 }
 
+pub fn vec_vec_to_csv(path: impl AsRef<Path>, data: &[Vec<f64>]) -> Result<(), Box<dyn Error>> {
+    let mut csv_writer = csv::Writer::from_path(path)?;
+    for record in data {
+        csv_writer.write_record(record.iter().map(|v| v.to_string()))?;
+    }
+    csv_writer.flush()?;
+    Ok(())
+}
+
 pub fn read_csv_to_vec(path: impl AsRef<Path>) -> Result<Vec<f64>, Box<dyn Error>> {
     let reader = BufReader::new(File::open(path)?);
     let mut reader = ReaderBuilder::new()

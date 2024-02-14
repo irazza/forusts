@@ -8,7 +8,7 @@ use rand::{seq::SliceRandom, thread_rng, Rng};
 
 use super::forest::{ClassificationForestConfig, ClassificationForestConfigTuning};
 
-pub const MIN_INTERVAL: usize = 10;
+pub const MIN_INTERVAL: usize = 20;
 pub const TOTAL_ATTRIBUTES: usize = 25;
 pub const N_ATTRIBUTES: usize = 8;
 

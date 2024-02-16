@@ -4,7 +4,7 @@ use hashbrown::HashMap;
 use rand::{thread_rng, Rng};
 use serde_derive::{Deserialize, Serialize};
 
-use crate::utils::structures::Sample;
+use crate::{feature_extraction::statistics::std, utils::structures::Sample};
 
 use super::node::Node;
 
@@ -316,5 +316,10 @@ pub trait Tree: Sync + Send {
     }
     fn random_impurity(class_counts: &HashMap<isize, usize>) -> f64 {
         return thread_rng().gen_range(0.0..1.0);
+    }
+    fn sd_gain(y_l: &[f64], y_r: &[f64]) -> f64 {
+        let num = (std(y_l) + std(y_r)) / 2.0;
+        let den = std(&[y_l, y_r].concat());
+        1.0 - num / den
     }
 }

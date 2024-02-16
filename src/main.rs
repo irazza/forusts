@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
     datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
-    let mut wtr = csv::Writer::from_path("admep_light_raw.csv")?;
+    let mut wtr = csv::Writer::from_path("admep_ulight100_raw.csv")?;
     wtr.write_record(&["Dataset", "ROC-AUC"])?;
     wtr.flush()?;
     for i in 0..n_repetitions {
@@ -59,10 +59,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             let n_features = ds_train[0].data.len() as f64;
 
             let config = CanonicalIsolationForestConfig {
-                n_intervals: n_features.log2() as usize,
+                n_intervals: n_features.log10() as usize,
                 outlier_config: OutlierForestConfig {
-                    n_trees: 200,
-                    enhanced_anomaly_score: false,
+                    n_trees: 100,
+                    enhanced_anomaly_score: true,
                     max_depth: None,
                 },
             };

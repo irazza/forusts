@@ -10,6 +10,8 @@ use crate::{
     utils::structures::Sample,
 };
 
+use super::tree::SplitTest;
+
 pub struct DecisionTreeConfig {
     pub criterion: Criterion,
     pub max_depth: usize,
@@ -35,6 +37,7 @@ impl ClassificationTree for DecisionTree {
 
 impl Tree for DecisionTree {
     type Config = DecisionTreeConfig;
+    type SplitParameters = SplitTest;
     fn new(config: Self::Config) -> Self {
         Self {
             root: Node::new(),
@@ -50,7 +53,7 @@ impl Tree for DecisionTree {
     fn set_root(&mut self, root: Node) {
         self.root = root;
     }
-    fn get_split(&self, samples: &[Sample<'_>]) -> (usize, f64, f64) {
+    fn get_split(&self, samples: &[Sample<'_>]) -> (Self::SplitParameters, f64) {
         // Initialize the best split
         let mut best_feature = usize::MAX;
         let mut best_threshold = f64::MAX;
@@ -120,7 +123,7 @@ impl Tree for DecisionTree {
                 }
             }
         }
-        (best_feature, best_threshold, best_impurity)
+        (SplitTest{feature: best_feature, threshold: best_threshold}, best_impurity)
     }
     fn pre_split_conditions(&self, samples: &[Sample<'_>], current_depth: usize) -> bool {
         // Base case: not enough samples or max depth reached

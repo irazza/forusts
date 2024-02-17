@@ -1,4 +1,4 @@
-use super::node::Node;
+use super::{node::Node, tree::{SplitParameters, SplitTest}};
 use crate::{
     forest::forest::{OutlierForestConfig, OutlierTree},
     tree::tree::Tree,
@@ -30,6 +30,7 @@ impl OutlierTree for IsolationTree {
 
 impl Tree for IsolationTree {
     type Config = IsolationTreeConfig;
+    type SplitParameters = SplitTest;
     fn new(config: Self::Config) -> Self {
         Self {
             root: Node::new(),
@@ -63,7 +64,7 @@ impl Tree for IsolationTree {
         // Base case: no split found
         return new_impurity == f64::MAX;
     }
-    fn get_split(&self, samples: &[Sample<'_>]) -> (usize, f64, f64) {
+    fn get_split(&self, samples: &[Sample<'_>]) -> (Self::SplitParameters, f64) {
         // Generate a random subsample (MaxFeatures) of features (length of sample)
         let mut features_subsample = (0..samples[0].data.len()).collect::<Vec<_>>();
         features_subsample.shuffle(&mut thread_rng());
@@ -81,7 +82,7 @@ impl Tree for IsolationTree {
         }
         if feature_counter == features_subsample.len() {
             // No split found
-            return (usize::MAX, f64::MAX, f64::MAX);
+            return (SplitTest{feature: usize::MAX, threshold: f64::MAX}, f64::MAX);
         }
         let best_feature = features_subsample[feature_counter - 1];
         let best_threshold = if thresholds.len() == 2 {
@@ -90,6 +91,6 @@ impl Tree for IsolationTree {
             thresholds[thread_rng().gen_range(1..thresholds.len() - 1)]
         };
         let best_impurity = f64::NAN;
-        (best_feature, best_threshold, best_impurity)
+        (SplitTest{feature: best_feature, threshold: best_threshold}, best_impurity)
     }
 }

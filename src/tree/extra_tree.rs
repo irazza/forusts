@@ -8,6 +8,8 @@ use crate::{
 };
 use rand::{seq::SliceRandom, thread_rng, Rng};
 
+use super::tree::SplitTest;
+
 #[derive(Clone, Debug)]
 pub struct ExtraTreeConfig {
     pub max_depth: usize,
@@ -33,6 +35,7 @@ impl ClassificationTree for ExtraTree {
 
 impl Tree for ExtraTree {
     type Config = ExtraTreeConfig;
+    type SplitParameters = SplitTest;
     fn new(config: Self::Config) -> Self {
         Self {
             root: Node::new(),
@@ -48,7 +51,7 @@ impl Tree for ExtraTree {
     fn set_root(&mut self, root: Node) {
         self.root = root;
     }
-    fn get_split(&self, samples: &[Sample<'_>]) -> (usize, f64, f64) {
+    fn get_split(&self, samples: &[Sample<'_>]) -> (Self::SplitParameters, f64) {
         // Generate a random subsample (MaxFeatures) of features (length of sample)
         let mut features_subsample = (0..samples[0].data.len()).collect::<Vec<_>>();
         features_subsample.shuffle(&mut thread_rng());
@@ -68,7 +71,10 @@ impl Tree for ExtraTree {
         }
         if feature_counter == features_subsample.len() {
             // No split found
-            return (usize::MAX, f64::MAX, f64::MAX);
+            return (SplitTest {
+                feature: usize::MAX,
+                threshold: f64::MAX,
+            }, f64::MAX);
         }
         let best_feature = features_subsample[feature_counter - 1];
         let best_threshold = if thresholds.len() == 2 {
@@ -77,7 +83,10 @@ impl Tree for ExtraTree {
             thresholds[thread_rng().gen_range(1..thresholds.len() - 1)]
         };
         let best_impurity = f64::NAN;
-        (best_feature, best_threshold, best_impurity)
+        (SplitTest {
+            feature: best_feature,
+            threshold: best_threshold,
+        }, best_impurity)
     }
     fn pre_split_conditions(&self, samples: &[Sample<'_>], current_depth: usize) -> bool {
         // Base case: not enough samples or max depth reached

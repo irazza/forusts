@@ -1,5 +1,5 @@
-use std::{cmp::max, ops::Deref};
-
+use std::{cmp::max, ops::Deref, sync::Arc};
+use core::fmt::Debug;
 use hashbrown::HashMap;
 use rand::{thread_rng, Rng};
 use serde_derive::{Deserialize, Serialize};
@@ -46,14 +46,40 @@ impl Criterion {
         }
     }
 }
+pub trait SplitParameters : Sync + Send + Debug{
+    fn split(&self, samples: &Sample<'_>) -> bool;
+    fn equals(&self, other: &Self) -> bool;
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering;
+}
+#[derive(Debug)]
+pub struct SplitTest {
+    pub feature: usize,
+    pub threshold: f64,
+}
 
+impl SplitParameters for SplitTest{
+    fn split(&self, sample: &Sample<'_>) -> bool {
+        sample.data[self.feature] < self.threshold 
+    }
+    fn equals(&self, other: &Self) -> bool {
+        self.feature == other.feature && self.threshold == other.threshold
+    }
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        if self.feature == other.feature {
+            self.threshold.partial_cmp(&other.threshold).unwrap()
+        } else {
+            self.feature.cmp(&other.feature)
+        }
+    }
+}
 pub trait Tree: Sync + Send {
     type Config;
+    type SplitParameters: SplitParameters;
     fn new(init: Self::Config) -> Self;
     fn get_max_depth(&self) -> usize;
     fn get_root(&self) -> &Node;
     fn set_root(&mut self, root: Node);
-    fn get_split(&self, samples: &[Sample<'_>]) -> (usize, f64, f64);
+    fn get_split(&self, samples: &[Sample<'_>]) -> (Self::SplitParameters, f64);
     fn pre_split_conditions(&self, samples: &[Sample<'_>], current_depth: usize) -> bool;
     fn post_split_conditions(&self, new_impurity: f64, old_impurity: f64) -> bool;
     fn fit(&mut self, data: &[Sample<'_>]) {
@@ -74,7 +100,7 @@ pub trait Tree: Sync + Send {
             };
         }
 
-        let (best_feature, best_threshold, best_impurity) = self.get_split(samples);
+        let (best_split_parameters, best_impurity) = self.get_split(samples);
 
         if self.post_split_conditions(best_impurity, impurity) {
             return Node::Leaf {
@@ -85,7 +111,7 @@ pub trait Tree: Sync + Send {
             };
         }
 
-        let (left_data, right_data) = Self::split(samples, best_feature, best_threshold);
+        let (left_data, right_data) = Self::split(samples, best_split_parameters);
 
         assert!(
             left_data.len() > 0 && right_data.len() > 0,
@@ -98,8 +124,7 @@ pub trait Tree: Sync + Send {
         let right_subtree = self.build_tree(right_data, max_depth - 1, best_impurity);
 
         Node::Split {
-            feature: best_feature,
-            threshold: best_threshold,
+            split_params: Arc::new(best_split_parameters),
             left: Box::new(left_subtree),
             right: Box::new(right_subtree),
             depth: current_depth,
@@ -127,12 +152,11 @@ pub trait Tree: Sync + Send {
             }
         }
     }
-    fn get_splits(&self, x: &Sample<'_>) -> Vec<(usize, f64)> {
+    fn get_splits(&self, x: &Sample<'_>) -> Vec<&dyn SplitParameters> {
         let mut path = Vec::new();
         let mut node = self.get_root();
         while let Node::Split {
-            feature,
-            threshold,
+            split_params,
             left,
             right,
             depth: _,
@@ -140,8 +164,8 @@ pub trait Tree: Sync + Send {
             n_samples: _,
         } = node
         {
-            path.push((*feature, *threshold));
-            if x.data[*feature] <= *threshold {
+            path.push(split_params.deref());
+            if split_params.split(x){
                 node = left;
             } else {
                 node = right;
@@ -153,8 +177,7 @@ pub trait Tree: Sync + Send {
         let mut node = self.get_root();
 
         while let Node::Split {
-            feature,
-            threshold,
+            split_params,
             left,
             right,
             depth: _,
@@ -162,7 +185,7 @@ pub trait Tree: Sync + Send {
             n_samples: _,
         } = node
         {
-            if x.data[*feature] <= *threshold {
+            if split_params.split(x) {
                 node = left;
             } else {
                 node = right;
@@ -172,14 +195,13 @@ pub trait Tree: Sync + Send {
     }
     fn split<'a, 'b>(
         samples: &'a mut [Sample<'b>],
-        feature: usize,
-        threshold: f64,
+        parameters: Self::SplitParameters,
     ) -> (&'a mut [Sample<'b>], &'a mut [Sample<'b>]) {
         let mut idx = 0;
         let mut last = samples.len();
 
         while idx < last {
-            if samples[idx].data[feature] < threshold {
+            if parameters.split(&samples[idx]) {
                 idx += 1;
             } else {
                 samples.swap(idx, last - 1);

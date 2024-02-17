@@ -236,11 +236,7 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
                     union.extend(tree.get_splits(x1).into_iter());
                     union.extend(tree.get_splits(x2).into_iter());
                     // Remove duplicates based on feature and threshold
-                    union.sort_by(|(f1, t1), (f2, t2)| {
-                        f1.partial_cmp(f2)
-                            .unwrap_or(std::cmp::Ordering::Equal) // If the feature is the same, compare the threshold
-                            .then(t1.partial_cmp(t2).unwrap())
-                    });
+                    union.sort_by(|s1, s2| s1.cmp(s2));
                     union.dedup_by(|a, b| a == b);
                     let agree = union
                         .iter()

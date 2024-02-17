@@ -1,3 +1,8 @@
+use std::{ops::Deref, sync::Arc};
+
+use super::tree::SplitParameters;
+
+
 #[derive(Debug, Clone)]
 pub enum Node {
     Leaf {
@@ -7,8 +12,7 @@ pub enum Node {
         n_samples: usize,
     },
     Split {
-        feature: usize,
-        threshold: f64,
+        split_params: Arc<dyn SplitParameters>,
         left: Box<Node>,
         right: Box<Node>,
         depth: usize,
@@ -26,7 +30,7 @@ impl Node {
             n_samples: 0,
         }
     }
-    pub fn get_feature(&self) -> usize {
+    pub fn get_split_parameters(&self) -> &dyn SplitParameters {
         match self {
             Node::Leaf {
                 class: _,
@@ -35,33 +39,13 @@ impl Node {
                 n_samples: _,
             } => panic!("Cannot get feature of a leaf node"),
             Node::Split {
-                feature,
-                threshold: _,
+                split_params,
                 left: _,
                 right: _,
                 depth: _,
                 impurity: _,
                 n_samples: _,
-            } => return *feature,
-        }
-    }
-    pub fn get_threshold(&self) -> f64 {
-        match self {
-            Node::Leaf {
-                class: _,
-                depth: _,
-                impurity: _,
-                n_samples: _,
-            } => panic!("Cannot get threshold of a leaf node"),
-            Node::Split {
-                feature: _,
-                threshold,
-                left: _,
-                right: _,
-                depth: _,
-                impurity: _,
-                n_samples: _,
-            } => return *threshold,
+            } => return split_params.deref(),
         }
     }
     pub fn get_depth(&self) -> usize {
@@ -73,8 +57,7 @@ impl Node {
                 n_samples: _,
             } => return *depth,
             Node::Split {
-                feature: _,
-                threshold: _,
+                split_params: _,
                 left: _,
                 right: _,
                 depth,
@@ -93,8 +76,7 @@ impl Node {
                 n_samples: _,
             } => return *class,
             Node::Split {
-                feature: _,
-                threshold: _,
+                split_params: _,
                 left: _,
                 right: _,
                 depth: _,
@@ -113,8 +95,7 @@ impl Node {
                 n_samples,
             } => return *n_samples,
             Node::Split {
-                feature: _,
-                threshold: _,
+                split_params: _,
                 left: _,
                 right: _,
                 depth: _,

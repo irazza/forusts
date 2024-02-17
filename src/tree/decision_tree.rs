@@ -20,7 +20,7 @@ pub struct DecisionTreeConfig {
 }
 
 pub struct DecisionTree {
-    root: Node,
+    root: Node<SplitTest>,
     config: DecisionTreeConfig,
 }
 
@@ -47,10 +47,10 @@ impl Tree for DecisionTree {
     fn get_max_depth(&self) -> usize {
         self.config.max_depth
     }
-    fn get_root(&self) -> &Node {
+    fn get_root(&self) -> &Node<Self::SplitParameters> {
         &self.root
     }
-    fn set_root(&mut self, root: Node) {
+    fn set_root(&mut self, root: Node<Self::SplitParameters>) {
         self.root = root;
     }
     fn get_split(&self, samples: &[Sample<'_>]) -> (Self::SplitParameters, f64) {
@@ -123,7 +123,13 @@ impl Tree for DecisionTree {
                 }
             }
         }
-        (SplitTest{feature: best_feature, threshold: best_threshold}, best_impurity)
+        (
+            SplitTest {
+                feature: best_feature,
+                threshold: best_threshold,
+            },
+            best_impurity,
+        )
     }
     fn pre_split_conditions(&self, samples: &[Sample<'_>], current_depth: usize) -> bool {
         // Base case: not enough samples or max depth reached

@@ -1,8 +1,8 @@
-use std::{cmp::max, ops::Deref, sync::Arc};
 use core::fmt::Debug;
 use hashbrown::HashMap;
 use rand::{thread_rng, Rng};
 use serde_derive::{Deserialize, Serialize};
+use std::{cmp::max, ops::Deref, sync::Arc};
 
 use crate::{feature_extraction::statistics::std, utils::structures::Sample};
 
@@ -46,30 +46,26 @@ impl Criterion {
         }
     }
 }
-pub trait SplitParameters : Sync + Send + Debug{
+pub trait SplitParameters: Sync + Send + Debug + Ord + Eq {
     fn split(&self, samples: &Sample<'_>) -> bool;
-    fn equals(&self, other: &Self) -> bool;
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering;
 }
-#[derive(Debug)]
+
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct SplitTest {
     pub feature: usize,
     pub threshold: f64,
 }
 
-impl SplitParameters for SplitTest{
-    fn split(&self, sample: &Sample<'_>) -> bool {
-        sample.data[self.feature] < self.threshold 
-    }
-    fn equals(&self, other: &Self) -> bool {
-        self.feature == other.feature && self.threshold == other.threshold
-    }
+impl Ord for SplitTest {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        if self.feature == other.feature {
-            self.threshold.partial_cmp(&other.threshold).unwrap()
-        } else {
-            self.feature.cmp(&other.feature)
-        }
+        self.partial_cmp(other).unwrap()
+    }
+}
+impl Eq for SplitTest {}
+
+impl SplitParameters for SplitTest {
+    fn split(&self, sample: &Sample<'_>) -> bool {
+        sample.data[self.feature] < self.threshold
     }
 }
 pub trait Tree: Sync + Send {
@@ -77,8 +73,8 @@ pub trait Tree: Sync + Send {
     type SplitParameters: SplitParameters;
     fn new(init: Self::Config) -> Self;
     fn get_max_depth(&self) -> usize;
-    fn get_root(&self) -> &Node;
-    fn set_root(&mut self, root: Node);
+    fn get_root(&self) -> &Node<Self::SplitParameters>;
+    fn set_root(&mut self, root: Node<Self::SplitParameters>);
     fn get_split(&self, samples: &[Sample<'_>]) -> (Self::SplitParameters, f64);
     fn pre_split_conditions(&self, samples: &[Sample<'_>], current_depth: usize) -> bool;
     fn post_split_conditions(&self, new_impurity: f64, old_impurity: f64) -> bool;
@@ -88,7 +84,12 @@ pub trait Tree: Sync + Send {
         let root = self.build_tree(data, self.get_max_depth(), f64::MAX);
         self.set_root(root);
     }
-    fn build_tree(&mut self, samples: &mut [Sample<'_>], max_depth: usize, impurity: f64) -> Node {
+    fn build_tree(
+        &mut self,
+        samples: &mut [Sample<'_>],
+        max_depth: usize,
+        impurity: f64,
+    ) -> Node<Self::SplitParameters> {
         let current_depth = max(1, self.get_max_depth() - max_depth);
 
         if self.pre_split_conditions(samples, current_depth) {
@@ -111,7 +112,7 @@ pub trait Tree: Sync + Send {
             };
         }
 
-        let (left_data, right_data) = Self::split(samples, best_split_parameters);
+        let (left_data, right_data) = Self::split(samples, &best_split_parameters);
 
         assert!(
             left_data.len() > 0 && right_data.len() > 0,
@@ -124,7 +125,7 @@ pub trait Tree: Sync + Send {
         let right_subtree = self.build_tree(right_data, max_depth - 1, best_impurity);
 
         Node::Split {
-            split_params: Arc::new(best_split_parameters),
+            split_params: best_split_parameters,
             left: Box::new(left_subtree),
             right: Box::new(right_subtree),
             depth: current_depth,
@@ -137,7 +138,7 @@ pub trait Tree: Sync + Send {
             .map(|sample| self.predict_leaf(sample).get_class())
             .collect()
     }
-    fn get_diameter(n: &Node) -> (usize, usize) {
+    fn get_diameter(n: &Node<Self::SplitParameters>) -> (usize, usize) {
         match n {
             Node::Leaf { .. } => (1, 1),
             Node::Split { left, right, .. } => {
@@ -152,7 +153,7 @@ pub trait Tree: Sync + Send {
             }
         }
     }
-    fn get_splits(&self, x: &Sample<'_>) -> Vec<&dyn SplitParameters> {
+    fn get_splits(&self, x: &Sample<'_>) -> Vec<&Self::SplitParameters> {
         let mut path = Vec::new();
         let mut node = self.get_root();
         while let Node::Split {
@@ -164,8 +165,8 @@ pub trait Tree: Sync + Send {
             n_samples: _,
         } = node
         {
-            path.push(split_params.deref());
-            if split_params.split(x){
+            path.push(split_params);
+            if split_params.split(x) {
                 node = left;
             } else {
                 node = right;
@@ -173,7 +174,7 @@ pub trait Tree: Sync + Send {
         }
         path
     }
-    fn predict_leaf(&self, x: &Sample<'_>) -> &Node {
+    fn predict_leaf(&self, x: &Sample<'_>) -> &Node<Self::SplitParameters> {
         let mut node = self.get_root();
 
         while let Node::Split {
@@ -195,7 +196,7 @@ pub trait Tree: Sync + Send {
     }
     fn split<'a, 'b>(
         samples: &'a mut [Sample<'b>],
-        parameters: Self::SplitParameters,
+        parameters: &Self::SplitParameters,
     ) -> (&'a mut [Sample<'b>], &'a mut [Sample<'b>]) {
         let mut idx = 0;
         let mut last = samples.len();
@@ -229,7 +230,7 @@ pub trait Tree: Sync + Send {
 
         most_common_class
     }
-    fn bfs(&self) -> Vec<&Node> {
+    fn bfs(&self) -> Vec<&Node<Self::SplitParameters>> {
         let mut queue = vec![self.get_root()];
         let mut bfs = Vec::new();
 
@@ -259,26 +260,34 @@ pub trait Tree: Sync + Send {
 
         max_depth
     }
-    fn compute_ancestor<'a>(&'a self, node: &'a Node) -> HashMap<*const Node, &'a Node> {
+    fn compute_ancestor<'a>(
+        &'a self,
+        node: &'a Node<Self::SplitParameters>,
+    ) -> HashMap<*const Node<Self::SplitParameters>, &'a Node<Self::SplitParameters>> {
         let mut ancestors = HashMap::new();
         Self::compute_ancestor_rec(&self.get_root(), node, None, &mut ancestors);
-        ancestors.insert(node as *const Node, node);
+        ancestors.insert(node as *const Node<Self::SplitParameters>, node);
         ancestors
     }
     fn compute_ancestor_rec<'a>(
-        current: &'a Node,
-        target: &'a Node,
-        found_lca: Option<&'a Node>,
-        ancestors: &mut HashMap<*const Node, &'a Node>,
+        current: &'a Node<Self::SplitParameters>,
+        target: &'a Node<Self::SplitParameters>,
+        found_lca: Option<&'a Node<Self::SplitParameters>>,
+        ancestors: &mut HashMap<
+            *const Node<Self::SplitParameters>,
+            &'a Node<Self::SplitParameters>,
+        >,
     ) -> bool {
-        if (current as *const Node) == (target as *const Node) {
+        if (current as *const Node<Self::SplitParameters>)
+            == (target as *const Node<Self::SplitParameters>)
+        {
             return true;
         }
 
         match current {
             Node::Leaf { .. } => {
                 if let Some(found_lca) = found_lca {
-                    ancestors.insert(current as *const Node, found_lca);
+                    ancestors.insert(current as *const Node<Self::SplitParameters>, found_lca);
                 }
                 false
             }

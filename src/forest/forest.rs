@@ -3,7 +3,7 @@ use crate::{
     grid_search_tuning,
     tree::{
         node::Node,
-        tree::{Criterion, MaxFeatures, Tree},
+        tree::{Criterion, MaxFeatures, SplitParameters, Tree},
     },
     utils::structures::Sample,
 };
@@ -128,7 +128,7 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
             for (i, &x1_node) in x1_nodes.iter().enumerate() {
                 for (j, &x2_node) in x2_nodes.iter().enumerate() {
                     distance_matrix[i][j].fetch_add(
-                        ((x1_node as *const Node) != (x2_node as *const Node)) as usize,
+                        ((x1_node as *const Node<_>) != (x2_node as *const Node<_>)) as usize,
                         Ordering::Relaxed,
                     );
                 }
@@ -165,7 +165,7 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
 
                 for (j, &x2_node) in x2_nodes.iter().enumerate() {
                     *distance_matrix[i][j].lock() += (x1_node.get_depth() + x2_node.get_depth()
-                        - 2 * distances[&(x2_node as *const Node)].get_depth())
+                        - 2 * distances[&(x2_node as *const Node<_>)].get_depth())
                         as f64
                         / max(x1_node.get_depth(), x2_node.get_depth()) as f64;
                 }
@@ -201,7 +201,7 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
                 let distances = tree.compute_ancestor(x1_node);
 
                 for (j, &x2_node) in x2_nodes.iter().enumerate() {
-                    *distance_matrix[i][j].lock() += distances[&(x2_node as *const Node)]
+                    *distance_matrix[i][j].lock() += distances[&(x2_node as *const Node<_>)]
                         .get_depth() as f64
                         / max(x1_node.get_depth(), x2_node.get_depth()) as f64;
                 }
@@ -238,10 +238,7 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
                     // Remove duplicates based on feature and threshold
                     union.sort_by(|s1, s2| s1.cmp(s2));
                     union.dedup_by(|a, b| a == b);
-                    let agree = union
-                        .iter()
-                        .filter(|(f, t)| (x1.data[*f] > *t) == (x2.data[*f] > *t))
-                        .count() as f64;
+                    let agree = union.iter().filter(|s| s.split(x1) == s.split(x2)).count() as f64;
                     *distance_matrix[i][j].lock() += 1.0
                         - if union.len() == 0 {
                             1.0
@@ -348,7 +345,7 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
         }));
         scores
     }
-    fn path_length(leaf: &Node) -> f64 {
+    fn path_length(leaf: &Node<T::SplitParameters>) -> f64 {
         let samples = leaf.get_samples() as f64;
         if samples > 1.0 {
             return leaf.get_depth() as f64

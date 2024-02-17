@@ -2,9 +2,8 @@ use std::{ops::Deref, sync::Arc};
 
 use super::tree::SplitParameters;
 
-
 #[derive(Debug, Clone)]
-pub enum Node {
+pub enum Node<S: SplitParameters> {
     Leaf {
         class: isize,
         depth: usize,
@@ -12,16 +11,16 @@ pub enum Node {
         n_samples: usize,
     },
     Split {
-        split_params: Arc<dyn SplitParameters>,
-        left: Box<Node>,
-        right: Box<Node>,
+        split_params: S,
+        left: Box<Node<S>>,
+        right: Box<Node<S>>,
         depth: usize,
         impurity: f64,
         n_samples: usize,
     },
 }
 
-impl Node {
+impl<S: SplitParameters> Node<S> {
     pub fn new() -> Self {
         Node::Leaf {
             class: 0,
@@ -30,7 +29,7 @@ impl Node {
             n_samples: 0,
         }
     }
-    pub fn get_split_parameters(&self) -> &dyn SplitParameters {
+    pub fn get_split_parameters(&self) -> &S {
         match self {
             Node::Leaf {
                 class: _,
@@ -45,7 +44,7 @@ impl Node {
                 depth: _,
                 impurity: _,
                 n_samples: _,
-            } => return split_params.deref(),
+            } => return split_params,
         }
     }
     pub fn get_depth(&self) -> usize {

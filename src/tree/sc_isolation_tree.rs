@@ -14,19 +14,19 @@ pub struct SCIsolationTreeConfig {
 
 #[derive(Clone, Debug)]
 pub struct SCIsolationTree {
-    root: Node,
+    root: Node<SplitHyperplane>,
     config: SCIsolationTreeConfig,
 }
 impl SCIsolationTree {
-    fn get_random_hyperplane(&self, samples: &[Sample<'_>]) -> (usize, f64){
+    fn get_random_hyperplane(&self, samples: &[Sample<'_>]) -> (usize, f64) {
         let n_features = samples[0].data.len();
         let mut subsampled_features = (0..n_features).collect::<Vec<_>>();
         subsampled_features.shuffle(&mut thread_rng());
-        let c = (0..subsampled_features.len()).into_iter().map(|_| thread_rng().gen_range(-1.0..1.0)).collect::<Vec<_>>();
-        for idx in subsampled_features {
-            
-
-        }
+        let c = (0..subsampled_features.len())
+            .into_iter()
+            .map(|_| thread_rng().gen_range(-1.0..1.0))
+            .collect::<Vec<_>>();
+        for idx in subsampled_features {}
         todo!()
     }
 }
@@ -40,15 +40,12 @@ impl OutlierTree for SCIsolationTree {
         })
     }
 }
-#[derive(Clone, Debug)]
-pub struct SplitHyperplane {
-    
-}
+#[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
+pub struct SplitHyperplane {}
 impl SplitParameters for SplitHyperplane {
     fn split(&self, sample: &Sample<'_>) -> bool {
         todo!()
     }
-
 }
 impl Tree for SCIsolationTree {
     type Config = SCIsolationTreeConfig;
@@ -62,10 +59,10 @@ impl Tree for SCIsolationTree {
     fn get_max_depth(&self) -> usize {
         self.config.max_depth
     }
-    fn get_root(&self) -> &Node {
+    fn get_root(&self) -> &Node<Self::SplitParameters> {
         &self.root
     }
-    fn set_root(&mut self, root: Node) {
+    fn set_root(&mut self, root: Node<Self::SplitParameters>) {
         self.root = root;
     }
     fn pre_split_conditions(&self, samples: &[Sample<'_>], current_depth: usize) -> bool {
@@ -93,8 +90,7 @@ impl Tree for SCIsolationTree {
             let (f, t) = self.get_random_hyperplane(samples);
             let mut x_l = Vec::new();
             let mut x_r = Vec::new();
-            for i in 0..samples.len()
-            {
+            for i in 0..samples.len() {
                 let x = samples[i].data[f];
                 if x < t {
                     x_l.push(x);
@@ -111,5 +107,4 @@ impl Tree for SCIsolationTree {
         }
         todo!()
     }
-
 }

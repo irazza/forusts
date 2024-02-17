@@ -19,7 +19,7 @@ pub struct ExtraTreeConfig {
 
 #[derive(Clone, Debug)]
 pub struct ExtraTree {
-    root: Node,
+    root: Node<SplitTest>,
     config: ExtraTreeConfig,
 }
 
@@ -45,10 +45,10 @@ impl Tree for ExtraTree {
     fn get_max_depth(&self) -> usize {
         self.config.max_depth
     }
-    fn get_root(&self) -> &Node {
+    fn get_root(&self) -> &Node<Self::SplitParameters> {
         &self.root
     }
-    fn set_root(&mut self, root: Node) {
+    fn set_root(&mut self, root: Node<Self::SplitParameters>) {
         self.root = root;
     }
     fn get_split(&self, samples: &[Sample<'_>]) -> (Self::SplitParameters, f64) {
@@ -71,10 +71,13 @@ impl Tree for ExtraTree {
         }
         if feature_counter == features_subsample.len() {
             // No split found
-            return (SplitTest {
-                feature: usize::MAX,
-                threshold: f64::MAX,
-            }, f64::MAX);
+            return (
+                SplitTest {
+                    feature: usize::MAX,
+                    threshold: f64::MAX,
+                },
+                f64::MAX,
+            );
         }
         let best_feature = features_subsample[feature_counter - 1];
         let best_threshold = if thresholds.len() == 2 {
@@ -83,10 +86,13 @@ impl Tree for ExtraTree {
             thresholds[thread_rng().gen_range(1..thresholds.len() - 1)]
         };
         let best_impurity = f64::NAN;
-        (SplitTest {
-            feature: best_feature,
-            threshold: best_threshold,
-        }, best_impurity)
+        (
+            SplitTest {
+                feature: best_feature,
+                threshold: best_threshold,
+            },
+            best_impurity,
+        )
     }
     fn pre_split_conditions(&self, samples: &[Sample<'_>], current_depth: usize) -> bool {
         // Base case: not enough samples or max depth reached

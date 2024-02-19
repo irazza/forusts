@@ -1,10 +1,14 @@
 use super::{node::Node, tree::SplitParameters};
+use crate::feature_extraction::statistics::stddev;
 use crate::{
     forest::forest::{OutlierForestConfig, OutlierTree},
     tree::tree::Tree,
     utils::structures::Sample,
 };
 use rand::{seq::SliceRandom, thread_rng, Rng};
+use rayon::iter::Split;
+
+const N_HYPERPLANES: usize = 10;
 
 #[derive(Clone, Debug)]
 pub struct SCIsolationTreeConfig {
@@ -18,16 +22,51 @@ pub struct SCIsolationTree {
     config: SCIsolationTreeConfig,
 }
 impl SCIsolationTree {
-    fn get_random_hyperplane(&self, samples: &[Sample<'_>]) -> (usize, f64) {
+    fn get_random_hyperplane(
+        &self,
+        samples: &[Sample<'_>],
+        n_attributes: usize,
+        stddevs: &[f64],
+    ) -> SplitHyperplane {
         let n_features = samples[0].data.len();
         let mut subsampled_features = (0..n_features).collect::<Vec<_>>();
         subsampled_features.shuffle(&mut thread_rng());
+        subsampled_features.truncate(n_attributes);
         let c = (0..subsampled_features.len())
             .into_iter()
-            .map(|_| thread_rng().gen_range(-1.0..1.0))
+            .map(|i| thread_rng().gen_range(-1.0..=1.0) / stddevs[subsampled_features[i]])
             .collect::<Vec<_>>();
-        for idx in subsampled_features {}
-        todo!()
+        let mut p = samples
+            .iter()
+            .map(|s| {
+                c.iter()
+                    .zip(subsampled_features.iter())
+                    .map(|(c, i)| c * s.data[*i])
+                    .sum::<f64>()
+            })
+            .collect::<Vec<f64>>();
+        p.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
+        let p_stddev = stddev(&p);
+        let mut p_l = 0.0;
+        let mut p_r = p.iter().sum::<f64>();
+        let mut best_p = 0.0;
+        let mut best_sd_gain = 0.0;
+
+        for i in 0..p.len() {
+            p_l += p[i];
+            p_r -= p[i];
+            let sd_gain = 1.0 - ((p_l + p_r) / 2.0) / p_stddev;
+            if sd_gain > best_sd_gain {
+                best_sd_gain = sd_gain;
+                best_p = p[i];
+            }
+        }
+        SplitHyperplane {
+            c: c,
+            idx_attributes: subsampled_features,
+            p: best_p,
+            best_sd_gain: best_sd_gain,
+        }
     }
 }
 
@@ -40,11 +79,26 @@ impl OutlierTree for SCIsolationTree {
         })
     }
 }
-#[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
-pub struct SplitHyperplane {}
+#[derive(Clone, Debug, PartialOrd, PartialEq)]
+pub struct SplitHyperplane {
+    c: Vec<f64>,
+    idx_attributes: Vec<usize>,
+    p: f64,
+    best_sd_gain: f64,
+}
+impl Eq for SplitHyperplane {}
+impl Ord for SplitHyperplane {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.p.partial_cmp(&other.p).unwrap()
+    }
+}
 impl SplitParameters for SplitHyperplane {
     fn split(&self, sample: &Sample<'_>) -> bool {
-        todo!()
+        let mut sum = 0.0;
+        for i in 0..self.c.len() {
+            sum += self.c[i] * sample.data[self.idx_attributes[i]];
+        }
+        sum < self.p
     }
 }
 impl Tree for SCIsolationTree {
@@ -83,28 +137,24 @@ impl Tree for SCIsolationTree {
         return false;
     }
     fn get_split(&self, samples: &[Sample<'_>]) -> (SplitHyperplane, f64) {
-        let mut best_f = 0;
-        let mut best_t = 0.0;
-        let mut best_sd_gain = 0.0;
-        for _ in 0..100 {
-            let (f, t) = self.get_random_hyperplane(samples);
-            let mut x_l = Vec::new();
-            let mut x_r = Vec::new();
-            for i in 0..samples.len() {
-                let x = samples[i].data[f];
-                if x < t {
-                    x_l.push(x);
-                } else {
-                    x_r.push(x);
-                }
-            }
-            let sd_gain = SCIsolationTree::sd_gain(&x_l, &x_r);
-            if sd_gain > best_sd_gain {
-                best_sd_gain = sd_gain;
-                best_f = f;
-                best_t = t;
-            }
+        let n_features = samples[0].data.len();
+        let n_attributes = (n_features as f64).sqrt().ceil() as usize;
+        let mut stddev = vec![0.0; samples.len()];
+        for i in 0..samples[0].data.len() {
+            let mean = samples.iter().map(|v| v.data[i]).sum::<f64>() / samples.len() as f64;
+            let variance = samples
+                .iter()
+                .map(|v| (v.data[i] - mean).powi(2))
+                .sum::<f64>()
+                / samples.len() as f64;
+            stddev[i] = variance.sqrt();
         }
-        todo!()
+        let best_hp = (0..N_HYPERPLANES)
+            .into_iter()
+            .map(|_| self.get_random_hyperplane(samples, n_attributes, &stddev))
+            .max_by(|a, b| a.best_sd_gain.partial_cmp(&b.best_sd_gain).unwrap())
+            .unwrap();
+        let best_sd_gain = best_hp.best_sd_gain;
+        (best_hp, best_sd_gain)
     }
 }

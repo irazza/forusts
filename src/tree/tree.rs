@@ -4,7 +4,7 @@ use rand::{thread_rng, Rng};
 use serde_derive::{Deserialize, Serialize};
 use std::{cmp::max, ops::Deref, sync::Arc};
 
-use crate::{feature_extraction::statistics::std, utils::structures::Sample};
+use crate::{feature_extraction::statistics::stddev, utils::structures::Sample};
 
 use super::node::Node;
 
@@ -349,8 +349,8 @@ pub trait Tree: Sync + Send {
         return thread_rng().gen_range(0.0..1.0);
     }
     fn sd_gain(y_l: &[f64], y_r: &[f64]) -> f64 {
-        let num = (std(y_l) + std(y_r)) / 2.0;
-        let den = std(&[y_l, y_r].concat());
+        let num = (stddev(y_l) + stddev(y_r)) / 2.0;
+        let den = stddev(&[y_l, y_r].concat());
         1.0 - num / den
     }
 }

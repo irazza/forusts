@@ -1,8 +1,12 @@
 use crate::forest::canonical_isolation_forest::{
     CanonicalIsolationForest, CanonicalIsolationForestConfig,
 };
+use crate::forest::canonical_sc_isolation_forest::{
+    CanonicalSCIsolationForest, CanonicalSCIsolationForestConfig,
+};
 use crate::forest::extra_canonical_forest::ExtraCanonicalForest;
 use crate::forest::forest::{ClassificationForest, Forest, OutlierForest, OutlierForestConfig};
+use crate::forest::sc_isolation_forest::{SCIsolationForest, SCIsolationForestConfig};
 use crate::metrics::classification::{accuracy_score, roc_auc_score};
 use crate::neighbors::local_outlier_factor::local_outlier_factor;
 use crate::neighbors::nearest_neighbor::k_nearest_neighbor;
@@ -58,20 +62,31 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let n_features = ds_train[0].data.len() as f64;
 
-            let config = CanonicalIsolationForestConfig {
+            // let config = CanonicalIsolationForestConfig {
+            //     n_intervals: n_features.log10() as usize,
+            //     outlier_config: OutlierForestConfig {
+            //         n_trees: 100,
+            //         enhanced_anomaly_score: true,
+            //         max_depth: None,
+            //     },
+            // };
+
+            // let mut model = CanonicalIsolationForest::new(config);
+            let config = CanonicalSCIsolationForestConfig {
                 n_intervals: n_features.log10() as usize,
                 outlier_config: OutlierForestConfig {
                     n_trees: 100,
-                    enhanced_anomaly_score: true,
+                    enhanced_anomaly_score: false,
                     max_depth: None,
                 },
             };
-
-            let mut model = CanonicalIsolationForest::new(config);
+            let mut model = CanonicalSCIsolationForest::new(config);
             model.fit(&mut ds_train);
 
             let y_pred = model.score_samples(&ds_test);
             let roc_auc = roc_auc_score(&y_pred, &y_true);
+            println!("\t\tROC-AUC: {}", roc_auc);
+            panic!();
             wtr.write_record(&[
                 path.file_name().to_string_lossy().to_string(),
                 roc_auc.to_string(),

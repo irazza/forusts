@@ -50,7 +50,7 @@ where
     median
 }
 
-pub fn std(x: &[f64]) -> f64 {
+pub fn stddev(x: &[f64]) -> f64 {
     let mean = mean(x);
     let std = (x.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / x.len() as f64).sqrt();
     assert!(std.is_finite());
@@ -200,6 +200,6 @@ pub fn f_entropy(a: &[f64]) -> f64 {
 
 pub fn zscore(x: &[f64]) -> Vec<f64> {
     let mean = mean(x);
-    let std = std(x);
+    let std = stddev(x);
     x.iter().map(|x| (x - mean) / std).collect()
 }

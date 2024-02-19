@@ -1,4 +1,4 @@
-use super::statistics::{mean, slope, std};
+use super::statistics::{mean, slope, stddev};
 
 mod bindings {
     #![allow(warnings)]
@@ -31,7 +31,7 @@ pub fn compute_catch(i: usize) -> fn(&[f64]) -> f64 {
         20 => sb_transition_matrix_3ac_sumdiagcov,
         21 => pd_periodicity_wang_th0_01,
         22 => mean,
-        23 => std,
+        23 => stddev,
         24 => slope,
         _ => panic!("Invalid index for CATCH22 (valide range 0..25)"),
     }

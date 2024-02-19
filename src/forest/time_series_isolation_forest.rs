@@ -1,4 +1,4 @@
-use crate::feature_extraction::statistics::{mean, slope, std};
+use crate::feature_extraction::statistics::{mean, slope, stddev};
 use crate::grid_search_tuning;
 use crate::utils::structures::Sample;
 use crate::utils::tuning::TuningConfig;
@@ -74,7 +74,7 @@ impl Forest<IsolationTree> for TimeSeriesIsolationForest {
             let mut sample = Vec::new();
             for (start, end) in self.intervals[intervals_index].iter().copied() {
                 let mean = mean(&data[j].data[start..end]);
-                let std = std(&data[j].data[start..end]);
+                let std = stddev(&data[j].data[start..end]);
                 let slope = slope(&data[j].data[start..end]);
                 sample.extend([mean, std, slope].into_iter());
             }

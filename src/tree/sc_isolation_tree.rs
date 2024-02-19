@@ -28,8 +28,13 @@ impl SCIsolationTree {
         n_attributes: usize,
         stddevs: &[f64],
     ) -> SplitHyperplane {
-        let n_features = samples[0].data.len();
-        let mut subsampled_features = (0..n_features).collect::<Vec<_>>();
+        let idxs_candidates = stddevs
+            .iter()
+            .enumerate()
+            .filter(|(_, v)| **v > 0.0)
+            .map(|(i, _)| i)
+            .collect::<Vec<_>>();
+        let mut subsampled_features = idxs_candidates;
         subsampled_features.shuffle(&mut thread_rng());
         subsampled_features.truncate(n_attributes);
         let c = (0..subsampled_features.len())
@@ -138,8 +143,8 @@ impl Tree for SCIsolationTree {
     }
     fn get_split(&self, samples: &[Sample<'_>]) -> (SplitHyperplane, f64) {
         let n_features = samples[0].data.len();
-        let n_attributes = (n_features as f64).sqrt().ceil() as usize;
-        let mut stddev = vec![0.0; samples.len()];
+        let n_attributes = n_features.ilog2() as usize + 1;
+        let mut stddev = vec![0.0; samples[0].data.len()];
         for i in 0..samples[0].data.len() {
             let mean = samples.iter().map(|v| v.data[i]).sum::<f64>() / samples.len() as f64;
             let variance = samples

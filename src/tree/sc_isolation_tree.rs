@@ -26,12 +26,13 @@ impl SCIsolationTree {
         &self,
         samples: &[Sample<'_>],
         n_attributes: usize,
+        means: &[f64],
         stddevs: &[f64],
     ) -> SplitHyperplane {
         let idxs_candidates = stddevs
             .iter()
             .enumerate()
-            .filter(|(_, v)| **v > 0.0)
+            .filter(|(_, v)| **v > f64::EPSILON)
             .map(|(i, _)| i)
             .collect::<Vec<_>>();
         let mut subsampled_features = idxs_candidates;
@@ -46,28 +47,37 @@ impl SCIsolationTree {
             .map(|s| {
                 c.iter()
                     .zip(subsampled_features.iter())
-                    .map(|(c, i)| c * s.data[*i])
+                    .map(|(c, i)| c * (s.data[*i] - means[*i]))
                     .sum::<f64>()
             })
             .collect::<Vec<f64>>();
         p.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
         let p_stddev = stddev(&p);
-        let mut p_l = 0.0;
-        let mut p_r = p.iter().sum::<f64>();
         let mut best_p = 0.0;
         let mut best_sd_gain = 0.0;
-
-        for i in 0..p.len() {
-            p_l += p[i];
-            p_r -= p[i];
+        let mut mut_left = 0;
+        for i in 1..p.len() {
+            let p_l = stddev(&p[0..i]);
+            let p_r = stddev(&p[i..]);
             let sd_gain = 1.0 - ((p_l + p_r) / 2.0) / p_stddev;
             if sd_gain > best_sd_gain {
+                mut_left = i;
                 best_sd_gain = sd_gain;
                 best_p = p[i];
             }
         }
+        if mut_left<1{
+            for s in samples {
+                println!("{:?}", subsampled_features.iter().map(|i| s.data[*i]).collect::<Vec<f64>>());
+            }
+            for i in 0..subsampled_features.len(){
+                println!("{:?}", stddevs[subsampled_features[i]]);
+            }
+            panic!("p: {:?}\n {},\n {}\n {}, \n c: {:?}, \n stddevs: {:?}", p, best_sd_gain, best_p, p_stddev, c, stddevs);
+        }
         SplitHyperplane {
             c: c,
+            means: subsampled_features.iter().map(|i| means[*i]).collect(),
             idx_attributes: subsampled_features,
             p: best_p,
             best_sd_gain: best_sd_gain,
@@ -87,6 +97,7 @@ impl OutlierTree for SCIsolationTree {
 #[derive(Clone, Debug, PartialOrd, PartialEq)]
 pub struct SplitHyperplane {
     c: Vec<f64>,
+    means: Vec<f64>,
     idx_attributes: Vec<usize>,
     p: f64,
     best_sd_gain: f64,
@@ -101,7 +112,7 @@ impl SplitParameters for SplitHyperplane {
     fn split(&self, sample: &Sample<'_>) -> bool {
         let mut sum = 0.0;
         for i in 0..self.c.len() {
-            sum += self.c[i] * sample.data[self.idx_attributes[i]];
+            sum += self.c[i] * (sample.data[self.idx_attributes[i]] - self.means[i]);
         }
         sum < self.p
     }
@@ -143,8 +154,9 @@ impl Tree for SCIsolationTree {
     }
     fn get_split(&self, samples: &[Sample<'_>]) -> (SplitHyperplane, f64) {
         let n_features = samples[0].data.len();
-        let n_attributes = n_features.ilog2() as usize + 1;
+        let n_attributes = 2;
         let mut stddev = vec![0.0; samples[0].data.len()];
+        let mut means = vec![0.0; samples[0].data.len()];
         for i in 0..samples[0].data.len() {
             let mean = samples.iter().map(|v| v.data[i]).sum::<f64>() / samples.len() as f64;
             let variance = samples
@@ -153,10 +165,11 @@ impl Tree for SCIsolationTree {
                 .sum::<f64>()
                 / samples.len() as f64;
             stddev[i] = variance.sqrt();
+            means[i] = mean;
         }
         let best_hp = (0..N_HYPERPLANES)
             .into_iter()
-            .map(|_| self.get_random_hyperplane(samples, n_attributes, &stddev))
+            .map(|_| self.get_random_hyperplane(samples, n_attributes, &means, &stddev))
             .max_by(|a, b| a.best_sd_gain.partial_cmp(&b.best_sd_gain).unwrap())
             .unwrap();
         let best_sd_gain = best_hp.best_sd_gain;

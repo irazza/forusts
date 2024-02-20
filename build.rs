@@ -68,15 +68,21 @@ fn main() {
         .opt_level(3)
         .compile("catch22");
 
-    // Run the configure script
     let dst = Config::new("catch22/fftw-3.3.10")
         .define("BUILD_SHARED_LIBS", "OFF")
         .define("ENABLE_OPENMP", "ON")
         .build();
-    println!("cargo:rustc-link-arg=-fopenmp");
     println!(
         "cargo:rustc-link-search=native={}",
         dst.join("build").display()
     );
     println!("cargo:rustc-link-lib=static=fftw3");
+
+    // let dst = Config::new("SCAMP")
+    //     .build();
+    // println!(
+    //     "cargo:rustc-link-search=native={}",
+    //     dst.join("build").display()
+    // );
+    // println!("cargo:rustc-link-lib=static=scamp");
 }

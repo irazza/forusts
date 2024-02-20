@@ -148,11 +148,14 @@ impl Tree for SCIsolationTree {
         }
         // Base case: samples are the same object
         let first_sample = &samples[0];
-        let is_all_same_data = samples.iter().all(|v| v == first_sample);
-        if is_all_same_data {
-            return true;
+        for sample in samples {
+            for i in 0..sample.data.len() {
+                if sample.data[i] != first_sample.data[i] {
+                    return false;
+                }
+            }
         }
-        return false;
+        return true;
     }
     fn post_split_conditions(&self, new_impurity: f64, _old_impurity: f64) -> bool {
         return false;

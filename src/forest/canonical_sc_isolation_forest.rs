@@ -5,7 +5,6 @@ use crate::utils::structures::Sample;
 use crate::utils::tuning::TuningConfig;
 use crate::{
     forest::forest::{Forest, OutlierForest},
-    tree::isolation_tree::IsolationTree,
 };
 use rand::{seq::SliceRandom, thread_rng, Rng};
 
@@ -13,7 +12,7 @@ use super::forest::{OutlierForestConfig, OutlierForestConfigTuning};
 
 pub const MIN_INTERVAL: usize = 20;
 pub const TOTAL_ATTRIBUTES: usize = 25;
-pub const N_ATTRIBUTES: usize = 8;
+pub const N_ATTRIBUTES: usize = 2;
 
 grid_search_tuning! {
     pub struct CanonicalSCIsolationForestConfig[CanonicalSCIsolationForestConfigTuning] {
@@ -55,6 +54,7 @@ impl Forest<SCIsolationTree> for CanonicalSCIsolationForest {
     fn compute_intervals(&mut self, n_features: usize) {
         // Generate n_intervals, with random start and end
         for _i in 0..self.config.outlier_config.n_trees {
+            //let intervals = (0..n_features).step_by(n_features/N_INTERVALS).into_iter().map(|start| (start, start + n_features/N_INTERVALS)).collect();
             let mut intervals = Vec::new();
             for _j in 0..self.config.n_intervals {
                 let start = thread_rng().gen_range(0..n_features - MIN_INTERVAL);

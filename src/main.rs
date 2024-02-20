@@ -1,22 +1,11 @@
-use crate::forest::canonical_isolation_forest::{
-    CanonicalIsolationForest, CanonicalIsolationForestConfig,
-};
 use crate::forest::canonical_sc_isolation_forest::{
     CanonicalSCIsolationForest, CanonicalSCIsolationForestConfig,
 };
-use crate::forest::extra_canonical_forest::ExtraCanonicalForest;
 use crate::forest::forest::{ClassificationForest, Forest, OutlierForest, OutlierForestConfig};
-use crate::forest::sc_isolation_forest::{SCIsolationForest, SCIsolationForestConfig};
 use crate::metrics::classification::{accuracy_score, roc_auc_score};
-use crate::neighbors::local_outlier_factor::local_outlier_factor;
-use crate::neighbors::nearest_neighbor::k_nearest_neighbor;
 use crate::utils::csv_io::{read_csv, vec_vec_to_csv};
-use forest::extra_canonical_forest::ExtraCanonicalForestConfig;
-use forest::forest::ClassificationForestConfig;
-use rayon::vec;
 use std::error::Error;
 use std::fs::{self};
-use tree::tree::Criterion;
 
 mod distance;
 mod feature_extraction;
@@ -41,11 +30,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
     datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
-    let mut wtr = csv::Writer::from_path("admep_raw.csv")?;
+    let mut wtr = csv::Writer::from_path("admep_raw_500.csv")?;
     wtr.write_record(&["Dataset", "ROC-AUC"])?;
     wtr.flush()?;
     let mut bw = csv::WriterBuilder::new().flexible(true)
-        .from_path("admep_raw_scores.csv")?;
+        .from_path("admep_raw_500_scores.csv")?;
     for i in 0..n_repetitions {
         println!("Repetition {}", i + 1);
         //let mut predictions = Vec::new();
@@ -65,9 +54,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             let n_features = ds_train[0].data.len() as f64;
 
             let config = CanonicalSCIsolationForestConfig {
-                n_intervals: n_features.log2() as usize,
+                n_intervals: n_features.sqrt() as usize,
                 outlier_config: OutlierForestConfig {
-                    n_trees: 200,
+                    n_trees: 500,
                     enhanced_anomaly_score: false,
                     max_depth: None,
                 },

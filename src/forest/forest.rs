@@ -274,7 +274,7 @@ pub trait OutlierTree: Tree {
 pub trait OutlierForest<T: OutlierTree>: Forest<T> {
     fn get_forest_config(&self) -> &OutlierForestConfig;
     fn fit_(&mut self, data: &[Sample<'_>]) {
-        let subsampling_ratio = 0.8;
+        let subsampling_ratio = f64::min(1.0, 256.0 / data.len() as f64);
         let max_samples = (data.len() as f64 * subsampling_ratio) as usize;
         self.compute_intervals(data[0].data.len());
         let mut trees = Vec::new();
@@ -310,22 +310,23 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
         }
     }
     fn compute_enhanced_anomaly_scores(&self, data: &[Sample<'_>]) -> Vec<f64> {
-        let mut scores = Vec::new();
-        let max_samples = min(256, data.len()) as f64;
-        let denominator = (2.0 * (f64::ln(max_samples - 1.0) + EULER_MASCHERONI))
-            - 2.0 * ((max_samples - 1.0) / max_samples);
-        scores.par_extend(data.par_windows(1).map(|sample| {
-            let mut average_as = 0.0;
-            let trees: &Vec<T> = self.get_trees();
-            for (i, tree) in trees.iter().enumerate() {
-                let transformed_x = self.transform(sample, i).into_iter().next().unwrap();
-                let leaf = tree.predict_leaf(&transformed_x);
-                average_as += ANOMALY_SCORE.powf(-Self::path_length(leaf) / denominator);
-            }
-            average_as /= self.get_forest_config().n_trees as f64;
-            return average_as;
-        }));
-        scores
+        todo!()
+        // let mut scores = Vec::new();
+        // let max_samples = min(256, data.len()) as f64;
+        // let denominator = (2.0 * (f64::ln(max_samples - 1.0) + EULER_MASCHERONI))
+        //     - 2.0 * ((max_samples - 1.0) / max_samples);
+        // scores.par_extend(data.par_windows(1).map(|sample| {
+        //     let mut average_as = 0.0;
+        //     let trees: &Vec<T> = self.get_trees();
+        //     for (i, tree) in trees.iter().enumerate() {
+        //         let transformed_x = self.transform(sample, i).into_iter().next().unwrap();
+        //         let leaf = tree.predict_leaf(&transformed_x);
+        //         average_as += ANOMALY_SCORE.powf(-Self::path_length(leaf) / denominator);
+        //     }
+        //     average_as /= self.get_forest_config().n_trees as f64;
+        //     return average_as;
+        // }));
+        // scores
     }
     fn compute_anomaly_scores(&self, data: &[Sample<'_>]) -> Vec<f64> {
         let mut scores = Vec::new();
@@ -337,22 +338,15 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
             let trees: &Vec<T> = self.get_trees();
             for (i, tree) in trees.iter().enumerate() {
                 let transformed_x = self.transform(sample, i).into_iter().next().unwrap();
-                let leaf = tree.predict_leaf(&transformed_x);
-                average_depth += Self::path_length(leaf);
+                average_depth += Self::path_length(tree, &transformed_x);
             }
             average_depth /= self.get_forest_config().n_trees as f64;
             return ANOMALY_SCORE.powf(-average_depth / denominator);
         }));
         scores
     }
-    fn path_length(leaf: &Node<T::SplitParameters>) -> f64 {
-        let samples = leaf.get_samples() as f64;
-        if samples > 1.0 {
-            return leaf.get_depth() as f64
-                + (2.0 * (f64::ln(samples - 1.0) + EULER_MASCHERONI)
-                    - 2.0 * (samples - 1.0) / samples);
-        } else {
-            return leaf.get_depth() as f64;
-        }
+    fn path_length(tree: &T, transformed_x: &Sample<'_>) -> f64 {
+        T::SplitParameters::path_length(tree, transformed_x)
+        
     }
 }

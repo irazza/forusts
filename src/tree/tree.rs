@@ -2,7 +2,8 @@ use core::fmt::Debug;
 use hashbrown::HashMap;
 use rand::{thread_rng, Rng};
 use serde_derive::{Deserialize, Serialize};
-use std::{cmp::max, ops::Deref, sync::Arc};
+use std::{cmp::max, ops::Deref};
+use crate::feature_extraction::statistics::EULER_MASCHERONI;
 
 use crate::{feature_extraction::statistics::stddev, utils::structures::Sample};
 
@@ -48,6 +49,7 @@ impl Criterion {
 }
 pub trait SplitParameters: Sync + Send + Debug + Ord + Eq {
     fn split(&self, samples: &Sample<'_>) -> bool;
+    fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample<'_>) -> f64;
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
@@ -66,6 +68,17 @@ impl Eq for SplitTest {}
 impl SplitParameters for SplitTest {
     fn split(&self, sample: &Sample<'_>) -> bool {
         sample.data[self.feature] < self.threshold
+    }
+    fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample<'_>) -> f64 {
+        let leaf = tree.predict_leaf(&x);
+        let samples = leaf.get_samples() as f64;
+        if samples > 1.0 {
+            return leaf.get_depth() as f64
+                + (2.0 * (f64::ln(samples - 1.0) + EULER_MASCHERONI)
+                    - 2.0 * (samples - 1.0) / samples);
+        } else {
+            return leaf.get_depth() as f64;
+        }
     }
 }
 pub trait Tree: Sync + Send {

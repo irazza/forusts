@@ -319,7 +319,8 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
             let trees: &Vec<T> = self.get_trees();
             for (i, tree) in trees.iter().enumerate() {
                 let transformed_x = self.transform(sample, i).into_iter().next().unwrap();
-                average_as += ANOMALY_SCORE.powf(-Self::path_length(tree, &transformed_x) / denominator);
+                average_as +=
+                    ANOMALY_SCORE.powf(-Self::path_length(tree, &transformed_x) / denominator);
             }
             average_as /= self.get_forest_config().n_trees as f64;
             return average_as;
@@ -345,6 +346,5 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
     }
     fn path_length(tree: &T, transformed_x: &Sample<'_>) -> f64 {
         T::SplitParameters::path_length(tree, transformed_x)
-        
     }
 }

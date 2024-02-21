@@ -1,9 +1,9 @@
 use crate::forest::canonical_sc_isolation_forest::{
     CanonicalSCIsolationForest, CanonicalSCIsolationForestConfig,
 };
-use crate::forest::forest::{ClassificationForest, Forest, OutlierForest, OutlierForestConfig};
-use crate::metrics::classification::{accuracy_score, roc_auc_score};
-use crate::utils::csv_io::{read_csv, vec_vec_to_csv};
+use crate::forest::forest::{Forest, OutlierForest, OutlierForestConfig};
+use crate::metrics::classification::roc_auc_score;
+use crate::utils::csv_io::read_csv;
 use std::error::Error;
 use std::fs::{self};
 
@@ -30,12 +30,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
     datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
-    let mut wtr = csv::Writer::from_path("admep.csv")?;
+    let mut wtr = csv::Writer::from_path("admepT500IsqrtR10.csv")?;
     wtr.write_record(&["Dataset", "ROC-AUC"])?;
     wtr.flush()?;
     let mut bw = csv::WriterBuilder::new()
         .flexible(true)
-        .from_path("admep_scores.csv")?;
+        .from_path("admepT500IsqrtR10_scores.csv")?;
     for i in 0..n_repetitions {
         println!("Repetition {}", i + 1);
         //let mut predictions = Vec::new();
@@ -55,10 +55,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             let n_features = ds_train[0].data.len() as f64;
 
             let config = CanonicalSCIsolationForestConfig {
-                n_intervals: n_features.log2() as usize,
+                n_intervals: n_features.sqrt() as usize,
                 outlier_config: OutlierForestConfig {
                     n_trees: 200,
-                    enhanced_anomaly_score: true,
+                    enhanced_anomaly_score: false,
                     max_depth: None,
                 },
             };
@@ -70,7 +70,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             bw.flush()?;
             let roc_auc = roc_auc_score(&y_pred, &y_true);
             println!("\t\tROC-AUC: {}", roc_auc);
-            panic!();
             wtr.write_record(&[
                 path.file_name().to_string_lossy().to_string(),
                 roc_auc.to_string(),

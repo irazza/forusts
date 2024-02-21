@@ -28,6 +28,7 @@ impl SCIsolationTree {
         &self,
         samples: &[Sample<'_>],
         n_attributes: usize,
+        means: &[f64],
         stddevs: &[f64],
     ) -> SplitHyperplane {
         let idxs_candidates = stddevs
@@ -48,7 +49,7 @@ impl SCIsolationTree {
             .map(|s| {
                 c.iter()
                     .zip(subsampled_features.iter())
-                    .map(|(c, i)| c * s.data[*i])
+                    .map(|(c, i)| c * (s.data[*i] - means[*i]))
                     .sum::<f64>()
             })
             .collect::<Vec<f64>>();
@@ -67,6 +68,7 @@ impl SCIsolationTree {
         }
         SplitHyperplane {
             c: c,
+            means: means.to_vec(),
             idx_attributes: subsampled_features,
             p: best_p,
             best_sd_gain: best_sd_gain,
@@ -87,6 +89,7 @@ impl OutlierTree for SCIsolationTree {
 #[derive(Clone, Debug, PartialOrd, PartialEq)]
 pub struct SplitHyperplane {
     c: Vec<f64>,
+    means: Vec<f64>,
     idx_attributes: Vec<usize>,
     p: f64,
     best_sd_gain: f64,
@@ -96,7 +99,8 @@ impl SplitHyperplane {
     pub fn get_dist(&self, sample: &Sample<'_>) -> f64 {
         let mut sum = 0.0;
         for i in 0..self.c.len() {
-            sum += self.c[i] * (sample.data[self.idx_attributes[i]]);
+            sum += self.c[i]
+                * (sample.data[self.idx_attributes[i]] - self.means[self.idx_attributes[i]]);
         }
         sum - self.p
     }
@@ -115,7 +119,7 @@ impl SplitParameters for SplitHyperplane {
         let splits = tree.get_splits(x);
         let mut path_length = 0.0;
         for split in splits {
-            if split.get_dist(x).abs() < split.limit{
+            if split.get_dist(x).abs() < split.limit {
                 path_length += 1.0;
             }
         }
@@ -162,6 +166,7 @@ impl Tree for SCIsolationTree {
     }
     fn get_split(&self, samples: &[Sample<'_>]) -> (SplitHyperplane, f64) {
         let mut stddev = vec![0.0; samples[0].data.len()];
+        let mut means = vec![0.0; samples[0].data.len()];
         for i in 0..samples[0].data.len() {
             let mean = samples.iter().map(|v| v.data[i]).sum::<f64>() / samples.len() as f64;
             let variance = samples
@@ -170,10 +175,11 @@ impl Tree for SCIsolationTree {
                 .sum::<f64>()
                 / samples.len() as f64;
             stddev[i] = variance.sqrt();
+            means[i] = mean;
         }
         let best_hp = (0..N_HYPERPLANES)
             .into_iter()
-            .map(|_| self.get_random_hyperplane(samples, N_ATTRIBUTES, &stddev))
+            .map(|_| self.get_random_hyperplane(samples, N_ATTRIBUTES, &means, &stddev))
             .max_by(|a, b| a.best_sd_gain.partial_cmp(&b.best_sd_gain).unwrap())
             .unwrap();
         let best_sd_gain = best_hp.best_sd_gain;

@@ -1,9 +1,9 @@
+use crate::feature_extraction::statistics::EULER_MASCHERONI;
 use core::fmt::Debug;
 use hashbrown::HashMap;
 use rand::{thread_rng, Rng};
 use serde_derive::{Deserialize, Serialize};
 use std::{cmp::max, ops::Deref};
-use crate::feature_extraction::statistics::EULER_MASCHERONI;
 
 use crate::{feature_extraction::statistics::stddev, utils::structures::Sample};
 

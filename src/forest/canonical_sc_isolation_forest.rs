@@ -1,11 +1,9 @@
 use crate::feature_extraction::catch22::compute_catch;
+use crate::forest::forest::{Forest, OutlierForest};
 use crate::grid_search_tuning;
 use crate::tree::sc_isolation_tree::SCIsolationTree;
 use crate::utils::structures::Sample;
 use crate::utils::tuning::TuningConfig;
-use crate::{
-    forest::forest::{Forest, OutlierForest},
-};
 use rand::{seq::SliceRandom, thread_rng, Rng};
 
 use super::forest::{OutlierForestConfig, OutlierForestConfigTuning};

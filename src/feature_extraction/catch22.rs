@@ -61,6 +61,9 @@ pub fn compute_catch_features(x: &[f64]) -> Vec<f64> {
     features.push(sp_summaries_welch_rect_centroid(x));
     features.push(sb_transition_matrix_3ac_sumdiagcov(x));
     features.push(pd_periodicity_wang_th0_01(x));
+    features.push(mean(x));
+    features.push(stddev(x));
+    features.push(slope(x));
     features
 }
 

@@ -1,4 +1,4 @@
-use crate::feature_extraction::catch22::compute_catch;
+use crate::feature_extraction::catch22::{compute_catch, compute_catch_features};
 use crate::forest::forest::{Forest, OutlierForest};
 use crate::grid_search_tuning;
 use crate::tree::sc_isolation_tree::SCIsolationTree;
@@ -10,7 +10,7 @@ use super::forest::{OutlierForestConfig, OutlierForestConfigTuning};
 
 pub const MIN_INTERVAL: usize = 20;
 pub const TOTAL_ATTRIBUTES: usize = 25;
-pub const N_ATTRIBUTES: usize = 2;
+pub const N_ATTRIBUTES: usize = 8;
 
 grid_search_tuning! {
     pub struct CanonicalSCIsolationForestConfig[CanonicalSCIsolationForestConfigTuning] {
@@ -52,7 +52,8 @@ impl Forest<SCIsolationTree> for CanonicalSCIsolationForest {
     fn compute_intervals(&mut self, n_features: usize) {
         // Generate n_intervals, with random start and end
         for _i in 0..self.config.outlier_config.n_trees {
-            //let intervals = (0..n_features).step_by(n_features/N_INTERVALS).into_iter().map(|start| (start, start + n_features/N_INTERVALS)).collect();
+            // let n_intervals = thread_rng().gen_range(1..=self.config.n_intervals);
+            // let intervals = (0..=n_features-(n_features/n_intervals)).step_by(n_features/n_intervals).into_iter().map(|start| (start, start + n_features/n_intervals)).collect();
             let mut intervals = Vec::new();
             for _j in 0..self.config.n_intervals {
                 let start = thread_rng().gen_range(0..n_features - MIN_INTERVAL);
@@ -77,7 +78,7 @@ impl Forest<SCIsolationTree> for CanonicalSCIsolationForest {
         let n_samples = data.len();
         let mut transformed_data: Vec<Sample<'_>> = Vec::new();
         for j in 0..n_samples {
-            let mut sample = Vec::new();
+            let mut sample = compute_catch_features(&data[j].data);
             for (start, end) in self.intervals[tree_index].iter().copied() {
                 for i in 0..N_ATTRIBUTES {
                     sample.push(compute_catch(self.attributes[tree_index][i])(

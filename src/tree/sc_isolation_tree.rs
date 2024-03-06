@@ -10,7 +10,7 @@ use crate::{
 use rand::{seq::SliceRandom, thread_rng, Rng};
 
 const N_HYPERPLANES: usize = 10;
-const N_ATTRIBUTES: usize = 2;
+const N_ATTRIBUTES: usize = 25;
 
 #[derive(Clone, Debug)]
 pub struct SCIsolationTreeConfig {

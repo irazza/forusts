@@ -3,7 +3,7 @@ use super::statistics::{mean, slope, stddev};
 mod bindings {
     #![allow(warnings)]
 
-    include! {concat ! (env ! ("OUT_DIR"),"/bindings.rs")}
+    include! {concat ! (env ! ("OUT_DIR"),"/catch22.rs")}
 }
 
 pub fn compute_catch(i: usize) -> fn(&[f64]) -> f64 {

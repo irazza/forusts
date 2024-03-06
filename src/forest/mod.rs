@@ -9,3 +9,4 @@ pub mod random_forest;
 pub mod sc_isolation_forest;
 pub mod time_series_forest;
 pub mod time_series_isolation_forest;
+pub mod mp_isolation_forest;

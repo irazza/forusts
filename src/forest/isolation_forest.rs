@@ -10,6 +10,7 @@ pub type IsolationForestConfig = OutlierForestConfig;
 pub struct IsolationForest {
     trees: Vec<IsolationTree>,
     config: IsolationForestConfig,
+    max_samples: usize,
 }
 
 impl Forest<IsolationTree> for IsolationForest {
@@ -20,6 +21,7 @@ impl Forest<IsolationTree> for IsolationForest {
         Self {
             trees: Vec::new(),
             config,
+            max_samples: 0,
         }
     }
     fn fit(&mut self, data: &mut [Sample<'_>]) {
@@ -49,5 +51,11 @@ impl Forest<IsolationTree> for IsolationForest {
 impl OutlierForest<IsolationTree> for IsolationForest {
     fn get_forest_config(&self) -> &OutlierForestConfig {
         &self.config
+    }
+    fn set_max_samples(&mut self, max_samples: usize) {
+        self.max_samples = max_samples;
+    }
+    fn get_max_samples(&self) -> usize {
+        self.max_samples
     }
 }

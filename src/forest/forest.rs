@@ -273,9 +273,12 @@ pub trait OutlierTree: Tree {
 
 pub trait OutlierForest<T: OutlierTree>: Forest<T> {
     fn get_forest_config(&self) -> &OutlierForestConfig;
+    fn set_max_samples(&mut self, max_samples: usize);
+    fn get_max_samples(&self) -> usize;
     fn fit_(&mut self, data: &[Sample<'_>]) {
         let subsampling_ratio = f64::min(1.0, 256.0 / data.len() as f64);
         let max_samples = (data.len() as f64 * subsampling_ratio) as usize;
+        self.set_max_samples(max_samples);
         self.compute_intervals(data[0].data.len());
         let mut trees = Vec::new();
         let config = self.get_forest_config();
@@ -311,7 +314,7 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
     }
     fn compute_enhanced_anomaly_scores(&self, data: &[Sample<'_>]) -> Vec<f64> {
         let mut scores = Vec::new();
-        let max_samples = min(256, data.len()) as f64;
+        let max_samples = self.get_max_samples() as f64;
         let denominator = (2.0 * (f64::ln(max_samples - 1.0) + EULER_MASCHERONI))
             - 2.0 * ((max_samples - 1.0) / max_samples);
         scores.par_extend(data.par_windows(1).map(|sample| {
@@ -329,7 +332,7 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
     }
     fn compute_anomaly_scores(&self, data: &[Sample<'_>]) -> Vec<f64> {
         let mut scores = Vec::new();
-        let max_samples = min(256, data.len()) as f64;
+        let max_samples = self.get_max_samples() as f64;
         let denominator = (2.0 * (f64::ln(max_samples - 1.0) + EULER_MASCHERONI))
             - 2.0 * ((max_samples - 1.0) / max_samples);
         scores.par_extend(data.par_windows(1).map(|sample| {

@@ -29,6 +29,7 @@ pub struct CanonicalSCIsolationForest {
     intervals: Vec<Vec<(usize, usize)>>,
     attributes: Vec<Vec<usize>>,
     config: CanonicalSCIsolationForestConfig,
+    max_samples: usize,
 }
 
 impl Forest<SCIsolationTree> for CanonicalSCIsolationForest {
@@ -41,6 +42,7 @@ impl Forest<SCIsolationTree> for CanonicalSCIsolationForest {
             intervals: Vec::new(),
             attributes: Vec::new(),
             config,
+            max_samples: 0,
         }
     }
     fn fit(&mut self, data: &mut [Sample<'_>]) {
@@ -105,5 +107,11 @@ impl Forest<SCIsolationTree> for CanonicalSCIsolationForest {
 impl OutlierForest<SCIsolationTree> for CanonicalSCIsolationForest {
     fn get_forest_config(&self) -> &OutlierForestConfig {
         &self.config.outlier_config
+    }
+    fn set_max_samples(&mut self, max_samples: usize) {
+        self.max_samples = max_samples;
+    }
+    fn get_max_samples(&self) -> usize {
+        self.max_samples
     }
 }

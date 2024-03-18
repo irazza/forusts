@@ -1,11 +1,14 @@
 use std::ops::{Add, Div};
 
+use hashbrown::HashMap;
+use serde::de::value;
+
 pub const EULER_MASCHERONI: f64 =
     0.5772156649015328606065120900824024310421593359399235988057672348849;
 
 pub fn mean(x: &[f64]) -> f64 {
     let mean = x.iter().sum::<f64>() / x.len() as f64;
-    assert!(mean.is_finite());
+    assert!(mean.is_finite(), "{:?}", x);
     mean
 }
 
@@ -200,6 +203,45 @@ pub fn f_entropy(a: &[f64]) -> f64 {
 
 pub fn zscore(x: &[f64]) -> Vec<f64> {
     let mean = mean(x);
-    let std = stddev(x);
+    let std = stddev(x) + f64::EPSILON;
     x.iter().map(|x| (x - mean) / std).collect()
+}
+
+pub fn value_counts(x: &[isize]) -> HashMap<isize, usize> {
+    let mut counts = HashMap::new();
+    for &val in x {
+        *counts.entry(val).or_insert(0) += 1;
+    }
+    counts
+}
+
+pub fn fisher_score(
+    x: &Vec<f64>,
+    y: &Vec<isize>,
+    classes: &Vec<isize>,
+    class_counts: &HashMap<isize, usize>,
+) -> f64 {
+    let mut num = 0.0;
+    let mut den = 0.0;
+
+    let x_mean = mean(x);
+
+    for (i, cls) in classes.iter().enumerate() {
+        let x_cls = x
+            .iter()
+            .enumerate()
+            .filter_map(|(j, &val)| if y[j] == *cls { Some(val) } else { None })
+            .collect::<Vec<f64>>();
+        let x_cls_mean = mean(&x_cls);
+        let x_cls_std = stddev(&x_cls);
+
+        num += class_counts[cls] as f64 * (x_cls_mean - x_mean).powi(2);
+        den += class_counts[cls] as f64 * x_cls_std.powi(2);
+    }
+
+    if den == 0.0 {
+        0.0
+    } else {
+        num / den
+    }
 }

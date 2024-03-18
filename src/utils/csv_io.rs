@@ -1,4 +1,5 @@
 use csv::ReaderBuilder;
+use serde::Serialize;
 use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
@@ -28,18 +29,23 @@ pub fn read_csv(
 
 pub fn write_csv(
     path: impl AsRef<Path>,
-    data: Vec<Vec<f64>>,
-    header: Vec<String>,
-    index: Vec<String>,
+    data: &Vec<Sample<'_>>,
+    header: Option<Vec<String>>,
 ) -> Result<(), Box<dyn Error>> {
-    let mut csv_writer = csv::Writer::from_path(path)?;
-    csv_writer.write_record(header)?;
-    for (i, prediction) in data.iter().enumerate() {
-        csv_writer.write_record(
-            [index[i].clone()]
-                .into_iter()
-                .chain(prediction.iter().map(|f| f.to_string())),
-        )?;
+    // Make dir if it does not exist
+    let parent = path.as_ref().parent().unwrap();
+    if !parent.exists() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let mut csv_writer = csv::WriterBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(false)
+        .from_path(path)?;
+    if let Some(header) = header {
+        csv_writer.write_record(header)?;
+    }
+    for record in data {
+        csv_writer.serialize(record)?;
     }
     csv_writer.flush()?;
     Ok(())

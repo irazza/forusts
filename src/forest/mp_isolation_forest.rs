@@ -1,5 +1,8 @@
+use std::borrow::Cow;
+
 use super::forest::OutlierForestConfig;
 use crate::{
+    feature_extraction::statistics::zscore,
     forest::forest::{Forest, OutlierForest},
     tree::{isolation_tree::IsolationTree, mp_tree::MPTree},
     utils::structures::Sample,
@@ -10,6 +13,7 @@ pub type MPIsolationForestConfig = OutlierForestConfig;
 pub struct MPIsolationForest {
     trees: Vec<MPTree>,
     config: MPIsolationForestConfig,
+    max_samples: usize,
 }
 
 impl Forest<MPTree> for MPIsolationForest {
@@ -20,10 +24,11 @@ impl Forest<MPTree> for MPIsolationForest {
         Self {
             trees: Vec::new(),
             config,
+            max_samples: 0,
         }
     }
     fn fit(&mut self, data: &mut [Sample<'_>]) {
-        self.fit_(data)
+        self.fit_(&data)
     }
     fn predict(&self, data: &[Sample<'_>]) -> Vec<isize> {
         self.predict_(data)
@@ -49,5 +54,11 @@ impl Forest<MPTree> for MPIsolationForest {
 impl OutlierForest<MPTree> for MPIsolationForest {
     fn get_forest_config(&self) -> &OutlierForestConfig {
         &self.config
+    }
+    fn set_max_samples(&mut self, max_samples: usize) {
+        self.max_samples = max_samples;
+    }
+    fn get_max_samples(&self) -> usize {
+        self.max_samples
     }
 }

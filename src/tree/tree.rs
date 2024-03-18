@@ -125,13 +125,13 @@ pub trait Tree: Sync + Send {
         }
 
         let (left_data, right_data) = Self::split(samples, &best_split_parameters);
+
         assert!(
             left_data.len() > 0 && right_data.len() > 0,
-            "{} {} \n{:?} {:?}\n {:?}",
+            "{} {} \n{}\n {:?}",
             left_data.len(),
             right_data.len(),
-            &left_data[0..],
-            &right_data[0..],
+            current_depth,
             best_split_parameters
         );
         // Split the data and recursively build the left and right subtrees

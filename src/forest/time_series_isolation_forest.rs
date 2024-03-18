@@ -28,6 +28,7 @@ pub struct TimeSeriesIsolationForest {
     min_interval_perc: usize,
     intervals: Vec<Vec<(usize, usize)>>,
     config: TimeSeriesIsolationForestConfig,
+    max_samples: usize,
 }
 
 impl Forest<IsolationTree> for TimeSeriesIsolationForest {
@@ -40,6 +41,7 @@ impl Forest<IsolationTree> for TimeSeriesIsolationForest {
             min_interval_perc: MIN_INTERVAL_PERC,
             intervals: Vec::new(),
             config,
+            max_samples: 0,
         }
     }
     fn fit(&mut self, data: &mut [Sample<'_>]) {
@@ -97,5 +99,11 @@ impl Forest<IsolationTree> for TimeSeriesIsolationForest {
 impl OutlierForest<IsolationTree> for TimeSeriesIsolationForest {
     fn get_forest_config(&self) -> &OutlierForestConfig {
         &self.config.outlier_config
+    }
+    fn set_max_samples(&mut self, max_samples: usize) {
+        self.max_samples = max_samples;
+    }
+    fn get_max_samples(&self) -> usize {
+        self.max_samples
     }
 }

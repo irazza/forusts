@@ -1,18 +1,27 @@
+use std::cmp::min;
+
 use super::{
     node::Node,
     tree::{SplitParameters, SplitTest},
 };
 use crate::{
-    distance::distances::twe, feature_extraction::{scamp::compute_scamp, statistics::EULER_MASCHERONI}, forest::forest::{OutlierForestConfig, OutlierTree}, tree::tree::Tree, utils::structures::Sample
+    distance::distances::{euclidean, twe},
+    feature_extraction::{
+        scamp::compute_selfmp,
+        statistics::{mean, median, stddev, zscore, EULER_MASCHERONI},
+    },
+    forest::forest::{OutlierForestConfig, OutlierTree},
+    tree::tree::Tree,
+    utils::structures::Sample,
 };
 use rand::{seq::SliceRandom, thread_rng, Rng};
 
-const MIN_INTERVAL_LENGHT: usize = 10;
+const MIN_INTERVAL_LENGTH: usize = 10;
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct MPSplit {
-    pub left_candidate: Vec<f64>,
-    pub right_candidate: Vec<f64>,
+    pub threshold: f64,
+    pub candidates: Vec<Vec<f64>>,
     pub interval: (usize, usize),
 }
 
@@ -25,7 +34,15 @@ impl Eq for MPSplit {}
 
 impl SplitParameters for MPSplit {
     fn split(&self, sample: &Sample<'_>) -> bool {
-        twe(&sample.data[self.interval.0..self.interval.1], &self.left_candidate, 0.1, 0.2) - twe(&sample.data[self.interval.0..self.interval.1], &self.right_candidate, 0.1, 0.2) > 0.0
+        let mut min = std::f64::INFINITY;
+        let sample = zscore(&sample.data[self.interval.0..self.interval.1]);
+        for candidate in &self.candidates {
+            let dist = euclidean(&sample, &candidate);
+            if dist < min && dist != 0.0 {
+                min = dist;
+            }
+        }
+        min < self.threshold
     }
     fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample<'_>) -> f64 {
         let leaf = tree.predict_leaf(&x);
@@ -89,29 +106,67 @@ impl Tree for MPTree {
         return false;
     }
     fn post_split_conditions(&self, new_impurity: f64, _old_impurity: f64) -> bool {
+        // Check if there is a non empty split
+        if new_impurity == std::f64::INFINITY {
+            return true;
+        }
         return false;
     }
     fn get_split(&self, samples: &[Sample<'_>]) -> (Self::SplitParameters, f64) {
         // Generate a random interval
         let n_features = samples[0].data.len();
-        let start = thread_rng().gen_range(0..n_features - MIN_INTERVAL_LENGHT);
-        let end = thread_rng().gen_range(start + MIN_INTERVAL_LENGHT..n_features);
+        let start = thread_rng().gen_range(0..n_features - MIN_INTERVAL_LENGTH);
+        let end = thread_rng().gen_range(start + MIN_INTERVAL_LENGTH..n_features);
 
-        let timeseries = samples.iter().flat_map(|s| s.data[start..end].to_vec()).collect::<Vec<_>>();
+        let ts = samples
+            .iter()
+            .map(|s| zscore(&s.data[start..end]))
+            .collect::<Vec<_>>();
+        let mut mp = Vec::new();
 
-        let (mp, _) = compute_scamp(&timeseries, end-start);
-        
-        // Get arg max and min of mp
-        let (max_idx, _) = mp.iter().enumerate().max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap()).unwrap();
-        let (min_idx, _) = mp.iter().enumerate().min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap()).unwrap();
+        for i in 0..ts.len() {
+            let mut min = std::f64::INFINITY;
+            for j in 0..ts.len() {
+                if i != j {
+                    let dist = euclidean(&ts[i], &ts[j]);
+                    if dist < min {
+                        min = dist;
+                    }
+                }
+            }
+            mp.push(min);
+        }
+        // let index_class_0 = samples.iter().enumerate().filter(|(_, s)| s.target == 0).map(|(i, _)| i).collect::<Vec<_>>();
+        // let mean_class_0 = mean(&index_class_0.iter().map(|i| mp[*i]).collect::<Vec<_>>());
+        // let std_class_0 = stddev(&index_class_0.iter().map(|i| mp[*i]).collect::<Vec<_>>());
+        // let index_class_1 = samples
+        //     .iter()
+        //     .enumerate()
+        //     .filter(|(_, s)| s.target == 1)
+        //     .map(|(i, _)| i)
+        //     .collect::<Vec<_>>();
+        // let mean_class_1 = mean(&index_class_1.iter().map(|i| mp[*i]).collect::<Vec<_>>());
+        // let std_class_1 = stddev(&index_class_1.iter().map(|i| mp[*i]).collect::<Vec<_>>());
+        // println!("Mean class 0: {}, Std class 0: {}", mean_class_0, std_class_0);
+        // println!("Mean class 1: {}, Std class 1: {}", mean_class_1, std_class_1);
+        // mp.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        // mp.dedup();
 
-        let left_candidate = timeseries[min_idx..min_idx+end-start].to_vec();
-        let right_candidate = timeseries[max_idx..max_idx+end-start].to_vec();
-
-        (MPSplit {
-            left_candidate,
-            right_candidate,
-            interval: (start, end),
-        }, 0.0)
+        if mp.len() > 2 {
+            //println!("MP Mean: {}, MP Median: {}, MP Std: {}", mean(&mp), median(&mp), stddev(&mp));
+            let split = MPSplit {
+                threshold: mean(&mp),
+                candidates: ts,
+                interval: (start, end),
+            };
+            (split, 0.0)
+        } else {
+            let split = MPSplit {
+                threshold: 0.0,
+                candidates: ts,
+                interval: (start, end),
+            };
+            (split, f64::INFINITY)
+        }
     }
 }

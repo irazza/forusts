@@ -7,3 +7,4 @@ fftw-3.3.10/
 perf.*
 SCAMP/
 *.csv
+UCR_Archive2018_AD/*

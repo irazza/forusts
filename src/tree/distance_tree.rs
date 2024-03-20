@@ -1,31 +1,44 @@
 use core::panic;
-use std::cmp::{max, min};
+use std::{cmp::{max, min}, sync::Arc};
 
 use super::{
-    node::Node,
+    node::{LeafClassifier, Node},
     tree::{SplitParameters, SplitTest},
 };
 use crate::{
     distance::distances::{dtw, euclidean, twe},
-    feature_extraction::{
-        scamp::compute_selfmp,
-        statistics::{
-            fisher_score, mean, median, slope, stddev, unique, value_counts, zscore,
-            EULER_MASCHERONI,
-        },
-    },
+    feature_extraction::statistics::{zscore, EULER_MASCHERONI},
     forest::forest::{
         ClassificationForestConfig, ClassificationTree, OutlierForestConfig, OutlierTree,
     },
     tree::tree::Tree,
     utils::structures::Sample,
 };
-use dtw_rs::{Algorithm, DynamicTimeWarping};
 use hashbrown::HashMap;
 use rand::{seq::SliceRandom, thread_rng, Rng};
 
 const MIN_INTERVAL_LENGTH: usize = 10;
 
+#[derive(Clone, Debug)]
+pub struct DistanceLeaf {
+    pub clusters: HashMap<isize, Vec<Vec<f64>>>,
+}
+impl LeafClassifier for DistanceLeaf {
+    fn classify(&self, x: &[f64]) -> isize {
+        let mut min_dist = std::f64::INFINITY;
+        let mut min_class = 0;
+        for (class, cluster) in &self.clusters {
+            for candidate in cluster {
+                let dist = dtw(x, candidate);
+                if dist < min_dist {
+                    min_dist = dist;
+                    min_class = *class;
+                }
+            }
+        }
+        min_class
+    }
+}
 pub struct KUnionFind {
     parent: Vec<usize>,
     k: usize,
@@ -51,7 +64,6 @@ impl KUnionFind {
     pub fn get_clusters(
         &mut self,
         distances: &Vec<Vec<f64>>,
-        targets: &Vec<isize>,
     ) -> Vec<Vec<usize>> {
         for (i, obj) in distances.iter().enumerate() {
             let mut nn = obj.iter().enumerate().collect::<Vec<_>>();
@@ -90,13 +102,13 @@ impl SplitParameters for DistanceSplit {
 
         let sample = &sample.data[self.interval.0..self.interval.1];
         for candidate in &self.left_candidates {
-            let dist = euclidean(&sample, &candidate);
+            let dist = dtw(&sample, &candidate);
             if dist < min_l {
                 min_l = dist;
             }
         }
         for candidate in &self.right_candidates {
-            let dist = euclidean(&sample, &candidate);
+            let dist = dtw(&sample, &candidate);
             if dist < min_r {
                 min_r = dist;
             }
@@ -177,65 +189,44 @@ impl Tree for DistanceTree {
         return false;
         // Update COnditions
     }
-    fn get_split(&self, samples: &[Sample<'_>]) -> (Self::SplitParameters, f64) {
-        // Generate a random interval
-        let n_features = samples[0].data.len();
-        let targets = samples.iter().map(|s| s.target).collect::<Vec<_>>();
-        let classes = unique(&targets);
-        let class_counts = value_counts(&targets);
-        let mut best_fisher = 0.0;
-        let mut best_ts = Vec::new();
-        let mut best_start = 0;
-        let mut best_end = 0;
-        for _ in 0..(n_features as f64).sqrt() as usize {
-            let start = thread_rng().gen_range(0..n_features - MIN_INTERVAL_LENGTH);
-            let end = thread_rng().gen_range(start + MIN_INTERVAL_LENGTH..n_features);
-            let aggregation = thread_rng().gen_range(0..3);
-            let ts;
-            if aggregation == 0 {
-                ts = samples
-                    .iter()
-                    .map(|s| mean(&s.data[start..end]))
-                    .collect::<Vec<_>>();
-            } else if aggregation == 1 {
-                ts = samples
-                    .iter()
-                    .map(|s| stddev(&s.data[start..end]))
-                    .collect::<Vec<_>>();
-            } else {
-                ts = samples
-                    .iter()
-                    .map(|s| slope(&s.data[start..end]))
-                    .collect::<Vec<_>>();
-            }
-
-            let fisher = fisher_score(&ts, &targets, &classes, &class_counts);
-            if fisher > best_fisher {
-                best_ts = samples
-                    .iter()
-                    .map(|s: &Sample<'_>| &s.data[start..end])
-                    .collect::<Vec<_>>();
-                best_fisher = fisher;
-                best_start = start;
-                best_end = end;
-            }
+    fn get_leaf_class(samples: &[Sample<'_>]) -> super::node::LeafClassification {
+        let mut distance_leaf = HashMap::new();
+        for sample in samples {
+            distance_leaf
+                .entry(sample.target)
+                .or_insert(Vec::new())
+                .push(sample.data.to_vec());
         }
+        super::node::LeafClassification::Complex(Arc::new(DistanceLeaf{
+            clusters: distance_leaf,
+        }))
+        
+    }
+    fn get_split(&self, samples: &[Sample<'_>]) -> (Self::SplitParameters, f64) {
+        let ts_length = samples[0].data.len();
+
+        let start = thread_rng().gen_range(0..ts_length - MIN_INTERVAL_LENGTH);
+        let end = thread_rng().gen_range(start + MIN_INTERVAL_LENGTH..ts_length);
+
+        let ts = samples
+            .iter()
+            .map(|s| &s.data[start..end])
+            .collect::<Vec<_>>();
 
         let mut distances = Vec::new();
-        for i in 0..best_ts.len() {
+        for i in 0..ts.len() {
             let mut dists = Vec::new();
             //let start_time = std::time::Instant::now();
-            for j in 0..best_ts.len() {
-                let dist = euclidean(&best_ts[i], &best_ts[j]);
+            for j in 0..ts.len() {
+                let dist = dtw(&ts[i], &ts[j]);
                 dists.push(dist);
             }
-            //println!("Time: {:?}", start_time.elapsed());
             distances.push(dists);
         }
-        //println!("k {}", (samples.len() as f64).log2().log2().ceil());
-        for k in (1..=max(2, ((samples.len() as f64).log2().log2().ceil() as usize))).rev() {
-            let mut sets = KUnionFind::new(k, best_ts.len());
-            let clusters = sets.get_clusters(&distances, &targets);
+
+        for k in (1..=max(2, (samples.len() as f64).log2().ceil() as usize)).rev() {
+            let mut sets = KUnionFind::new(k, ts.len());
+            let clusters = sets.get_clusters(&distances);
 
             // Get two sets of labels from targets
             let mut to_left = Vec::new();
@@ -262,9 +253,9 @@ impl Tree for DistanceTree {
                     }
                 };
                 if goes_to_right {
-                    to_right.extend(set.iter().map(|x| best_ts[*x].to_vec()));
+                    to_right.extend(set.iter().map(|x| ts[*x].to_vec()));
                 } else {
-                    to_left.extend(set.iter().map(|x| best_ts[*x].to_vec()));
+                    to_left.extend(set.iter().map(|x| ts[*x].to_vec()));
                 }
             }
             if splits.len() < 2 {
@@ -272,7 +263,7 @@ impl Tree for DistanceTree {
                     let t = DistanceSplit {
                         left_candidates: Vec::new(),
                         right_candidates: Vec::new(),
-                        interval: (best_start, best_end),
+                        interval: (start, end),
                     };
                     return (t, f64::INFINITY);
                 } else {
@@ -282,11 +273,54 @@ impl Tree for DistanceTree {
             let t = DistanceSplit {
                 left_candidates: to_left,
                 right_candidates: to_right,
-                interval: (best_start, best_end),
+                interval: (start, end),
             };
             return (t, 0.0);
         }
         unreachable!()
+
+        // Generate a random interval
+        // let n_features = samples[0].data.len();
+        // let targets = samples.iter().map(|s| s.target).collect::<Vec<_>>();
+        // let classes = unique(&targets);
+        // let class_counts = value_counts(&targets);
+        // let mut best_fisher = 0.0;
+        // let mut best_ts = Vec::new();
+        // let mut best_start = 0;
+        // let mut best_end = 0;
+        // for _ in 0..(n_features as f64).sqrt() as usize {
+        //     let start = thread_rng().gen_range(0..n_features - MIN_INTERVAL_LENGTH);
+        //     let end = thread_rng().gen_range(start + MIN_INTERVAL_LENGTH..n_features);
+        //     let aggregation = thread_rng().gen_range(0..3);
+        //     let ts;
+        //     if aggregation == 0 {
+        //         ts = samples
+        //             .iter()
+        //             .map(|s| mean(&s.data[start..end]))
+        //             .collect::<Vec<_>>();
+        //     } else if aggregation == 1 {
+        //         ts = samples
+        //             .iter()
+        //             .map(|s| stddev(&s.data[start..end]))
+        //             .collect::<Vec<_>>();
+        //     } else {
+        //         ts = samples
+        //             .iter()
+        //             .map(|s| slope(&s.data[start..end]))
+        //             .collect::<Vec<_>>();
+        //     }
+
+        //     let fisher = fisher_score(&ts, &targets, &classes, &class_counts);
+        //     if fisher > best_fisher {
+        //         best_ts = samples
+        //             .iter()
+        //             .map(|s: &Sample<'_>| &s.data[start..end])
+        //             .collect::<Vec<_>>();
+        //         best_fisher = fisher;
+        //         best_start = start;
+        //         best_end = end;
+        //     }
+        // }
 
         // // Find the minimum inter class distance
         // let mut threshold = std::f64::INFINITY;

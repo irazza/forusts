@@ -7,7 +7,7 @@ use std::{cmp::max, ops::Deref};
 
 use crate::{feature_extraction::statistics::stddev, utils::structures::Sample};
 
-use super::node::Node;
+use super::node::{LeafClassification, LeafClassifier, Node};
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub enum MaxFeatures {
@@ -107,7 +107,7 @@ pub trait Tree: Sync + Send {
 
         if self.pre_split_conditions(samples, current_depth) {
             return Node::Leaf {
-                class: Self::get_most_common_class(samples),
+                class: Self::get_leaf_class(samples),
                 depth: current_depth,
                 impurity: f64::EPSILON,
                 n_samples: samples.len(),
@@ -117,7 +117,7 @@ pub trait Tree: Sync + Send {
         let (best_split_parameters, best_impurity) = self.get_split(samples);
         if self.post_split_conditions(best_impurity, impurity) {
             return Node::Leaf {
-                class: Self::get_most_common_class(samples),
+                class: Self::get_leaf_class(samples),
                 depth: current_depth,
                 impurity: f64::EPSILON,
                 n_samples: samples.len(),
@@ -149,7 +149,7 @@ pub trait Tree: Sync + Send {
     }
     fn predict(&self, x: &[Sample<'_>]) -> Vec<isize> {
         x.iter()
-            .map(|sample| self.predict_leaf(sample).get_class())
+            .map(|sample| self.predict_leaf(sample).get_class(&sample.data))
             .collect()
     }
     fn get_diameter(n: &Node<Self::SplitParameters>) -> (usize, usize) {
@@ -226,7 +226,7 @@ pub trait Tree: Sync + Send {
 
         samples.split_at_mut(idx)
     }
-    fn get_most_common_class(samples: &[Sample<'_>]) -> isize {
+    fn get_leaf_class(samples: &[Sample<'_>]) -> LeafClassification {
         let mut class_counts = HashMap::new();
         for Sample { target, .. } in samples {
             *class_counts.entry(*target).or_insert(0) += 1;
@@ -242,7 +242,7 @@ pub trait Tree: Sync + Send {
             }
         }
 
-        most_common_class
+        LeafClassification::Simple(most_common_class)
     }
     fn bfs(&self) -> Vec<&Node<Self::SplitParameters>> {
         let mut queue = vec![self.get_root()];

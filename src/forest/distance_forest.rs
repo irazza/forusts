@@ -1,8 +1,5 @@
-use std::borrow::Cow;
-
-use crate::feature_extraction::statistics::zscore;
 use crate::tree::distance_tree::DistanceTree;
-use crate::{tree::decision_tree::DecisionTree, utils::structures::Sample};
+use crate::utils::structures::Sample;
 
 use crate::forest::forest::{ClassificationForest, Forest};
 
@@ -41,7 +38,7 @@ impl Forest<DistanceTree> for DistanceForest {
     }
     fn tuning_predict(
         &self,
-        ds_train: &[Sample<'_>],
+        _ds_train: &[Sample<'_>],
         ds_test: &[Sample<'_>],
     ) -> Vec<Self::TuningType> {
         self.predict(ds_test)

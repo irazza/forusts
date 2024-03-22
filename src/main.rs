@@ -1,3 +1,4 @@
+use crate::feature_extraction::statistics::median;
 use crate::forest::distance_forest::{DistanceForest, DistanceForestConfig};
 use crate::forest::forest::Forest;
 use crate::metrics::classification::accuracy_score;
@@ -18,12 +19,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Settings for the experiments
     let n_repetitions = 30;
     let paths = fs::read_dir("/media/aazzari/DATA/UCRArchive_2018")?;
-    // let mut candidate_reader = csv::Reader::from_path("candidates.csv")?;
-    // let mut candidates = Vec::new();
-    // for result in candidate_reader.deserialize() {
-    //     let record: String = result.unwrap();
-    //     candidates.push(record);
-    // }
 
     let mut datasets = Vec::new();
     for entry in paths {
@@ -32,17 +27,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         datasets.push(entry.path());
     }
     datasets.sort_by_key(|dir| dir.file_name().unwrap().to_string_lossy().to_string());
-    let mut wtr = csv::Writer::from_path("test.csv")?;
+    let mut wtr = csv::Writer::from_path("dist_forest.csv")?;
     wtr.write_record(&["Dataset", "ROC-AUC"])?;
     wtr.flush()?;
-    let mut bw = csv::WriterBuilder::new()
-        .flexible(true)
-        .from_path("test_scores.csv")?;
-    let mut m = 0.0;
+    let mut mean = Vec::new();
     for i in 0..n_repetitions {
         println!("Repetition {}", i + 1);
         //let mut predictions = Vec::new();
-        for path in &datasets[0..1] {
+        for path in &datasets {
             println!(
                 "\tProcessing {}",
                 path.file_name().unwrap().to_string_lossy()
@@ -62,7 +54,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
 
             let config = DistanceForestConfig {
-                n_trees: 100,
+                n_trees: 200,
                 min_samples_split: 2,
                 max_features: tree::tree::MaxFeatures::All,
                 max_depth: None,
@@ -73,10 +65,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             model.fit(&mut ds_train);
             //let ds_test = ds_test.iter().map(|x| Sample{data: Cow::Owned(zscore(&x.data)), target: x.target}).collect::<Vec<_>>();
             let y_pred = model.predict(&ds_test);
-            bw.write_record(y_pred.iter().map(|v| v.to_string()))?;
-            bw.flush()?;
             let acc = accuracy_score(&y_pred, &y_true);
-            m += acc;
+            mean.push(acc);
             println!("\t\tAccuracy: {}", acc);
             wtr.write_record(&[
                 path.file_name().unwrap().to_string_lossy().to_string(),
@@ -85,6 +75,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             wtr.flush()?;
         }
     }
-    println!("Mean accuracy: {}", m / (n_repetitions as f64));
+    println!("Median accuracy: {}", median(&mean));
     Ok(())
 }

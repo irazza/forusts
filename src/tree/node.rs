@@ -1,9 +1,8 @@
-use std::{ops::Deref, sync::Arc, fmt::Debug};
+use std::{fmt::Debug, ops::Deref, sync::Arc};
 
 use super::tree::SplitParameters;
 
-
-pub trait LeafClassifier: Sync + Send + Debug{
+pub trait LeafClassifier: Sync + Send + Debug {
     fn classify(&self, x: &[f64]) -> isize;
 }
 #[derive(Debug, Clone)]
@@ -46,7 +45,7 @@ impl<S: SplitParameters> Node<S> {
                 depth: _,
                 impurity: _,
                 n_samples: _,
-            } => panic!("Cannot get feature of a leaf node"),
+            } => panic!("Cannot get split parameters of a leaf node"),
             Node::Split {
                 split_params,
                 left: _,
@@ -83,10 +82,12 @@ impl<S: SplitParameters> Node<S> {
                 depth: _,
                 impurity: _,
                 n_samples: _,
-            } => return match class {
-                LeafClassification::Simple(c) => *c,
-                LeafClassification::Complex(c) => c.classify(sample),
-            },
+            } => {
+                return match class {
+                    LeafClassification::Simple(c) => *c,
+                    LeafClassification::Complex(c) => c.classify(sample),
+                }
+            }
             Node::Split {
                 split_params: _,
                 left: _,

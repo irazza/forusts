@@ -107,7 +107,7 @@ pub trait Tree: Sync + Send {
 
         if self.pre_split_conditions(samples, current_depth) {
             return Node::Leaf {
-                class: Self::get_leaf_class(samples),
+                class: Self::get_leaf_class(samples, None),
                 depth: current_depth,
                 impurity: f64::EPSILON,
                 n_samples: samples.len(),
@@ -117,7 +117,7 @@ pub trait Tree: Sync + Send {
         let (best_split_parameters, best_impurity) = self.get_split(samples);
         if self.post_split_conditions(best_impurity, impurity) {
             return Node::Leaf {
-                class: Self::get_leaf_class(samples),
+                class: Self::get_leaf_class(samples, Some(&best_split_parameters)),
                 depth: current_depth,
                 impurity: f64::EPSILON,
                 n_samples: samples.len(),
@@ -226,7 +226,10 @@ pub trait Tree: Sync + Send {
 
         samples.split_at_mut(idx)
     }
-    fn get_leaf_class(samples: &[Sample<'_>]) -> LeafClassification {
+    fn get_leaf_class(
+        samples: &[Sample<'_>],
+        _parameters: Option<&Self::SplitParameters>,
+    ) -> LeafClassification {
         let mut class_counts = HashMap::new();
         for Sample { target, .. } in samples {
             *class_counts.entry(*target).or_insert(0) += 1;

@@ -1,39 +1,45 @@
 use core::panic;
-use std::{cmp::{max, min}, sync::Arc};
+use std::{
+    cmp::{max, min},
+    sync::Arc,
+};
 
 use super::{
     node::{LeafClassifier, Node},
-    tree::{SplitParameters, SplitTest},
+    tree::SplitParameters,
 };
 use crate::{
     distance::distances::{dtw, euclidean, twe},
-    feature_extraction::statistics::{zscore, EULER_MASCHERONI},
     forest::forest::{
-        ClassificationForestConfig, ClassificationTree, OutlierForestConfig, OutlierTree,
-    },
+        ClassificationForestConfig, ClassificationTree},
     tree::tree::Tree,
     utils::structures::Sample,
 };
 use hashbrown::HashMap;
-use rand::{seq::SliceRandom, thread_rng, Rng};
+use rand::{thread_rng, Rng, seq::SliceRandom};
 
 const MIN_INTERVAL_LENGTH: usize = 10;
 
 #[derive(Clone, Debug)]
 pub struct DistanceLeaf {
     pub clusters: HashMap<isize, Vec<Vec<f64>>>,
+    pub interval: (usize, usize),
 }
 impl LeafClassifier for DistanceLeaf {
     fn classify(&self, x: &[f64]) -> isize {
         let mut min_dist = std::f64::INFINITY;
         let mut min_class = 0;
         for (class, cluster) in &self.clusters {
+            let mut dist = 0.0;
+            let mut counter = 0.0;
             for candidate in cluster {
-                let dist = dtw(x, candidate);
-                if dist < min_dist {
-                    min_dist = dist;
-                    min_class = *class;
-                }
+                dist += dtw(&x[self.interval.0..self.interval.1], &candidate);
+                counter += 1.0;
+            }
+            let mean_dist = dist / counter;
+            if mean_dist < min_dist {
+                min_dist = mean_dist;
+                min_class = *class;
             }
         }
         min_class
@@ -61,10 +67,7 @@ impl KUnionFind {
         let y_root = self.find(y);
         self.parent[x_root] = y_root;
     }
-    pub fn get_clusters(
-        &mut self,
-        distances: &Vec<Vec<f64>>,
-    ) -> Vec<Vec<usize>> {
+    pub fn get_clusters(&mut self, distances: &Vec<Vec<f64>>) -> Vec<Vec<usize>> {
         for (i, obj) in distances.iter().enumerate() {
             let mut nn = obj.iter().enumerate().collect::<Vec<_>>();
             nn.select_nth_unstable_by(self.k, |a, b| a.1.partial_cmp(b.1).unwrap());
@@ -115,16 +118,8 @@ impl SplitParameters for DistanceSplit {
         }
         min_l < min_r
     }
-    fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample<'_>) -> f64 {
-        let leaf = tree.predict_leaf(&x);
-        let samples = leaf.get_samples() as f64;
-        if samples > 1.0 {
-            return leaf.get_depth() as f64
-                + (2.0 * (f64::ln(samples - 1.0) + EULER_MASCHERONI)
-                    - 2.0 * (samples - 1.0) / samples);
-        } else {
-            return leaf.get_depth() as f64;
-        }
+    fn path_length<T: Tree<SplitParameters = Self>>(_tree: &T, _x: &Sample<'_>) -> f64 {
+        unreachable!()
     }
 }
 
@@ -179,7 +174,6 @@ impl Tree for DistanceTree {
             return true;
         }
         return false;
-        // Update COnditions
     }
     fn post_split_conditions(&self, new_impurity: f64, _old_impurity: f64) -> bool {
         // Check if there is a non empty split
@@ -189,19 +183,26 @@ impl Tree for DistanceTree {
         return false;
         // Update COnditions
     }
-    fn get_leaf_class(samples: &[Sample<'_>]) -> super::node::LeafClassification {
+    fn get_leaf_class(
+        samples: &[Sample<'_>],
+        parameters: Option<&Self::SplitParameters>,
+    ) -> super::node::LeafClassification {
+        let interval = parameters
+            .map(|p| p.interval)
+            .unwrap_or((0, samples[0].data.len()));
         let mut distance_leaf = HashMap::new();
         for sample in samples {
             distance_leaf
                 .entry(sample.target)
                 .or_insert(Vec::new())
-                .push(sample.data.to_vec());
+                .push(sample.data[interval.0..interval.1].to_vec());
         }
-        super::node::LeafClassification::Complex(Arc::new(DistanceLeaf{
+        super::node::LeafClassification::Complex(Arc::new(DistanceLeaf {
             clusters: distance_leaf,
+            interval: interval,
         }))
-        
     }
+
     fn get_split(&self, samples: &[Sample<'_>]) -> (Self::SplitParameters, f64) {
         let ts_length = samples[0].data.len();
 
@@ -213,209 +214,93 @@ impl Tree for DistanceTree {
             .map(|s| &s.data[start..end])
             .collect::<Vec<_>>();
 
-        let mut distances = Vec::new();
-        for i in 0..ts.len() {
-            let mut dists = Vec::new();
-            //let start_time = std::time::Instant::now();
-            for j in 0..ts.len() {
+        let mut distances = vec![vec![0.0; ts.len()]; ts.len()];
+        for i in 0..ts.len()-1 {
+            for j in i+1..ts.len() {
                 let dist = dtw(&ts[i], &ts[j]);
-                dists.push(dist);
+                distances[i][j] = dist;
+                distances[j][i] = dist;
             }
-            distances.push(dists);
         }
 
-        for k in (1..=max(2, (samples.len() as f64).log2().ceil() as usize)).rev() {
-            let mut sets = KUnionFind::new(k, ts.len());
-            let clusters = sets.get_clusters(&distances);
+        let k = max(1, (samples.len() as f64).log2().log2().ceil() as usize);
 
-            // Get two sets of labels from targets
-            let mut to_left = Vec::new();
-            let mut to_right = Vec::new();
-            let mut splits: HashMap<isize, bool> = HashMap::new();
-            for set in clusters {
-                let mut classes = HashMap::new();
-                for i in &set {
-                    *classes.entry(samples[*i].target).or_insert(0) += 1;
-                }
-                let majority = *classes.iter().max_by_key(|(_, v)| **v).unwrap().0;
+        let mut sets = KUnionFind::new(k, ts.len());
+        let mut clusters = sets.get_clusters(&distances);
 
-                let goes_to_right = if let Some(&goes_to_right) = splits.get(&majority) {
-                    goes_to_right
-                } else {
-                    if to_left.len() == 0 && to_right.len() != 0 {
-                        false
-                    } else if to_right.len() == 0 && to_left.len() != 0 {
-                        true
-                    } else {
-                        let goes_to_right = thread_rng().gen_bool(0.5);
-                        splits.insert(majority, goes_to_right);
-                        goes_to_right
-                    }
-                };
-                if goes_to_right {
-                    to_right.extend(set.iter().map(|x| ts[*x].to_vec()));
-                } else {
-                    to_left.extend(set.iter().map(|x| ts[*x].to_vec()));
-                }
+        let mut splits: HashMap<bool, Vec<usize>> = HashMap::new();
+
+        // Split all the clusters in pure (clusters with same target for every element) and impure
+        for i in 0..clusters.len() {
+            if clusters[i]
+                .iter()
+                .all(|x| samples[*x].target == samples[*clusters[i].first().unwrap()].target)
+            {
+                splits
+                    .entry(true)
+                    .or_insert(Vec::<usize>::new())
+                    .extend(&clusters[i]);
+            } else {
+                splits
+                    .entry(false)
+                    .or_insert(Vec::<usize>::new())
+                    .extend(&clusters[i]);
             }
-            if splits.len() < 2 {
-                if k == 2 {
-                    let t = DistanceSplit {
-                        left_candidates: Vec::new(),
-                        right_candidates: Vec::new(),
-                        interval: (start, end),
-                    };
-                    return (t, f64::INFINITY);
-                } else {
-                    continue;
-                }
-            }
+        }
+
+        // If there are only pure clusters, return a leaf node
+        if splits.len() < 2 && splits.contains_key(&true) {
             let t = DistanceSplit {
-                left_candidates: to_left,
-                right_candidates: to_right,
+                left_candidates: Vec::new(),
+                right_candidates: Vec::new(),
                 interval: (start, end),
             };
-            return (t, 0.0);
+            return (t, f64::INFINITY);
+        } else if splits.len() < 2 && splits.contains_key(&false){
+            // If there are only impure clusters, split them randomically in two sets with balancing
+            splits.clear();
+            clusters.shuffle(&mut thread_rng());
+            for i in 0..clusters.len() {
+                if i%2 == 0 {
+                    splits
+                        .entry(true)
+                        .or_insert(Vec::<usize>::new())
+                        .extend(&clusters[i]);
+                } else {
+                    splits
+                        .entry(false)
+                        .or_insert(Vec::<usize>::new())
+                        .extend(&clusters[i]);
+                }
+            }
+            // If there is only one cluster, return a leaf node
+            if splits.len() < 2 {
+                let t = DistanceSplit {
+                    left_candidates: Vec::new(),
+                    right_candidates: Vec::new(),
+                    interval: (start, end),
+                };
+                return (t, f64::INFINITY);
+            }
         }
-        unreachable!()
 
-        // Generate a random interval
-        // let n_features = samples[0].data.len();
-        // let targets = samples.iter().map(|s| s.target).collect::<Vec<_>>();
-        // let classes = unique(&targets);
-        // let class_counts = value_counts(&targets);
-        // let mut best_fisher = 0.0;
-        // let mut best_ts = Vec::new();
-        // let mut best_start = 0;
-        // let mut best_end = 0;
-        // for _ in 0..(n_features as f64).sqrt() as usize {
-        //     let start = thread_rng().gen_range(0..n_features - MIN_INTERVAL_LENGTH);
-        //     let end = thread_rng().gen_range(start + MIN_INTERVAL_LENGTH..n_features);
-        //     let aggregation = thread_rng().gen_range(0..3);
-        //     let ts;
-        //     if aggregation == 0 {
-        //         ts = samples
-        //             .iter()
-        //             .map(|s| mean(&s.data[start..end]))
-        //             .collect::<Vec<_>>();
-        //     } else if aggregation == 1 {
-        //         ts = samples
-        //             .iter()
-        //             .map(|s| stddev(&s.data[start..end]))
-        //             .collect::<Vec<_>>();
-        //     } else {
-        //         ts = samples
-        //             .iter()
-        //             .map(|s| slope(&s.data[start..end]))
-        //             .collect::<Vec<_>>();
-        //     }
+        let left_candidates = splits
+            .get(&true)
+            .unwrap_or_else(|| panic!("{:?}", splits))
+            .iter()
+            .map(|x| ts[*x].to_vec())
+            .collect::<Vec<_>>();
+        let right_candidates = splits
+            .get(&false)
+            .unwrap_or_else(|| panic!("{:?}", splits))
+            .iter()
+            .map(|x| ts[*x].to_vec())
+            .collect::<Vec<_>>();
 
-        //     let fisher = fisher_score(&ts, &targets, &classes, &class_counts);
-        //     if fisher > best_fisher {
-        //         best_ts = samples
-        //             .iter()
-        //             .map(|s: &Sample<'_>| &s.data[start..end])
-        //             .collect::<Vec<_>>();
-        //         best_fisher = fisher;
-        //         best_start = start;
-        //         best_end = end;
-        //     }
-        // }
-
-        // // Find the minimum inter class distance
-        // let mut threshold = std::f64::INFINITY;
-        // for i in 0..ts.len() {
-        //     for j in 0..ts.len() {
-        //         if samples[i].target != samples[j].target {
-        //             if distances[i][j] < threshold {
-        //                 threshold = distances[i][j];
-        //             }
-        //         }
-        //     }
-        // }
-
-        // let mut sets = UnionFind::new(ts.len(), &distances, threshold);
-        // let clusters = sets.get_clusters(indexes);
-        // let mut splits: HashMap<isize, Vec<usize>> = HashMap::new();
-        // for i in clusters.keys() {
-        //     if clusters
-        //         .get(i)
-        //         .unwrap()
-        //         .iter()
-        //         .all(|x| samples[*x].target == samples[*clusters.get(i).unwrap().first().unwrap()].target)
-        //     {
-        //         splits
-        //             .entry(0)
-        //             .or_insert(Vec::<usize>::new())
-        //             .extend(clusters.get(i).unwrap().iter().copied());
-        //     } else {
-        //         splits
-        //             .entry(1)
-        //             .or_insert(Vec::<usize>::new())
-        //             .extend(clusters.get(i).unwrap().iter().copied());
-        //     }
-        // }
-        // if splits.len() < 2 {
-        //     splits.clear();
-        //     for i in clusters.keys() {
-        //         let set = clusters.get(i).unwrap();
-        //         let mut class_counts = HashMap::new();
-        //         for j in set {
-        //             let target = samples[*j].target;
-        //             *class_counts.entry(target).or_insert(0) += 1;
-        //         }
-        //         let majority = *class_counts.iter().max_by_key(|(_, v)| **v).unwrap().0;
-        //         splits
-        //             .entry(majority)
-        //             .or_insert(Vec::<usize>::new())
-        //             .extend(set.iter().copied());
-        //     }
-        //     if splits.len() < 2 {
-        //         let t = DistanceSplit {
-        //             left_candidates: Vec::new(),
-        //             right_candidates: Vec::new(),
-        //             interval: (start, end),
-        //         };
-        //         return (t, f64::INFINITY);
-        //     }
-        // }
-        // let left_candidates = splits
-        //     .get(&0)
-        //     .unwrap_or_else(|| {
-        //         panic!(
-        //             "{:?}, \n {:?}",
-        //             clusters
-        //                 .iter()
-        //                 .map(|x| x.1.iter().map(|v| samples[*v].target).collect::<Vec<_>>())
-        //                 .collect::<Vec<_>>(),
-        //             splits
-        //         )
-        //     })
-        //     .iter()
-        //     .map(|x| ts[*x].to_vec())
-        //     .collect::<Vec<_>>();
-        // let right_candidates = splits
-        //     .get(&1)
-        //     .unwrap_or_else(|| {
-        //         panic!(
-        //             "{:?}, \n {:?}",
-        //             clusters
-        //                 .iter()
-        //                 .map(|x| x.1.iter().map(|v| samples[*v].target).collect::<Vec<_>>())
-        //                 .collect::<Vec<_>>(),
-        //             splits
-        //         )
-        //     })
-        //     .iter()
-        //     .map(|x| ts[*x].to_vec())
-        //     .collect::<Vec<_>>();
-
-        // let t = DistanceSplit {
-        //     left_candidates: left_candidates,
-        //     right_candidates: right_candidates,
-        //     interval: (start, end),
-        // };
-        // //panic!("{}",t.split(&samples[splits.get(&1).unwrap()[0]]));
-        // (t, 0.0)
+        (DistanceSplit {
+            left_candidates,
+            right_candidates,
+            interval: (start, end),
+        }, thread_rng().gen_range(0.0..1.0))
     }
 }

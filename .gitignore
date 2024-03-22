@@ -5,6 +5,6 @@
 admep*.csv
 fftw-3.3.10/
 perf.*
-SCAMP/
+SCAMP_/*
 *.csv
 UCR_Archive2018_AD/*

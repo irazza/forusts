@@ -63,48 +63,48 @@ fn main() {
     );
     println!("cargo:rustc-link-lib=static=fftw3");
 
-    // SCAMP
+    // // SCAMP
 
-    let bindings = bindgen::Builder::default()
-        .blocklist_item("FP_.*")
-        .header("SCAMP/src/common/api.h")
-        .generate()
-        .expect("Unable to generate bindings");
+    // let bindings = bindgen::Builder::default()
+    //     .blocklist_item("FP_.*")
+    //     .header("SCAMP/src/common/api.h")
+    //     .generate()
+    //     .expect("Unable to generate bindings");
 
-    let temp_path = out_dir.join("scamp.rs");
-    bindings
-        .write_to_file(&temp_path)
-        .expect("Couldn't write bindings!");
+    // let temp_path = out_dir.join("scamp.rs");
+    // bindings
+    //     .write_to_file(&temp_path)
+    //     .expect("Couldn't write bindings!");
 
-    let dst = Config::new("SCAMP").out_dir(out_dir.join("scamp")).build();
-    for src_dir in [
-        "/src/common",
-        "/src/core",
-        "/src/core/cpu_kernel",
-        "/src/core/cpu_kernel/baseline",
-    ] {
-        println!(
-            "cargo:rustc-link-search=native={}",
-            dst.join("build").display().to_string() + src_dir
-        );
-    }
-    println!("cargo:rustc-link-lib=static=scamp_api");
-    println!("cargo:rustc-link-lib=static=scamp_interface");
-    println!("cargo:rustc-link-lib=static=common");
-    println!("cargo:rustc-link-lib=static=scamp_utils");
-    println!("cargo:rustc-link-lib=static=scamp_args");
-    println!("cargo:rustc-link-lib=static=profile");
-    println!("cargo:rustc-link-lib=static=scamp_op");
-    println!("cargo:rustc-link-lib=static=tile");
-    println!("cargo:rustc-link-lib=static=cpu_stats");
-    println!("cargo:rustc-link-lib=static=cpu_kernels");
-    println!("cargo:rustc-link-lib=static=tile");
-    println!("cargo:rustc-link-lib=static=qt_helper");
-    println!("cargo:rustc-link-lib=static=stdc++");
-    println!("cargo:rustc-link-lib=static=cpu_kernels");
-    println!("cargo:rustc-link-lib=static=kernel_common");
-    println!("cargo:rustc-link-lib=static=dispatch_baseline");
-    println!("cargo:rustc-link-lib=static=kernel_baseline");
+    // let dst = Config::new("SCAMP").out_dir(out_dir.join("scamp")).build();
+    // for src_dir in [
+    //     "/src/common",
+    //     "/src/core",
+    //     "/src/core/cpu_kernel",
+    //     "/src/core/cpu_kernel/baseline",
+    // ] {
+    //     println!(
+    //         "cargo:rustc-link-search=native={}",
+    //         dst.join("build").display().to_string() + src_dir
+    //     );
+    // }
+    // println!("cargo:rustc-link-lib=static=scamp_api");
+    // println!("cargo:rustc-link-lib=static=scamp_interface");
+    // println!("cargo:rustc-link-lib=static=common");
+    // println!("cargo:rustc-link-lib=static=scamp_utils");
+    // println!("cargo:rustc-link-lib=static=scamp_args");
+    // println!("cargo:rustc-link-lib=static=profile");
+    // println!("cargo:rustc-link-lib=static=scamp_op");
+    // println!("cargo:rustc-link-lib=static=tile");
+    // println!("cargo:rustc-link-lib=static=cpu_stats");
+    // println!("cargo:rustc-link-lib=static=cpu_kernels");
+    // println!("cargo:rustc-link-lib=static=tile");
+    // println!("cargo:rustc-link-lib=static=qt_helper");
+    // println!("cargo:rustc-link-lib=static=stdc++");
+    // println!("cargo:rustc-link-lib=static=cpu_kernels");
+    // println!("cargo:rustc-link-lib=static=kernel_common");
+    // println!("cargo:rustc-link-lib=static=dispatch_baseline");
+    // println!("cargo:rustc-link-lib=static=kernel_baseline");
 }
 
 pub fn compile_from_path(path: &str, libname: &str, inc: Option<Vec<&str>>) {

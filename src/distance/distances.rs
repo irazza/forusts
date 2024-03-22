@@ -33,7 +33,7 @@ pub fn twe(x1: &[f64], x2: &[f64]) -> f64 {
     let m = x2.len();
 
     let delete_addition = nu + lambda;
-    let sakoe_chiba = 0.6;
+    let sakoe_chiba = 0.7;
     let sakoe_chiba_window_radius = (n as f64 + 1.0) * sakoe_chiba;
 
     let alpha = ((m) as f64) / ((n) as f64);
@@ -94,7 +94,7 @@ pub fn dtw(x1: &[f64], x2: &[f64]) -> f64 {
     let n = x1.len();
     let m = x2.len();
 
-    let sakoe_chiba = 0.6;
+    let sakoe_chiba = 1.0;
     let sakoe_chiba_window_radius = (n as f64 + 1.0) * sakoe_chiba;
 
     let alpha = ((m) as f64) / ((n) as f64);

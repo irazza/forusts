@@ -9,16 +9,14 @@ use super::{
     tree::SplitParameters,
 };
 use crate::{
-    distance::distances::{dtw, euclidean, twe},
-    forest::forest::{
-        ClassificationForestConfig, ClassificationTree},
-    tree::tree::Tree,
-    utils::structures::Sample,
+    distance::distances::{dtw, euclidean, twe}, feature_extraction::statistics::{fisher_score, mean, slope, stddev, unique, value_counts}, forest::forest::{
+        ClassificationForestConfig, ClassificationTree}, tree::tree::Tree, utils::structures::Sample
 };
 use hashbrown::HashMap;
 use rand::{thread_rng, Rng, seq::SliceRandom};
 
 const MIN_INTERVAL_LENGTH: usize = 10;
+const MIN_INTERVAL_PERC: f64 = 0.2;
 
 #[derive(Clone, Debug)]
 pub struct DistanceLeaf {
@@ -33,7 +31,7 @@ impl LeafClassifier for DistanceLeaf {
             let mut dist = 0.0;
             let mut counter = 0.0;
             for candidate in cluster {
-                dist += dtw(&x[self.interval.0..self.interval.1], &candidate);
+                dist += euclidean(&x[self.interval.0..self.interval.1], &candidate);
                 counter += 1.0;
             }
             let mean_dist = dist / counter;
@@ -105,13 +103,13 @@ impl SplitParameters for DistanceSplit {
 
         let sample = &sample.data[self.interval.0..self.interval.1];
         for candidate in &self.left_candidates {
-            let dist = dtw(&sample, &candidate);
+            let dist = euclidean(&sample, &candidate);
             if dist < min_l {
                 min_l = dist;
             }
         }
         for candidate in &self.right_candidates {
-            let dist = dtw(&sample, &candidate);
+            let dist = euclidean(&sample, &candidate);
             if dist < min_r {
                 min_r = dist;
             }
@@ -133,6 +131,34 @@ pub struct DistanceTreeConfig {
 pub struct DistanceTree {
     root: Node<DistanceSplit>,
     config: DistanceTreeConfig,
+}
+impl DistanceTree {
+    fn supervised_interval(samples: &[Sample<'_>], min_interval_len: usize) -> (usize, usize) {
+        // let mut start = 0;
+        // let mut end = samples[0].data.len();
+        // let mut best_score = f64::INFINITY;
+        // for i in 0..samples[0].data.len() - min_interval_len {
+        //     for j in i + min_interval_len..samples[0].data.len() {
+        //         let interval = (i, j);
+        //         let mut classes = HashMap::new();
+        //         for sample in samples {
+        //             let entry = classes.entry(sample.target).or_insert(Vec::new());
+        //             entry.push(&sample.data[interval.0..interval.1]);
+        //         }
+        //         let score = fisher_score(&classes);
+        //         if score < best_score {
+        //             best_score = score;
+        //             start = i;
+        //             end = j;
+        //         }
+        //     }
+        // }
+        // (start, end)
+        let ts_length = samples[0].data.len();
+        let start = thread_rng().gen_range(0..ts_length - min_interval_len);
+        let end = thread_rng().gen_range(start + min_interval_len..ts_length);
+        (start, end)
+    }
 }
 
 impl ClassificationTree for DistanceTree {
@@ -205,10 +231,16 @@ impl Tree for DistanceTree {
 
     fn get_split(&self, samples: &[Sample<'_>]) -> (Self::SplitParameters, f64) {
         let ts_length = samples[0].data.len();
+        let mut min_interval_len = 0;
 
-        let start = thread_rng().gen_range(0..ts_length - MIN_INTERVAL_LENGTH);
-        let end = thread_rng().gen_range(start + MIN_INTERVAL_LENGTH..ts_length);
+        if ((MIN_INTERVAL_PERC * ts_length as f64).ceil() as usize) < MIN_INTERVAL_LENGTH {
+            min_interval_len = MIN_INTERVAL_LENGTH;
+        } else {
+            min_interval_len = (MIN_INTERVAL_PERC * ts_length as f64).ceil() as usize;
+        }
 
+        let (start, end) = Self::supervised_interval(samples, min_interval_len);
+        
         let ts = samples
             .iter()
             .map(|s| &s.data[start..end])
@@ -217,7 +249,7 @@ impl Tree for DistanceTree {
         let mut distances = vec![vec![0.0; ts.len()]; ts.len()];
         for i in 0..ts.len()-1 {
             for j in i+1..ts.len() {
-                let dist = dtw(&ts[i], &ts[j]);
+                let dist = euclidean(&ts[i], &ts[j]);
                 distances[i][j] = dist;
                 distances[j][i] = dist;
             }
@@ -273,8 +305,10 @@ impl Tree for DistanceTree {
                         .extend(&clusters[i]);
                 }
             }
-            // If there is only one cluster, return a leaf node
+            // If there is only one impure cluster, 
             if splits.len() < 2 {
+                // TODO: Check if this is the best way to handle this case, because so many times we reach this point
+                //println!("{:?}", clusters[0].iter().map(|x| samples[*x].target).collect::<Vec<_>>());
                 let t = DistanceSplit {
                     left_candidates: Vec::new(),
                     right_candidates: Vec::new(),

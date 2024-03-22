@@ -1,9 +1,11 @@
-use crate::feature_extraction::statistics::median;
+use crate::feature_extraction::statistics::{mean, median, zscore};
 use crate::forest::distance_forest::{DistanceForest, DistanceForestConfig};
 use crate::forest::forest::Forest;
 use crate::metrics::classification::accuracy_score;
 use crate::utils::csv_io::read_csv;
+use crate::utils::structures::Sample;
 use rand::SeedableRng;
+use std::borrow::Cow;
 use std::error::Error;
 use std::fs::{self};
 
@@ -17,7 +19,7 @@ mod utils;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Settings for the experiments
-    let n_repetitions = 30;
+    let n_repetitions = 10;
     let paths = fs::read_dir("/media/aazzari/DATA/UCRArchive_2018")?;
 
     let mut datasets = Vec::new();
@@ -30,11 +32,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut wtr = csv::Writer::from_path("dist_forest.csv")?;
     wtr.write_record(&["Dataset", "ROC-AUC"])?;
     wtr.flush()?;
-    let mut mean = Vec::new();
+    let mut mean_acc = Vec::new();
     for i in 0..n_repetitions {
         println!("Repetition {}", i + 1);
         //let mut predictions = Vec::new();
-        for path in &datasets {
+        for path in &datasets[4..5] {
             println!(
                 "\tProcessing {}",
                 path.file_name().unwrap().to_string_lossy()
@@ -48,25 +50,25 @@ fn main() -> Result<(), Box<dyn Error>> {
                 path.file_name().unwrap().to_string_lossy()
             ));
 
-            let mut ds_train = read_csv(train_path, b'\t', false)?;
+            let ds_train = read_csv(train_path, b'\t', false)?;
             let ds_test = read_csv(test_path, b'\t', false)?;
 
             let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
 
             let config = DistanceForestConfig {
-                n_trees: 200,
+                n_trees: 100,
                 min_samples_split: 2,
                 max_features: tree::tree::MaxFeatures::All,
                 max_depth: None,
                 criterion: tree::tree::Criterion::Gini,
             };
             let mut model = DistanceForest::new(config);
-            //let mut ds_train = ds_train.iter().map(|x| Sample{data: Cow::Owned(zscore(&x.data)), target: x.target}).collect::<Vec<_>>();
+            let mut ds_train = ds_train.iter().map(|x| Sample{data: Cow::Owned(zscore(&x.data)), target: x.target}).collect::<Vec<_>>();
             model.fit(&mut ds_train);
-            //let ds_test = ds_test.iter().map(|x| Sample{data: Cow::Owned(zscore(&x.data)), target: x.target}).collect::<Vec<_>>();
+            let ds_test = ds_test.iter().map(|x| Sample{data: Cow::Owned(zscore(&x.data)), target: x.target}).collect::<Vec<_>>();
             let y_pred = model.predict(&ds_test);
             let acc = accuracy_score(&y_pred, &y_true);
-            mean.push(acc);
+            mean_acc.push(acc);
             println!("\t\tAccuracy: {}", acc);
             wtr.write_record(&[
                 path.file_name().unwrap().to_string_lossy().to_string(),
@@ -75,6 +77,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             wtr.flush()?;
         }
     }
-    println!("Median accuracy: {}", median(&mean));
+    println!("Mean accuracy: {}", mean(&mean_acc));
     Ok(())
 }

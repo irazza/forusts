@@ -48,8 +48,8 @@ impl Criterion {
     }
 }
 pub trait SplitParameters: Sync + Send + Debug + Ord + Eq {
-    fn split(&self, samples: &Sample<'_>) -> bool;
-    fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample<'_>) -> f64;
+    fn split(&self, samples: &Sample) -> bool;
+    fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample) -> f64;
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
@@ -66,10 +66,10 @@ impl Ord for SplitTest {
 impl Eq for SplitTest {}
 
 impl SplitParameters for SplitTest {
-    fn split(&self, sample: &Sample<'_>) -> bool {
+    fn split(&self, sample: &Sample) -> bool {
         sample.data[self.feature] < self.threshold
     }
-    fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample<'_>) -> f64 {
+    fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample) -> f64 {
         let leaf = tree.predict_leaf(&x);
         let samples = leaf.get_samples() as f64;
         if samples > 1.0 {
@@ -88,10 +88,10 @@ pub trait Tree: Sync + Send {
     fn get_max_depth(&self) -> usize;
     fn get_root(&self) -> &Node<Self::SplitParameters>;
     fn set_root(&mut self, root: Node<Self::SplitParameters>);
-    fn get_split(&self, samples: &[Sample<'_>]) -> (Self::SplitParameters, f64);
-    fn pre_split_conditions(&self, samples: &[Sample<'_>], current_depth: usize) -> bool;
+    fn get_split(&self, samples: &[Sample]) -> (Self::SplitParameters, f64);
+    fn pre_split_conditions(&self, samples: &[Sample], current_depth: usize) -> bool;
     fn post_split_conditions(&self, new_impurity: f64, old_impurity: f64) -> bool;
-    fn fit(&mut self, data: &[Sample<'_>]) {
+    fn fit(&mut self, data: &[Sample]) {
         let _n_features = data[0].data.len();
         let data = &mut data.to_vec();
         let root = self.build_tree(data, self.get_max_depth(), f64::MAX);
@@ -99,7 +99,7 @@ pub trait Tree: Sync + Send {
     }
     fn build_tree(
         &mut self,
-        samples: &mut [Sample<'_>],
+        samples: &mut [Sample],
         max_depth: usize,
         impurity: f64,
     ) -> Node<Self::SplitParameters> {
@@ -147,7 +147,7 @@ pub trait Tree: Sync + Send {
             n_samples: samples.len(),
         }
     }
-    fn predict(&self, x: &[Sample<'_>]) -> Vec<isize> {
+    fn predict(&self, x: &[Sample]) -> Vec<isize> {
         x.iter()
             .map(|sample| self.predict_leaf(sample).get_class(&sample.data))
             .collect()
@@ -167,7 +167,7 @@ pub trait Tree: Sync + Send {
             }
         }
     }
-    fn get_splits(&self, x: &Sample<'_>) -> Vec<&Self::SplitParameters> {
+    fn get_splits(&self, x: &Sample) -> Vec<&Self::SplitParameters> {
         let mut path = Vec::new();
         let mut node = self.get_root();
         while let Node::Split {
@@ -188,7 +188,7 @@ pub trait Tree: Sync + Send {
         }
         path
     }
-    fn predict_leaf(&self, x: &Sample<'_>) -> &Node<Self::SplitParameters> {
+    fn predict_leaf(&self, x: &Sample) -> &Node<Self::SplitParameters> {
         let mut node = self.get_root();
 
         while let Node::Split {
@@ -209,9 +209,9 @@ pub trait Tree: Sync + Send {
         node
     }
     fn split<'a, 'b>(
-        samples: &'a mut [Sample<'b>],
+        samples: &'a mut [Sample],
         parameters: &Self::SplitParameters,
-    ) -> (&'a mut [Sample<'b>], &'a mut [Sample<'b>]) {
+    ) -> (&'a mut [Sample], &'a mut [Sample]) {
         let mut idx = 0;
         let mut last = samples.len();
 
@@ -227,7 +227,7 @@ pub trait Tree: Sync + Send {
         samples.split_at_mut(idx)
     }
     fn get_leaf_class(
-        samples: &[Sample<'_>],
+        samples: &[Sample],
         _parameters: Option<&Self::SplitParameters>,
     ) -> LeafClassification {
         let mut class_counts = HashMap::new();

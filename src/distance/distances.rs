@@ -1,7 +1,5 @@
 use std::{
-    cmp::{max, min},
-    mem::swap,
-    thread::current,
+    cmp::{max, min}, mem::swap, sync::atomic::AtomicU64, thread::current
 };
 
 use dtw_rs::{Algorithm, DynamicTimeWarping};
@@ -72,7 +70,7 @@ pub fn twe(x1: &[f64], x2: &[f64]) -> f64 {
                 + match_same_euclid_dist
                 + match_previous_euclid_dist
                 + (nu * (2.0 * (i as isize - j as isize).abs() as f64));
-
+            
             current[j] = del_x1.min(del_x2.min(match_x1_x2));
                 
         }
@@ -94,7 +92,7 @@ pub fn dtw(x1: &[f64], x2: &[f64]) -> f64 {
     let n = x1.len();
     let m = x2.len();
 
-    let sakoe_chiba = 1.0;
+    let sakoe_chiba = 0.7;
     let sakoe_chiba_window_radius = (n as f64 + 1.0) * sakoe_chiba;
 
     let alpha = ((m) as f64) / ((n) as f64);

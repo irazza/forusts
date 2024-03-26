@@ -11,7 +11,7 @@ pub fn read_csv(
     path: impl AsRef<Path>,
     delimiter: u8,
     header: bool,
-) -> Result<Vec<Sample<'static>>, Box<dyn Error>> {
+) -> Result<Vec<Sample>, Box<dyn Error>> {
     let reader = BufReader::new(File::open(path)?);
     let mut reader = ReaderBuilder::new()
         .has_headers(header)
@@ -29,7 +29,7 @@ pub fn read_csv(
 
 pub fn write_csv(
     path: impl AsRef<Path>,
-    data: &Vec<Sample<'_>>,
+    data: &Vec<Sample>,
     header: Option<Vec<String>>,
 ) -> Result<(), Box<dyn Error>> {
     // Make dir if it does not exist

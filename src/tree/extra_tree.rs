@@ -51,7 +51,7 @@ impl Tree for ExtraTree {
     fn set_root(&mut self, root: Node<Self::SplitParameters>) {
         self.root = root;
     }
-    fn get_split(&self, samples: &[Sample<'_>]) -> (Self::SplitParameters, f64) {
+    fn get_split(&self, samples: &[Sample]) -> (Self::SplitParameters, f64) {
         // Generate a random subsample (MaxFeatures) of features (length of sample)
         let mut features_subsample = (0..samples[0].data.len()).collect::<Vec<_>>();
         features_subsample.shuffle(&mut thread_rng());
@@ -94,7 +94,7 @@ impl Tree for ExtraTree {
             best_impurity,
         )
     }
-    fn pre_split_conditions(&self, samples: &[Sample<'_>], current_depth: usize) -> bool {
+    fn pre_split_conditions(&self, samples: &[Sample], current_depth: usize) -> bool {
         // Base case: not enough samples or max depth reached
         if samples.len() <= self.config.min_samples_split || current_depth == self.config.max_depth
         {

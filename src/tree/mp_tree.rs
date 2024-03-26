@@ -33,7 +33,7 @@ impl Ord for MPSplit {
 impl Eq for MPSplit {}
 
 impl SplitParameters for MPSplit {
-    fn split(&self, sample: &Sample<'_>) -> bool {
+    fn split(&self, sample: &Sample) -> bool {
         let mut min = std::f64::INFINITY;
         let sample = zscore(&sample.data[self.interval.0..self.interval.1]);
         for candidate in &self.candidates {
@@ -44,7 +44,7 @@ impl SplitParameters for MPSplit {
         }
         min < self.threshold
     }
-    fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample<'_>) -> f64 {
+    fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample) -> f64 {
         let leaf = tree.predict_leaf(&x);
         let samples = leaf.get_samples() as f64;
         if samples > 1.0 {
@@ -97,7 +97,7 @@ impl Tree for MPTree {
     fn set_root(&mut self, root: Node<Self::SplitParameters>) {
         self.root = root;
     }
-    fn pre_split_conditions(&self, samples: &[Sample<'_>], current_depth: usize) -> bool {
+    fn pre_split_conditions(&self, samples: &[Sample], current_depth: usize) -> bool {
         // Base case: not enough samples or max depth reached
         if samples.len() <= self.config.min_samples_split || current_depth == self.config.max_depth
         {
@@ -112,7 +112,7 @@ impl Tree for MPTree {
         }
         return false;
     }
-    fn get_split(&self, samples: &[Sample<'_>]) -> (Self::SplitParameters, f64) {
+    fn get_split(&self, samples: &[Sample]) -> (Self::SplitParameters, f64) {
         // Generate a random interval
         let n_features = samples[0].data.len();
         let start = thread_rng().gen_range(0..n_features - MIN_INTERVAL_LENGTH);

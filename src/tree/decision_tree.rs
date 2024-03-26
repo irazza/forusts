@@ -53,7 +53,7 @@ impl Tree for DecisionTree {
     fn set_root(&mut self, root: Node<Self::SplitParameters>) {
         self.root = root;
     }
-    fn get_split(&self, samples: &[Sample<'_>]) -> (Self::SplitParameters, f64) {
+    fn get_split(&self, samples: &[Sample]) -> (Self::SplitParameters, f64) {
         // Initialize the best split
         let mut best_feature = usize::MAX;
         let mut best_threshold = f64::MAX;
@@ -131,7 +131,7 @@ impl Tree for DecisionTree {
             best_impurity,
         )
     }
-    fn pre_split_conditions(&self, samples: &[Sample<'_>], current_depth: usize) -> bool {
+    fn pre_split_conditions(&self, samples: &[Sample], current_depth: usize) -> bool {
         // Base case: not enough samples or max depth reached
         if samples.len() <= self.config.min_samples_split || current_depth == self.config.max_depth
         {

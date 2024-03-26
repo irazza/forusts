@@ -8,3 +8,4 @@ perf.*
 SCAMP_/*
 *.csv
 UCR_Archive2018_AD/*
+*.csv

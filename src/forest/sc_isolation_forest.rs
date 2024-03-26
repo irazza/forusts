@@ -24,10 +24,10 @@ impl Forest<IsolationTree> for SCIsolationForest {
             max_samples: 0,
         }
     }
-    fn fit(&mut self, data: &mut [Sample<'_>]) {
+    fn fit(&mut self, data: &mut [Sample]) {
         self.fit_(data)
     }
-    fn predict(&self, data: &[Sample<'_>]) -> Vec<isize> {
+    fn predict(&self, data: &[Sample]) -> Vec<isize> {
         self.predict_(data)
     }
     fn compute_intervals(&mut self, _n_features: usize) {}
@@ -37,13 +37,13 @@ impl Forest<IsolationTree> for SCIsolationForest {
     fn get_trees_mut(&mut self) -> &mut Vec<IsolationTree> {
         &mut self.trees
     }
-    fn transform<'a>(&self, data: &[Sample<'a>], _intervals_index: usize) -> Vec<Sample<'a>> {
+    fn transform<'a>(&self, data: &[Sample], _intervals_index: usize) -> Vec<Sample> {
         data.to_vec()
     }
     fn tuning_predict(
         &self,
-        ds_train: &[Sample<'_>],
-        ds_test: &[Sample<'_>],
+        ds_train: &[Sample],
+        ds_test: &[Sample],
     ) -> Vec<Self::TuningType> {
         self.score_samples(ds_test)
     }

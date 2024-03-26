@@ -103,8 +103,8 @@ macro_rules! grid_search_tuning {
 }
 
 pub fn grid_search<T: GridSearch + TuningConfig>(
-    ds_train: &mut [Sample<'_>],
-    ds_test: &[Sample<'_>],
+    ds_train: &mut [Sample],
+    ds_test: &[Sample],
     parameters: T,
     repetition: usize,
     metric: fn(&[<T::Forest as Forest<T::Tree>>::TuningType], &[isize]) -> f64,

@@ -26,7 +26,7 @@ pub struct SCIsolationTree {
 impl SCIsolationTree {
     fn get_random_hyperplane(
         &self,
-        samples: &[Sample<'_>],
+        samples: &[Sample],
         n_attributes: usize,
         means: &[f64],
         stddevs: &[f64],
@@ -96,7 +96,7 @@ pub struct SplitHyperplane {
     limit: f64,
 }
 impl SplitHyperplane {
-    pub fn get_dist(&self, sample: &Sample<'_>) -> f64 {
+    pub fn get_dist(&self, sample: &Sample) -> f64 {
         let mut sum = 0.0;
         for i in 0..self.c.len() {
             sum += self.c[i]
@@ -112,10 +112,10 @@ impl Ord for SplitHyperplane {
     }
 }
 impl SplitParameters for SplitHyperplane {
-    fn split(&self, sample: &Sample<'_>) -> bool {
+    fn split(&self, sample: &Sample) -> bool {
         self.get_dist(sample) < 0.0
     }
-    fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample<'_>) -> f64 {
+    fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample) -> f64 {
         let splits = tree.get_splits(x);
         let mut path_length = 0.0;
         for split in splits {
@@ -144,7 +144,7 @@ impl Tree for SCIsolationTree {
     fn set_root(&mut self, root: Node<Self::SplitParameters>) {
         self.root = root;
     }
-    fn pre_split_conditions(&self, samples: &[Sample<'_>], current_depth: usize) -> bool {
+    fn pre_split_conditions(&self, samples: &[Sample], current_depth: usize) -> bool {
         // Base case: not enough samples or max depth reached
         if samples.len() <= self.config.min_samples_split || current_depth == self.config.max_depth
         {
@@ -164,7 +164,7 @@ impl Tree for SCIsolationTree {
     fn post_split_conditions(&self, new_impurity: f64, _old_impurity: f64) -> bool {
         return false;
     }
-    fn get_split(&self, samples: &[Sample<'_>]) -> (SplitHyperplane, f64) {
+    fn get_split(&self, samples: &[Sample]) -> (SplitHyperplane, f64) {
         let mut stddev = vec![0.0; samples[0].data.len()];
         let mut means = vec![0.0; samples[0].data.len()];
         for i in 0..samples[0].data.len() {

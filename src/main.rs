@@ -3,11 +3,13 @@ use crate::forest::distance_forest::{DistanceForest, DistanceForestConfig};
 use crate::forest::forest::Forest;
 use crate::metrics::classification::accuracy_score;
 use crate::utils::csv_io::read_csv;
-use crate::utils::structures::Sample;
+use crate::utils::structures::{Sample, ZScoreTransformer};
 use rand::SeedableRng;
+use core::panic;
 use std::borrow::Cow;
 use std::error::Error;
 use std::fs::{self};
+use std::sync::Arc;
 
 mod distance;
 mod feature_extraction;
@@ -36,7 +38,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     for i in 0..n_repetitions {
         println!("Repetition {}", i + 1);
         //let mut predictions = Vec::new();
-        for path in &datasets[4..5] {
+        for path in &datasets[53..54] {
             println!(
                 "\tProcessing {}",
                 path.file_name().unwrap().to_string_lossy()
@@ -50,8 +52,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 path.file_name().unwrap().to_string_lossy()
             ));
 
+            let mut zst = ZScoreTransformer::new();
+
             let ds_train = read_csv(train_path, b'\t', false)?;
+            
+            let mut ds_train = zst.fit_transform( &ds_train);
+
             let ds_test = read_csv(test_path, b'\t', false)?;
+            let ds_test = zst.transform(&ds_test);
 
             let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
 
@@ -61,11 +69,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 max_features: tree::tree::MaxFeatures::All,
                 max_depth: None,
                 criterion: tree::tree::Criterion::Gini,
+                bootstrap: false,
             };
             let mut model = DistanceForest::new(config);
-            let mut ds_train = ds_train.iter().map(|x| Sample{data: Cow::Owned(zscore(&x.data)), target: x.target}).collect::<Vec<_>>();
+            //let mut ds_train = ds_train.iter().map(|x| Sample{data: Arc::new(zscore(&x.data)), target: x.target}).collect::<Vec<_>>();
+            //let start_time = std::time::Instant::now();
             model.fit(&mut ds_train);
-            let ds_test = ds_test.iter().map(|x| Sample{data: Cow::Owned(zscore(&x.data)), target: x.target}).collect::<Vec<_>>();
+            //let ds_test = ds_test.iter().map(|x| Sample{data: Arc::new(zscore(&x.data)), target: x.target}).collect::<Vec<_>>();
             let y_pred = model.predict(&ds_test);
             let acc = accuracy_score(&y_pred, &y_true);
             mean_acc.push(acc);

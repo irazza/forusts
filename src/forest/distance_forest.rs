@@ -19,11 +19,11 @@ impl Forest<DistanceTree> for DistanceForest {
             config,
         }
     }
-    fn fit(&mut self, data: &mut [Sample<'_>]) {
+    fn fit(&mut self, data: &mut [Sample]) {
         //let mut data = data.iter().map(|x| Sample{ data: Cow::Owned(zscore(&x.data)), target: x.target}).collect::<Vec<_>>();
         self.fit_(data)
     }
-    fn predict(&self, data: &[Sample<'_>]) -> Vec<isize> {
+    fn predict(&self, data: &[Sample]) -> Vec<isize> {
         self.predict_(data)
     }
     fn compute_intervals(&mut self, _n_features: usize) {}
@@ -33,13 +33,13 @@ impl Forest<DistanceTree> for DistanceForest {
     fn get_trees_mut(&mut self) -> &mut Vec<DistanceTree> {
         &mut self.trees
     }
-    fn transform<'a>(&self, data: &[Sample<'a>], _intervals_index: usize) -> Vec<Sample<'a>> {
+    fn transform<'a>(&self, data: &[Sample], _intervals_index: usize) -> Vec<Sample> {
         data.to_vec()
     }
     fn tuning_predict(
         &self,
-        _ds_train: &[Sample<'_>],
-        ds_test: &[Sample<'_>],
+        _ds_train: &[Sample],
+        ds_test: &[Sample],
     ) -> Vec<Self::TuningType> {
         self.predict(ds_test)
     }

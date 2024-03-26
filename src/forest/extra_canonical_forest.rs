@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::feature_extraction::catch22::compute_catch;
 use crate::forest::forest::Forest;
 use crate::grid_search_tuning;
@@ -45,10 +47,10 @@ impl Forest<ExtraTree> for ExtraCanonicalForest {
             config,
         }
     }
-    fn fit(&mut self, data: &mut [Sample<'_>]) {
+    fn fit(&mut self, data: &mut [Sample]) {
         self.fit_(data);
     }
-    fn predict(&self, data: &[Sample<'_>]) -> Vec<isize> {
+    fn predict(&self, data: &[Sample]) -> Vec<isize> {
         self.predict_(data)
     }
     fn compute_intervals(&mut self, n_features: usize) {
@@ -74,9 +76,9 @@ impl Forest<ExtraTree> for ExtraCanonicalForest {
     fn get_trees_mut(&mut self) -> &mut Vec<ExtraTree> {
         &mut self.trees
     }
-    fn transform<'a>(&self, data: &[Sample<'a>], tree_index: usize) -> Vec<Sample<'a>> {
+    fn transform<'a>(&self, data: &[Sample], tree_index: usize) -> Vec<Sample> {
         let n_samples = data.len();
-        let mut transformed_data: Vec<Sample<'_>> = Vec::new();
+        let mut transformed_data: Vec<Sample> = Vec::new();
         for j in 0..n_samples {
             let mut sample = Vec::new();
             for (start, end) in self.intervals[tree_index].iter().copied() {
@@ -87,7 +89,7 @@ impl Forest<ExtraTree> for ExtraCanonicalForest {
                 }
             }
             transformed_data.push(Sample {
-                data: std::borrow::Cow::Owned(sample),
+                data: Arc::new(sample),
                 target: data[j].target,
             });
         }
@@ -95,8 +97,8 @@ impl Forest<ExtraTree> for ExtraCanonicalForest {
     }
     fn tuning_predict(
         &self,
-        ds_train: &[Sample<'_>],
-        ds_test: &[Sample<'_>],
+        ds_train: &[Sample],
+        ds_test: &[Sample],
     ) -> Vec<Self::TuningType> {
         let breiman_distance = self.pairwise_breiman(&ds_test, &ds_train);
         k_nearest_neighbor(

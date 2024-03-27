@@ -99,11 +99,7 @@ impl Forest<IsolationTree> for CanonicalIsolationForest {
         }
         transformed_data
     }
-    fn tuning_predict(
-        &self,
-        _ds_train: &[Sample],
-        ds_test: &[Sample],
-    ) -> Vec<Self::TuningType> {
+    fn tuning_predict(&self, _ds_train: &[Sample], ds_test: &[Sample]) -> Vec<Self::TuningType> {
         self.score_samples(ds_test)
     }
 }

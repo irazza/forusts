@@ -1,16 +1,13 @@
 #![allow(dead_code)]
-use crate::feature_extraction::statistics::{mean, median, zscore};
+use crate::feature_extraction::statistics::mean;
 use crate::forest::distance_forest::{DistanceForest, DistanceForestConfig};
 use crate::forest::forest::Forest;
 use crate::metrics::classification::accuracy_score;
 use crate::utils::csv_io::read_csv;
-use crate::utils::structures::{Sample, ZScoreTransformer};
-use rand::SeedableRng;
-use core::panic;
-use std::borrow::Cow;
+use crate::utils::structures::ZScoreTransformer;
+
 use std::error::Error;
 use std::fs::{self};
-use std::sync::Arc;
 
 mod distance;
 mod feature_extraction;
@@ -56,8 +53,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             let mut zst = ZScoreTransformer::new();
 
             let ds_train = read_csv(train_path, b'\t', false)?;
-            
-            let mut ds_train = zst.fit_transform( &ds_train);
+
+            let mut ds_train = zst.fit_transform(&ds_train);
 
             let ds_test = read_csv(test_path, b'\t', false)?;
             let ds_test = zst.transform(&ds_test);

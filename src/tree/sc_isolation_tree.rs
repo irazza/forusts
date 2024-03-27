@@ -1,5 +1,3 @@
-use std::path;
-
 use super::{node::Node, tree::SplitParameters};
 use crate::feature_extraction::statistics::stddev;
 use crate::{

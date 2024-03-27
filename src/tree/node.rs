@@ -1,4 +1,4 @@
-use std::{fmt::Debug, ops::Deref, sync::Arc};
+use std::{fmt::Debug, sync::Arc};
 
 use super::tree::SplitParameters;
 

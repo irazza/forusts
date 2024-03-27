@@ -1,7 +1,4 @@
-use super::{
-    node::Node,
-    tree::{SplitParameters, SplitTest},
-};
+use super::{node::Node, tree::SplitTest};
 use crate::{
     forest::forest::{OutlierForestConfig, OutlierTree},
     tree::tree::Tree,

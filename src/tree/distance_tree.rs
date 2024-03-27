@@ -1,18 +1,17 @@
-use core::panic;
-use std::{
-    borrow::Cow, cmp::{max, min}, fmt::Debug, ops::RemAssign, sync::Arc
-};
+use std::{fmt::Debug, sync::Arc};
 
 use super::{
-    node::{LeafClassifier, Node},
+    node::Node,
     tree::{Criterion, SplitParameters},
 };
 use crate::{
-    distance::distances::{dtw, euclidean, twe}, feature_extraction::statistics::{fisher_score, mean, slope, stddev, unique, value_counts}, forest::forest::{
-        ClassificationForestConfig, ClassificationTree}, tree::tree::Tree, utils::{float_handling::FloatVecEq, structures::Sample}
+    distance::distances::twe,
+    forest::forest::{ClassificationForestConfig, ClassificationTree},
+    tree::tree::Tree,
+    utils::{float_handling::FloatVecEq, structures::Sample},
 };
-use hashbrown::{HashMap, HashSet};
-use rand::{seq::SliceRandom, thread_rng, Rng, SeedableRng};
+use hashbrown::HashSet;
+use rand::{seq::SliceRandom, thread_rng, Rng};
 
 #[derive(Clone, PartialEq, PartialOrd)]
 pub struct DistanceSplit {
@@ -38,25 +37,30 @@ impl Debug for DistanceSplit {
 
 impl SplitParameters for DistanceSplit {
     fn split(&self, sample: &Sample, is_train: bool) -> bool {
-
-        if is_train { 
+        if is_train {
             return self.left_candidates.iter().any(|ts| sample.data == *ts);
         }
-        
+
         let mut left_dist = Vec::new();
         for candidate in &self.left_candidates {
             let dist = twe(&sample.data, &candidate);
             // left_dist = left_dist.min(dist);
             left_dist.push(dist);
         }
-        let mut right_dist =  Vec::new();
+        let mut right_dist = Vec::new();
         for candidate in &self.right_candidates {
             let dist = twe(&sample.data, &candidate);
             // right_dist = right_dist.min(dist);
             right_dist.push(dist);
         }
-        let left_dist = left_dist.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
-        let right_dist = right_dist.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let left_dist = left_dist
+            .iter()
+            .min_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap();
+        let right_dist = right_dist
+            .iter()
+            .min_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap();
         left_dist < right_dist
     }
 

@@ -1,5 +1,3 @@
-use rand::{seq::SliceRandom, thread_rng};
-
 use super::statistics::{mean, slope, stddev};
 
 mod bindings {

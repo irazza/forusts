@@ -36,11 +36,7 @@ impl Forest<DistanceTree> for DistanceForest {
     fn transform<'a>(&self, data: &[Sample], _intervals_index: usize) -> Vec<Sample> {
         data.to_vec()
     }
-    fn tuning_predict(
-        &self,
-        _ds_train: &[Sample],
-        ds_test: &[Sample],
-    ) -> Vec<Self::TuningType> {
+    fn tuning_predict(&self, _ds_train: &[Sample], ds_test: &[Sample]) -> Vec<Self::TuningType> {
         self.predict(ds_test)
     }
 }

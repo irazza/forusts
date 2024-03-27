@@ -12,7 +12,7 @@ use parking_lot::Mutex;
 use rand::{seq::SliceRandom, thread_rng, Rng};
 use rayon::prelude::*;
 use std::{
-    cmp::{max, min},
+    cmp::max,
     sync::atomic::{AtomicUsize, Ordering},
 };
 
@@ -28,11 +28,7 @@ pub trait Forest<T: Tree>: Sync + Send {
     fn new(config: Self::Config) -> Self;
     fn fit(&mut self, data: &mut [Sample]);
     fn predict(&self, data: &[Sample]) -> Vec<isize>;
-    fn tuning_predict(
-        &self,
-        ds_train: &[Sample],
-        ds_test: &[Sample],
-    ) -> Vec<Self::TuningType>;
+    fn tuning_predict(&self, ds_train: &[Sample], ds_test: &[Sample]) -> Vec<Self::TuningType>;
 }
 
 grid_search_tuning! {
@@ -72,7 +68,12 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
                         .collect::<Vec<Sample>>(),
                 );
             } else {
-                tree.fit(&mut transformed_data.iter().map(|x| x.to_ref()).collect::<Vec<Sample>>());
+                tree.fit(
+                    &mut transformed_data
+                        .iter()
+                        .map(|x| x.to_ref())
+                        .collect::<Vec<Sample>>(),
+                );
             }
             tree
         }));
@@ -243,7 +244,10 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
                     // Remove duplicates based on feature and threshold
                     union.sort_by(|s1, s2| s1.cmp(s2));
                     union.dedup_by(|a, b| a == b);
-                    let agree = union.iter().filter(|s| s.split(x1, false) == s.split(x2, false)).count() as f64;
+                    let agree = union
+                        .iter()
+                        .filter(|s| s.split(x1, false) == s.split(x2, false))
+                        .count() as f64;
                     *distance_matrix[i][j].lock() += 1.0
                         - if union.len() == 0 {
                             1.0

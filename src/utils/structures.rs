@@ -3,9 +3,9 @@ use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::{max, min},
-    mem::swap, sync::Arc,
+    mem::swap,
+    sync::Arc,
 };
-
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Sample {

@@ -7,7 +7,7 @@ use std::{cmp::max, ops::Deref};
 
 use crate::{feature_extraction::statistics::stddev, utils::structures::Sample};
 
-use super::node::{LeafClassification, LeafClassifier, Node};
+use super::node::{LeafClassification, Node};
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub enum MaxFeatures {

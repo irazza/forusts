@@ -1,10 +1,10 @@
 use std::{
-    cmp::{max, min}, mem::swap, sync::atomic::AtomicU64, thread::current
+    cmp::{max, min},
+    mem::swap,
 };
 
 use dashmap::DashMap;
 use lazy_static::lazy_static;
-use dtw_rs::{Algorithm, DynamicTimeWarping};
 
 use crate::utils::float_handling::FloatEq;
 
@@ -31,7 +31,6 @@ lazy_static! {
     static ref TWE_CACHE: DashMap<(Vec<FloatEq>, Vec<FloatEq>), f64> = DashMap::new();
 }
 pub fn twe(x1: &[f64], x2: &[f64]) -> f64 {
-
     // TWE_CACHE
     let x1_cache = x1.iter().copied().map(FloatEq).collect::<Vec<_>>();
     let x2_cache = x2.iter().copied().map(FloatEq).collect::<Vec<_>>();
@@ -87,9 +86,8 @@ pub fn twe(x1: &[f64], x2: &[f64]) -> f64 {
                 + match_same_euclid_dist
                 + match_previous_euclid_dist
                 + (nu * (2.0 * (i as isize - j as isize).abs() as f64));
-            
+
             current[j] = del_x1.min(del_x2.min(match_x1_x2));
-                
         }
         swap(&mut previous, &mut current);
     }
@@ -98,7 +96,6 @@ pub fn twe(x1: &[f64], x2: &[f64]) -> f64 {
     TWE_CACHE.insert(key_cache.clone(), distance);
     swap(&mut key_cache.0, &mut key_cache.1);
     TWE_CACHE.insert(key_cache, distance);
-
 
     distance
 }
@@ -112,7 +109,6 @@ pub fn test_dtw() {
 }
 
 pub fn dtw(x1: &[f64], x2: &[f64]) -> f64 {
-
     let n = x1.len();
     let m = x2.len();
 
@@ -140,7 +136,7 @@ pub fn dtw(x1: &[f64], x2: &[f64]) -> f64 {
 
         for j in lower..=upper {
             let dist = (x1(i) - x2(j)).powi(2);
-            current[j] = dist + previous[j].min(current[j-1].min(previous[j-1]));
+            current[j] = dist + previous[j].min(current[j - 1].min(previous[j - 1]));
         }
         swap(&mut previous, &mut current);
     }

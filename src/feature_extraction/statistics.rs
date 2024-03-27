@@ -1,7 +1,6 @@
 use std::ops::{Add, Div};
 
 use hashbrown::HashMap;
-use serde::de::value;
 
 pub const EULER_MASCHERONI: f64 =
     0.5772156649015328606065120900824024310421593359399235988057672348849;

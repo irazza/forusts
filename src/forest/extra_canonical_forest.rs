@@ -95,11 +95,7 @@ impl Forest<ExtraTree> for ExtraCanonicalForest {
         }
         transformed_data
     }
-    fn tuning_predict(
-        &self,
-        ds_train: &[Sample],
-        ds_test: &[Sample],
-    ) -> Vec<Self::TuningType> {
+    fn tuning_predict(&self, ds_train: &[Sample], ds_test: &[Sample]) -> Vec<Self::TuningType> {
         let breiman_distance = self.pairwise_breiman(&ds_test, &ds_train);
         k_nearest_neighbor(
             1,

@@ -5,12 +5,8 @@ use super::{
     tree::{Criterion, SplitParameters},
 };
 use crate::{
-    distance::distances::twe,
-    forest::forest::{ClassificationForestConfig, ClassificationTree},
-    tree::tree::Tree,
-    utils::{float_handling::FloatVecEq, structures::Sample},
+    distance::distances::twe, feature_extraction::statistics, forest::forest::{ClassificationForestConfig, ClassificationTree}, tree::tree::Tree, utils::{float_handling::FloatVecEq, structures::Sample}
 };
-use hashbrown::HashSet;
 use rand::{seq::SliceRandom, thread_rng, Rng};
 
 #[derive(Clone, PartialEq, PartialOrd)]
@@ -40,27 +36,17 @@ impl SplitParameters for DistanceSplit {
         if is_train {
             return self.left_candidates.iter().any(|ts| sample.data == *ts);
         }
-
-        let mut left_dist = Vec::new();
+        let mut left_distances = Vec::new();
         for candidate in &self.left_candidates {
-            let dist = twe(&sample.data, &candidate);
-            // left_dist = left_dist.min(dist);
-            left_dist.push(dist);
+            left_distances.push(twe(&sample.data, candidate));
         }
-        let mut right_dist = Vec::new();
+        let mut right_distances = Vec::new();
         for candidate in &self.right_candidates {
-            let dist = twe(&sample.data, &candidate);
-            // right_dist = right_dist.min(dist);
-            right_dist.push(dist);
+            right_distances.push(twe(&sample.data, candidate));
         }
-        let left_dist = left_dist
-            .iter()
-            .min_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap();
-        let right_dist = right_dist
-            .iter()
-            .min_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap();
+
+        let left_dist = left_distances.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let right_dist = right_distances.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
         left_dist < right_dist
     }
 
@@ -139,19 +125,19 @@ impl Tree for DistanceTree {
         let mut samples = samples.iter().map(|s| s.data.clone()).collect::<Vec<_>>();
         samples.shuffle(&mut thread_rng());
 
-        let mut unique_samples = HashSet::new();
-        for sample in &samples {
-            unique_samples.insert(FloatVecEq(sample.clone()));
-        }
+        // let mut unique_samples = HashSet::new();
+        // for sample in &samples {
+        //     unique_samples.insert(FloatVecEq(sample.clone()));
+        // }
         // let idx_split = thread_rng().gen_range(1..samples.len()-1);
         let mut left_candidates = Vec::new();
         let mut right_candidates = Vec::new();
 
-        for (i, sample) in unique_samples.into_iter().enumerate() {
+        for (i, sample) in samples.into_iter().enumerate() {
             if i % 2 == 0 {
-                left_candidates.push(sample.0);
+                left_candidates.push(FloatVecEq(sample).0);
             } else {
-                right_candidates.push(sample.0);
+                right_candidates.push(FloatVecEq(sample).0);
             }
         }
 

@@ -23,6 +23,26 @@ pub fn min(x: &[f64]) -> f64 {
     min
 }
 
+pub fn sum(x: Vec<Vec<f64>>, axis: usize) -> Vec<f64> {
+    if axis == 0 {
+        let mut sum = vec![0.0; x[0].len()];
+        for i in 0..x.len() {
+            for j in 0..x[i].len() {
+                sum[j] += x[i][j];
+            }
+        }
+        sum
+    } else if axis == 1{
+        let mut sum = vec![0.0; x.len()];
+        for i in 0..x.len() {
+            sum[i] = x[i].iter().sum();
+        }
+        sum
+    } else {
+        panic!("Axis must be either 0 or 1")
+    }
+}
+
 pub fn unique<T: PartialOrd + Clone>(x: &[T]) -> Vec<T> {
     let mut unique = x.to_vec();
     unique.sort_by(|a, b| a.partial_cmp(b).unwrap());

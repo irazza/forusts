@@ -123,6 +123,7 @@ pub fn compile_from_path(path: &str, libname: &str, inc: Option<Vec<&str>>) {
     cc::Build::new()
         .files(filtered_paths)
         .includes(inc.unwrap_or_default())
+        .flag("-w")
         .opt_level(3)
         .compile(libname);
 }

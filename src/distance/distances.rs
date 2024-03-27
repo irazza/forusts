@@ -108,7 +108,19 @@ pub fn test_dtw() {
     println!("DTW: {}", result);
 }
 
+lazy_static! {
+    static ref DTW_CACHE: DashMap<(Vec<FloatEq>, Vec<FloatEq>), f64> = DashMap::new();
+}
 pub fn dtw(x1: &[f64], x2: &[f64]) -> f64 {
+    // DTW_CACHE
+    let x1_cache = x1.iter().copied().map(FloatEq).collect::<Vec<_>>();
+    let x2_cache = x2.iter().copied().map(FloatEq).collect::<Vec<_>>();
+    let mut key_cache = (x1_cache, x2_cache);
+
+    if let Some(value) = DTW_CACHE.get(&key_cache) {
+        return *value.value();
+    }
+
     let n = x1.len();
     let m = x2.len();
 
@@ -140,5 +152,12 @@ pub fn dtw(x1: &[f64], x2: &[f64]) -> f64 {
         }
         swap(&mut previous, &mut current);
     }
-    return previous[m].sqrt();
+
+    let distance = previous[m].sqrt();
+
+    DTW_CACHE.insert(key_cache.clone(), distance);
+    swap(&mut key_cache.0, &mut key_cache.1);
+    DTW_CACHE.insert(key_cache, distance);
+
+    distance
 }

@@ -4,7 +4,7 @@ use crate::forest::distance_forest::{DistanceForest, DistanceForestConfig};
 use crate::forest::forest::Forest;
 use crate::metrics::classification::accuracy_score;
 use crate::utils::csv_io::read_csv;
-use crate::utils::structures::ZScoreTransformer;
+//use crate::utils::structures::ZScoreTransformer;
 
 use std::error::Error;
 use std::fs::{self};
@@ -50,14 +50,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 path.file_name().unwrap().to_string_lossy()
             ));
 
-            let mut zst = ZScoreTransformer::new();
+            //let mut zst = ZScoreTransformer::new();
 
-            let ds_train = read_csv(train_path, b'\t', false)?;
+            let mut ds_train = read_csv(train_path, b'\t', false)?;
 
-            let mut ds_train = zst.fit_transform(&ds_train);
+            //let mut ds_train = zst.fit_transform(&ds_train);
 
             let ds_test = read_csv(test_path, b'\t', false)?;
-            let ds_test = zst.transform(&ds_test);
+            //let ds_test = zst.transform(&ds_test);
 
             let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
 
@@ -67,7 +67,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 max_features: tree::tree::MaxFeatures::All,
                 max_depth: None,
                 criterion: tree::tree::Criterion::Gini,
-                bootstrap: true,
+                bootstrap: false,
             };
             let mut model = DistanceForest::new(config);
             //let mut ds_train = ds_train.iter().map(|x| Sample{data: Arc::new(zscore(&x.data)), target: x.target}).collect::<Vec<_>>();

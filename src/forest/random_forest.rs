@@ -36,7 +36,7 @@ impl Forest<DecisionTree> for RandomForest {
     }
     fn tuning_predict(
         &self,
-        ds_train: &[Sample],
+        _ds_train: &[Sample],
         ds_test: &[Sample],
     ) -> Vec<Self::TuningType> {
         self.predict(ds_test)

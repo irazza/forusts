@@ -1,6 +1,6 @@
 use core::panic;
 use std::{
-    borrow::Cow, cmp::{max, min}, fmt::Debug, sync::Arc
+    borrow::Cow, cmp::{max, min}, fmt::Debug, ops::RemAssign, sync::Arc
 };
 
 use super::{
@@ -9,9 +9,9 @@ use super::{
 };
 use crate::{
     distance::distances::{dtw, euclidean, twe}, feature_extraction::statistics::{fisher_score, mean, slope, stddev, unique, value_counts}, forest::forest::{
-        ClassificationForestConfig, ClassificationTree}, tree::tree::Tree, utils::structures::Sample
+        ClassificationForestConfig, ClassificationTree}, tree::tree::Tree, utils::{float_handling::FloatVecEq, structures::Sample}
 };
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use rand::{seq::SliceRandom, thread_rng, Rng, SeedableRng};
 
 #[derive(Clone, PartialEq, PartialOrd)]
@@ -37,28 +37,26 @@ impl Debug for DistanceSplit {
 }
 
 impl SplitParameters for DistanceSplit {
-    fn split(&self, sample: &Sample) -> bool {
+    fn split(&self, sample: &Sample, is_train: bool) -> bool {
 
-        let mut left_dist = 0.0;
+        if is_train { 
+            return self.left_candidates.iter().any(|ts| sample.data == *ts);
+        }
+        
+        let mut left_dist = Vec::new();
         for candidate in &self.left_candidates {
             let dist = twe(&sample.data, &candidate);
-            if dist <= f64::EPSILON {
-                return true;
-            }
             // left_dist = left_dist.min(dist);
-            left_dist += dist;
+            left_dist.push(dist);
         }
-        let mut right_dist = 0.0;
+        let mut right_dist =  Vec::new();
         for candidate in &self.right_candidates {
             let dist = twe(&sample.data, &candidate);
-            if dist <= f64::EPSILON {
-                return false;
-            }
             // right_dist = right_dist.min(dist);
-            right_dist += dist;
+            right_dist.push(dist);
         }
-        left_dist /= self.left_candidates.len() as f64;
-        right_dist /= self.right_candidates.len() as f64;
+        let left_dist = left_dist.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let right_dist = right_dist.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
         left_dist < right_dist
     }
 
@@ -136,20 +134,29 @@ impl Tree for DistanceTree {
     fn get_split(&self, samples: &[Sample]) -> (Self::SplitParameters, f64) {
         let mut samples = samples.iter().map(|s| s.data.clone()).collect::<Vec<_>>();
         samples.shuffle(&mut thread_rng());
+
+        let mut unique_samples = HashSet::new();
+        for sample in &samples {
+            unique_samples.insert(FloatVecEq(sample.clone()));
+        }
+        // let idx_split = thread_rng().gen_range(1..samples.len()-1);
         let mut left_candidates = Vec::new();
         let mut right_candidates = Vec::new();
 
-        for (i, sample) in samples.into_iter().enumerate() {
+        for (i, sample) in unique_samples.into_iter().enumerate() {
             if i % 2 == 0 {
-                left_candidates.push(sample);
+                left_candidates.push(sample.0);
             } else {
-                right_candidates.push(sample);
+                right_candidates.push(sample.0);
             }
         }
 
+        // let mut left_candidates = samples[..idx_split].iter().map(|s| s.clone()).collect();
+        // let mut right_candidates = samples[idx_split..].iter().map(|s| s.clone()).collect();
+
         let split = DistanceSplit {
-            left_candidates,
-            right_candidates,
+            left_candidates: left_candidates,
+            right_candidates: right_candidates,
         };
 
         let impurity = thread_rng().gen_range(0.0..1.0);

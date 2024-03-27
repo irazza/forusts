@@ -112,7 +112,7 @@ impl Ord for SplitHyperplane {
     }
 }
 impl SplitParameters for SplitHyperplane {
-    fn split(&self, sample: &Sample) -> bool {
+    fn split(&self, sample: &Sample, _is_train: bool) -> bool {
         self.get_dist(sample) < 0.0
     }
     fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample) -> f64 {
@@ -161,7 +161,7 @@ impl Tree for SCIsolationTree {
         }
         return true;
     }
-    fn post_split_conditions(&self, new_impurity: f64, _old_impurity: f64) -> bool {
+    fn post_split_conditions(&self, _new_impurity: f64, _old_impurity: f64) -> bool {
         return false;
     }
     fn get_split(&self, samples: &[Sample]) -> (SplitHyperplane, f64) {

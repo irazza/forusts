@@ -17,6 +17,8 @@ serde_derive = "1.0.193"
 find_peaks = "0.1.5"
 rand_chacha = "0.3.1"
 dtw_rs = "0.9.5"
+dashmap = "5.5.3"
+lazy_static = "1.4.0"
 
 [profile.release]
 debug = 1

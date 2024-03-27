@@ -108,7 +108,7 @@ impl Tree for ExtraTree {
         }
         return false;
     }
-    fn post_split_conditions(&self, new_impurity: f64, old_impurity: f64) -> bool {
+    fn post_split_conditions(&self, new_impurity: f64, _old_impurity: f64) -> bool {
         // Base case: no split found
         return new_impurity == f64::MAX;
     }

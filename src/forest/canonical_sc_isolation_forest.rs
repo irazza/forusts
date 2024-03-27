@@ -99,7 +99,7 @@ impl Forest<SCIsolationTree> for CanonicalSCIsolationForest {
     }
     fn tuning_predict(
         &self,
-        ds_train: &[Sample],
+        _ds_train: &[Sample],
         ds_test: &[Sample],
     ) -> Vec<Self::TuningType> {
         self.score_samples(ds_test)

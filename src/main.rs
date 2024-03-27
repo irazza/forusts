@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::feature_extraction::statistics::{mean, median, zscore};
 use crate::forest::distance_forest::{DistanceForest, DistanceForestConfig};
 use crate::forest::forest::Forest;
@@ -38,7 +39,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     for i in 0..n_repetitions {
         println!("Repetition {}", i + 1);
         //let mut predictions = Vec::new();
-        for path in &datasets[53..54] {
+        for path in &datasets[1..2] {
             println!(
                 "\tProcessing {}",
                 path.file_name().unwrap().to_string_lossy()
@@ -69,14 +70,17 @@ fn main() -> Result<(), Box<dyn Error>> {
                 max_features: tree::tree::MaxFeatures::All,
                 max_depth: None,
                 criterion: tree::tree::Criterion::Gini,
-                bootstrap: false,
+                bootstrap: true,
             };
             let mut model = DistanceForest::new(config);
             //let mut ds_train = ds_train.iter().map(|x| Sample{data: Arc::new(zscore(&x.data)), target: x.target}).collect::<Vec<_>>();
-            //let start_time = std::time::Instant::now();
+            let start_time = std::time::Instant::now();
             model.fit(&mut ds_train);
+            println!("\t\tTraining time: {:?}", start_time.elapsed());
             //let ds_test = ds_test.iter().map(|x| Sample{data: Arc::new(zscore(&x.data)), target: x.target}).collect::<Vec<_>>();
+            let start_time = std::time::Instant::now();
             let y_pred = model.predict(&ds_test);
+            println!("\t\tPrediction time: {:?}", start_time.elapsed());
             let acc = accuracy_score(&y_pred, &y_true);
             mean_acc.push(acc);
             println!("\t\tAccuracy: {}", acc);

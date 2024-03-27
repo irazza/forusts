@@ -243,7 +243,7 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
                     // Remove duplicates based on feature and threshold
                     union.sort_by(|s1, s2| s1.cmp(s2));
                     union.dedup_by(|a, b| a == b);
-                    let agree = union.iter().filter(|s| s.split(x1) == s.split(x2)).count() as f64;
+                    let agree = union.iter().filter(|s| s.split(x1, false) == s.split(x2, false)).count() as f64;
                     *distance_matrix[i][j].lock() += 1.0
                         - if union.len() == 0 {
                             1.0

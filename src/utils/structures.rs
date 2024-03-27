@@ -1,13 +1,11 @@
 use hashbrown::HashMap;
-use rand::{seq::SliceRandom, Rng};
+use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use std::{
-    borrow::Cow,
     cmp::{max, min},
     mem::swap, sync::Arc,
 };
 
-use crate::{distance, feature_extraction::statistics::unique};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Sample {

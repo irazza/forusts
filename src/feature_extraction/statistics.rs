@@ -226,7 +226,7 @@ pub fn fisher_score(
 
     let x_mean = mean(x);
 
-    for (i, cls) in classes.iter().enumerate() {
+    for cls in classes.iter() {
         let x_cls = x
             .iter()
             .enumerate()

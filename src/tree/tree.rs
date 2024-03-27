@@ -48,7 +48,7 @@ impl Criterion {
     }
 }
 pub trait SplitParameters: Sync + Send + Debug + Ord + Eq {
-    fn split(&self, samples: &Sample) -> bool;
+    fn split(&self, samples: &Sample, is_train: bool) -> bool;
     fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample) -> f64;
 }
 
@@ -66,7 +66,7 @@ impl Ord for SplitTest {
 impl Eq for SplitTest {}
 
 impl SplitParameters for SplitTest {
-    fn split(&self, sample: &Sample) -> bool {
+    fn split(&self, sample: &Sample, _is_train: bool) -> bool {
         sample.data[self.feature] < self.threshold
     }
     fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample) -> f64 {
@@ -180,7 +180,7 @@ pub trait Tree: Sync + Send {
         } = node
         {
             path.push(split_params);
-            if split_params.split(x) {
+            if split_params.split(x, true) {
                 node = left;
             } else {
                 node = right;
@@ -200,7 +200,7 @@ pub trait Tree: Sync + Send {
             n_samples: _,
         } = node
         {
-            if split_params.split(x) {
+            if split_params.split(x, false) {
                 node = left;
             } else {
                 node = right;
@@ -216,7 +216,7 @@ pub trait Tree: Sync + Send {
         let mut last = samples.len();
 
         while idx < last {
-            if parameters.split(&samples[idx]) {
+            if parameters.split(&samples[idx], true) {
                 idx += 1;
             } else {
                 samples.swap(idx, last - 1);
@@ -362,7 +362,7 @@ pub trait Tree: Sync + Send {
 
         impurity
     }
-    fn random_impurity(class_counts: &HashMap<isize, usize>) -> f64 {
+    fn random_impurity(_class_counts: &HashMap<isize, usize>) -> f64 {
         return thread_rng().gen_range(0.0..1.0);
     }
     fn sd_gain(y_l: &[f64], y_r: &[f64]) -> f64 {

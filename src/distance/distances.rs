@@ -2,7 +2,11 @@ use std::{
     cmp::{max, min}, mem::swap, sync::atomic::AtomicU64, thread::current
 };
 
+use dashmap::DashMap;
+use lazy_static::lazy_static;
 use dtw_rs::{Algorithm, DynamicTimeWarping};
+
+use crate::utils::float_handling::FloatEq;
 
 pub fn euclidean(x1: &[f64], x2: &[f64]) -> f64 {
     assert!(x1.len() == x2.len());
@@ -23,7 +27,20 @@ pub fn test_twe() {
     println!("TWE: {}, time: {:?}", result, start.elapsed());
 }
 
+lazy_static! {
+    static ref TWE_CACHE: DashMap<(Vec<FloatEq>, Vec<FloatEq>), f64> = DashMap::new();
+}
 pub fn twe(x1: &[f64], x2: &[f64]) -> f64 {
+
+    // TWE_CACHE
+    let x1_cache = x1.iter().copied().map(FloatEq).collect::<Vec<_>>();
+    let x2_cache = x2.iter().copied().map(FloatEq).collect::<Vec<_>>();
+    let mut key_cache = (x1_cache, x2_cache);
+
+    if let Some(value) = TWE_CACHE.get(&key_cache) {
+        return *value.value();
+    }
+
     let nu = 0.001;
     let lambda = 1.0;
 
@@ -31,7 +48,7 @@ pub fn twe(x1: &[f64], x2: &[f64]) -> f64 {
     let m = x2.len();
 
     let delete_addition = nu + lambda;
-    let sakoe_chiba = 0.7;
+    let sakoe_chiba = 1.0;
     let sakoe_chiba_window_radius = (n as f64 + 1.0) * sakoe_chiba;
 
     let alpha = ((m) as f64) / ((n) as f64);
@@ -76,7 +93,14 @@ pub fn twe(x1: &[f64], x2: &[f64]) -> f64 {
         }
         swap(&mut previous, &mut current);
     }
-    return previous[m];
+    let distance = previous[m];
+
+    TWE_CACHE.insert(key_cache.clone(), distance);
+    swap(&mut key_cache.0, &mut key_cache.1);
+    TWE_CACHE.insert(key_cache, distance);
+
+
+    distance
 }
 
 #[test]
@@ -92,7 +116,7 @@ pub fn dtw(x1: &[f64], x2: &[f64]) -> f64 {
     let n = x1.len();
     let m = x2.len();
 
-    let sakoe_chiba = 0.7;
+    let sakoe_chiba = 1.0;
     let sakoe_chiba_window_radius = (n as f64 + 1.0) * sakoe_chiba;
 
     let alpha = ((m) as f64) / ((n) as f64);

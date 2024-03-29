@@ -321,6 +321,14 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
             self.compute_anomaly_scores(data)
         }
     }
+    fn compute_as_per_tree(&self, data: &[Sample]) -> Vec<Vec<f64>> {
+        let mut scores = Vec::new();
+        for (i, tree) in self.get_trees().iter().enumerate() {
+            let transformed_x = self.transform(data, i);
+            scores.push(transformed_x.iter().map(|s| Self::path_length(tree, s)).collect());
+        }
+        scores
+    }
     fn compute_enhanced_anomaly_scores(&self, data: &[Sample]) -> Vec<f64> {
         let mut scores = Vec::new();
         let max_samples = self.get_max_samples() as f64;

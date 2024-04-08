@@ -175,24 +175,23 @@ pub fn msm(x1: &[f64], x2: &[f64]) -> f64 {
     let n = x1.len();
     let m = x2.len();
 
-    let mut cost_matrix = vec![vec![0.0; m]; n];
-    cost_matrix[0][0] = (x1[0] - x2[0]).abs();
-    for i in 1..n {
-        cost_matrix[i][0] = cost_matrix[i - 1][0] + msm_cost_function(x1[i], x1[i - 1], x2[0]);
-    }
+    let mut previous = vec![0.0; m];
+    let mut current = vec![0.0; m];
+    previous[0] = (x1[0] - x2[0]).abs();
     for j in 1..m {
-        cost_matrix[0][j] = cost_matrix[0][j - 1] + msm_cost_function(x2[j], x1[0], x2[j-1]);
+        previous[j] = previous[j - 1] + msm_cost_function(x2[j], x1[0], x2[j - 1]);
     }
 
     for i in 1..n {
+        current[0] = previous[0] + msm_cost_function(x1[i], x1[i - 1], x2[0]);
         for j in 1..m {
-            let c1 = cost_matrix[i-1][j-1] + (x1[i] - x2[j]).abs();
-            let c2 = cost_matrix[i-1][j] + msm_cost_function(x1[i], x1[i-1], x2[j]);
-            let c3 = cost_matrix[i][j-1] + msm_cost_function(x2[j], x1[i], x2[j-1]);
-            cost_matrix[i][j] = c1.min(c2.min(c3));
+            current[j] = (previous[j - 1] + (x1[i] - x2[j]).abs())
+                .min(previous[j] + msm_cost_function(x1[i], x1[i - 1], x2[j]))
+                .min(current[j - 1] + msm_cost_function(x2[j], x1[i], x2[j - 1]));
         }
+        swap(&mut previous, &mut current);
     }
-    cost_matrix[n-1][m-1]
+    previous[m - 1]
 }
 
 fn msm_cost_function(x_i: f64, x_i_1: f64, y_j: f64) -> f64 {

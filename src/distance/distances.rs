@@ -5,6 +5,7 @@ use std::{
 
 use dashmap::DashMap;
 use lazy_static::lazy_static;
+use rayon::vec;
 
 use crate::utils::float_handling::FloatEq;
 
@@ -160,4 +161,48 @@ pub fn dtw(x1: &[f64], x2: &[f64]) -> f64 {
     DTW_CACHE.insert(key_cache, distance);
 
     distance
+}
+
+#[test]
+pub fn test_msm() {
+    let s1 = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+    let s2 = vec![10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0];
+    let result = msm(&s1, &s2);
+    println!("MSM: {}", result);
+}
+
+pub fn msm(x1: &[f64], x2: &[f64]) -> f64 {
+    let n = x1.len();
+    let m = x2.len();
+
+    let mut cost_matrix = vec![vec![0.0; m]; n];
+    cost_matrix[0][0] = (x1[0] - x2[0]).abs();
+    for i in 1..n {
+        cost_matrix[i][0] = cost_matrix[i - 1][0] + msm_cost_function(x1[i], x1[i - 1], x2[0]);
+    }
+    for j in 1..m {
+        cost_matrix[0][j] = cost_matrix[0][j - 1] + msm_cost_function(x2[j], x1[0], x2[j-1]);
+    }
+
+    for i in 1..n {
+        for j in 1..m {
+            let c1 = cost_matrix[i-1][j-1] + (x1[i] - x2[j]).abs();
+            let c2 = cost_matrix[i-1][j] + msm_cost_function(x1[i], x1[i-1], x2[j]);
+            let c3 = cost_matrix[i][j-1] + msm_cost_function(x2[j], x1[i], x2[j-1]);
+            cost_matrix[i][j] = c1.min(c2.min(c3));
+        }
+    }
+    cost_matrix[n-1][m-1]
+}
+
+fn msm_cost_function(x_i: f64, x_i_1: f64, y_j: f64) -> f64 {
+    lazy_static! {
+        static ref c: f64 = 1.0;
+    }
+
+    if (x_i >= x_i_1 && x_i <= y_j) || (x_i_1 >= x_i && x_i >= y_j) {
+        *c
+    } else {
+        *c + (x_i - x_i_1).abs().min((x_i - y_j).abs())
+    }
 }

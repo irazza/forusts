@@ -1,71 +1,170 @@
-use std::{fmt::Debug, sync::Arc};
+use std::{cmp::max, fmt::Debug, sync::Arc};
 
 use super::{
-    node::Node,
-    tree::{Criterion, SplitParameters},
+    node::{LeafClassification, Node},
+    tree::{Criterion, MaxFeatures, SplitParameters},
 };
 use crate::{
-    distance::distances::twe, feature_extraction::statistics, forest::forest::{ClassificationForestConfig, ClassificationTree}, tree::tree::Tree, utils::{float_handling::FloatVecEq, structures::Sample}
+    distance::{self, distances::{self, euclidean}}, feature_extraction::statistics::stddev, forest::forest::{ClassificationForestConfig, ClassificationTree}, tree::tree::Tree, utils::structures::Sample
 };
-use rand::{seq::SliceRandom, thread_rng, Rng};
+use hashbrown::HashMap;
+use rand::{seq::SliceRandom, thread_rng, Rng, SeedableRng};
+use rand_chacha::ChaCha8Rng;
 
-#[derive(Clone, PartialEq, PartialOrd)]
-pub struct DistanceSplit {
-    pub left_candidates: Vec<Arc<Vec<f64>>>,
-    pub right_candidates: Vec<Arc<Vec<f64>>>,
+const N_HYPERPLANES: usize = 10;
+
+#[derive(Clone, Debug, PartialOrd, PartialEq)]
+pub struct DistanceSplitHyperplane {
+    c: Vec<f64>,
+    means: Vec<f64>,
+    idx_attributes: Vec<usize>,
+    candidates: Vec<Arc<Vec<f64>>>,
+    p: f64,
+    best_gain: f64,
+    limit: f64,
 }
-
-impl Ord for DistanceSplit {
+impl DistanceSplitHyperplane {
+    pub fn get_dist(&self, sample: &Sample) -> f64 {
+        let mut sum = 0.0;
+        for i in 0..self.c.len() {
+            sum += self.c[i]
+                * (euclidean(&sample.data, &self.candidates[i]) - self.means[self.idx_attributes[i]]);
+        }
+        sum - self.p
+    }
+}
+impl Eq for DistanceSplitHyperplane {}
+impl Ord for DistanceSplitHyperplane {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap()
+        self.p.partial_cmp(&other.p).unwrap()
     }
 }
-impl Eq for DistanceSplit {}
-
-impl Debug for DistanceSplit {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("DistanceSplit")
-            .field("left_candidates", &self.left_candidates.len())
-            .field("right_candidates", &self.right_candidates.len())
-            .finish()
+impl SplitParameters for DistanceSplitHyperplane {
+    fn split(&self, sample: &Sample, _is_train: bool) -> bool {
+        self.get_dist(sample) < 0.0
+    }
+    fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample) -> f64 {
+        unreachable!();
     }
 }
 
-impl SplitParameters for DistanceSplit {
-    fn split(&self, sample: &Sample, is_train: bool) -> bool {
-        if is_train {
-            return self.left_candidates.iter().any(|ts| sample.data == *ts);
-        }
-        let mut left_distances = Vec::new();
-        for candidate in &self.left_candidates {
-            left_distances.push(twe(&sample.data, candidate));
-        }
-        let mut right_distances = Vec::new();
-        for candidate in &self.right_candidates {
-            right_distances.push(twe(&sample.data, candidate));
-        }
-
-        let left_dist = left_distances.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
-        let right_dist = right_distances.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
-        left_dist < right_dist
-    }
-
-    fn path_length<T: Tree<SplitParameters = Self>>(_tree: &T, _x: &Sample) -> f64 {
-        unreachable!()
-    }
-}
 
 #[derive(Clone, Debug)]
 pub struct DistanceTreeConfig {
     pub max_depth: usize,
     pub min_samples_split: usize,
     pub criterion: Criterion,
+    pub max_features: MaxFeatures,
 }
 
 #[derive(Clone, Debug)]
 pub struct DistanceTree {
-    root: Node<DistanceSplit>,
+    root: Node<DistanceSplitHyperplane>,
     config: DistanceTreeConfig,
+}
+impl DistanceTree {
+    fn get_random_hyperplane(
+        &self,
+        data: &[Sample],
+        samples: &Vec<Vec<f64>>,
+        targets: &Vec<isize>,
+        n_attributes: usize,
+        means: &[f64],
+        stddevs: &[f64],
+        random_state: &mut ChaCha8Rng
+    ) -> DistanceSplitHyperplane {
+        // Compute the impurity of the parent node
+        let mut parent = HashMap::new();
+        for s in targets.iter() {
+            *parent.entry(*s).or_insert(0) += 1;
+        }
+        
+        let parent_impurity = self.config.criterion.to_fn::<DistanceTree>()(&parent);
+
+        let idxs_candidates = stddevs
+            .iter()
+            .enumerate()
+            .filter(|(_, v)| **v > f64::EPSILON)
+            .map(|(i, _)| i)
+            .collect::<Vec<_>>();
+        let mut subsampled_features = idxs_candidates;
+        subsampled_features.shuffle(random_state);
+        subsampled_features.truncate(n_attributes);
+        let c = (0..subsampled_features.len())
+            .into_iter()
+            .map(|i| random_state.gen_range(-1.0..=1.0) / stddevs[subsampled_features[i]])
+            .collect::<Vec<_>>();
+        let mut p = samples
+            .iter()
+            .map(|s| {
+                c.iter()
+                    .zip(subsampled_features.iter())
+                    .map(|(c, i)| c * (s[*i] - means[*i]))
+                    .sum::<f64>()
+            })
+            .collect::<Vec<f64>>();
+        p.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
+        //let p_stddev = stddev(&p);
+        let mut best_p = 0.0;
+        let mut best_gain = 0.0;
+
+        for i in 1..p.len() {
+            let mut left = HashMap::new();
+            let mut right = HashMap::new();
+
+            let split = DistanceSplitHyperplane {
+                c: c.clone(),
+                means: means.to_vec(),
+                idx_attributes: subsampled_features.clone(),
+                candidates: subsampled_features.iter().map(|i| data[*i].data.clone()).collect::<Vec<_>>(),
+                p: p[i],
+                best_gain: 0.0,
+                limit: p[p.len() - 1] - p[0],
+            };
+
+            for j in 0..samples.len() {
+                if split.split(&data[j], true) {
+                    *left.entry(targets[j]).or_insert(0) += 1;
+                } else {
+                    *right.entry(targets[j]).or_insert(0) += 1;
+                }
+            }
+
+            // Compute the impurity of the split
+            let n_samples = samples.len() as f64;
+            let n_left = left.values().sum::<usize>() as f64;
+            let n_right = right.values().sum::<usize>() as f64;
+            let left_impurity = self.config.criterion.to_fn::<DistanceTree>()(&left) * (n_left / n_samples);
+            let right_impurity = self.config.criterion.to_fn::<DistanceTree>()(&right) * (n_right / n_samples);
+
+            // Compute the weighted impurity of the split
+            let impurity = match self.config.criterion {
+                Criterion::Gini => {
+                    parent_impurity - (left_impurity + right_impurity)
+                }
+                Criterion::Entropy => {
+                    parent_impurity - (left_impurity + right_impurity)
+                }
+                Criterion::Random => left_impurity + right_impurity,
+            };
+
+            // Compute the gain of the split
+            if impurity > best_gain {
+                best_gain = impurity;
+                best_p = p[i];
+                //println!("{}, {}", left.values().sum::<usize>(), right.values().sum::<usize>());
+            }
+        }
+        DistanceSplitHyperplane {
+            c: c,
+            means: means.to_vec(),
+            idx_attributes: subsampled_features.clone(),
+            candidates:  subsampled_features.iter().map(|i| data[*i].data.clone()).collect::<Vec<_>>(),
+            p: best_p,
+            best_gain: best_gain,
+            limit: p[p.len() - 1] - p[0],
+        }
+    }
 }
 
 impl ClassificationTree for DistanceTree {
@@ -75,13 +174,14 @@ impl ClassificationTree for DistanceTree {
             min_samples_split: config.min_samples_split,
             // Setted to 2 to avoid empty child when splitting when there are only two samples
             criterion: config.criterion,
+            max_features: config.max_features,
         })
     }
 }
 
 impl Tree for DistanceTree {
     type Config = DistanceTreeConfig;
-    type SplitParameters = DistanceSplit;
+    type SplitParameters = DistanceSplitHyperplane;
     fn new(config: Self::Config) -> Self {
         Self {
             root: Node::new(),
@@ -99,8 +199,7 @@ impl Tree for DistanceTree {
     }
     fn pre_split_conditions(&self, samples: &[Sample], current_depth: usize) -> bool {
         // Base case: not enough samples or max depth reached
-        if samples.len() <= self.config.min_samples_split || current_depth == self.config.max_depth
-        {
+        if samples.len() <= self.config.min_samples_split || current_depth == self.config.max_depth {
             return true;
         }
         // Base case: all samples have the same target
@@ -113,44 +212,58 @@ impl Tree for DistanceTree {
         }
         return false;
     }
-    fn post_split_conditions(&self, new_impurity: f64, _old_impurity: f64) -> bool {
-        // Check if there is a non empty split
-        if new_impurity == std::f64::INFINITY {
+    fn post_split_conditions(&self, new_impurity: f64, old_impurity: f64) -> bool {
+        if (new_impurity - old_impurity).abs() < f64::EPSILON {
             return true;
         }
         return false;
     }
 
     fn get_split(&self, samples: &[Sample]) -> (Self::SplitParameters, f64) {
-        let mut samples = samples.iter().map(|s| s.data.clone()).collect::<Vec<_>>();
-        samples.shuffle(&mut thread_rng());
+        //let mut rng = ChaCha8Rng::seed_from_u64(42 as u64);
+        let mut rng = ChaCha8Rng::from_rng(thread_rng()).unwrap();
+        let n_features = self.config.max_features.convert(samples.len());
+        let mut stddev = vec![0.0; samples.len()];
+        let mut means = vec![0.0; samples.len()];
 
-        // let mut unique_samples = HashSet::new();
-        // for sample in &samples {
-        //     unique_samples.insert(FloatVecEq(sample.clone()));
-        // }
-        // let idx_split = thread_rng().gen_range(1..samples.len()-1);
-        let mut left_candidates = Vec::new();
-        let mut right_candidates = Vec::new();
-
-        for (i, sample) in samples.into_iter().enumerate() {
-            if i % 2 == 0 {
-                left_candidates.push(FloatVecEq(sample).0);
-            } else {
-                right_candidates.push(FloatVecEq(sample).0);
+        let mut distances = vec![vec![0.0; samples.len()]; samples.len()];
+        for i in 0..samples.len() {
+            for j in 0..samples.len() {
+                distances[i][j] = euclidean(&samples[i].data, &samples[j].data);
+                distances[j][i] = distances[i][j];
             }
         }
+        let targets = samples.iter().map(|s| s.target).collect::<Vec<_>>();
 
-        // let mut left_candidates = samples[..idx_split].iter().map(|s| s.clone()).collect();
-        // let mut right_candidates = samples[idx_split..].iter().map(|s| s.clone()).collect();
-
-        let split = DistanceSplit {
-            left_candidates: left_candidates,
-            right_candidates: right_candidates,
+        for i in 0..distances.len() {
+            let mean = distances.iter().map(|v| v[i]).sum::<f64>() / distances.len() as f64;
+            let variance = distances
+                .iter()
+                .map(|v| (v[i] - mean).powi(2))
+                .sum::<f64>()
+                / distances.len() as f64;
+            stddev[i] = variance.sqrt();
+            means[i] = mean;
+        }
+        let mut best_gain = 0.0;
+        let mut best_hp = DistanceSplitHyperplane {
+            c: Vec::new(),
+            means: Vec::new(),
+            idx_attributes: Vec::new(),
+            candidates: Vec::new(),
+            p: 0.0,
+            best_gain: 0.0,
+            limit: 0.0,
         };
 
-        let impurity = thread_rng().gen_range(0.0..1.0);
+        for _i in 0..N_HYPERPLANES {
+            let hp = self.get_random_hyperplane(samples, &distances, &targets, n_features, &means, &stddev, &mut rng);
+            if best_gain < hp.best_gain {
+                best_gain = hp.best_gain;
+                best_hp = hp.clone();
+            }
 
-        (split, impurity)
+        }
+        (best_hp.clone(), best_hp.best_gain)
     }
 }

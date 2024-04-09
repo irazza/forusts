@@ -40,6 +40,7 @@ grid_search_tuning! {
         pub criterion: Criterion,
         pub bootstrap: bool,
     }
+    
 }
 
 pub trait ClassificationTree: Tree {

@@ -3,7 +3,7 @@ use core::fmt::Debug;
 use hashbrown::HashMap;
 use rand::{thread_rng, Rng};
 use serde_derive::{Deserialize, Serialize};
-use std::{cmp::max, ops::Deref};
+use std::{cmp::max, fmt::Display, ops::Deref};
 
 use crate::{feature_extraction::statistics::stddev, utils::structures::Sample};
 
@@ -19,8 +19,8 @@ impl MaxFeatures {
     pub fn convert(&self, n_features: usize) -> usize {
         match self {
             MaxFeatures::All => n_features,
-            MaxFeatures::Sqrt => (n_features as f64).sqrt() as usize,
-            MaxFeatures::Log2 => (n_features as f64).log2() as usize,
+            MaxFeatures::Sqrt => max(1, (n_features as f64).sqrt() as usize),
+            MaxFeatures::Log2 => max(1, (n_features as f64).log2() as usize),
         }
     }
 }
@@ -31,19 +31,21 @@ pub enum Criterion {
     Random,
 }
 impl Criterion {
-    pub fn to_string(self) -> &'static str {
-        match self {
-            Criterion::Gini => "gini",
-            Criterion::Entropy => "entropy",
-            Criterion::Random => "random",
-        }
-    }
-
     pub fn to_fn<T: Tree>(self) -> fn(&HashMap<isize, usize>) -> f64 {
         match self {
             Criterion::Gini => T::gini_impurity,
             Criterion::Entropy => T::entropy_impurity,
             Criterion::Random => T::random_impurity,
+        }
+    }
+}
+
+impl Display for Criterion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Criterion::Gini => write!(f, "G"),
+            Criterion::Entropy => write!(f, "E"),
+            Criterion::Random => write!(f, "R"),
         }
     }
 }
@@ -94,7 +96,7 @@ pub trait Tree: Sync + Send {
     fn fit(&mut self, data: &[Sample]) {
         let _n_features = data[0].data.len();
         let data = &mut data.to_vec();
-        let root = self.build_tree(data, self.get_max_depth(), f64::MAX);
+        let root = self.build_tree(data, self.get_max_depth(), 0.0);
         self.set_root(root);
     }
     fn build_tree(

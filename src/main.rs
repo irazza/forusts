@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     for i in 0..n_repetitions {
         println!("Repetition {}", i + 1);
         //let mut predictions = Vec::new();
-        for path in &datasets[1..2] {
+        for path in &datasets {
             println!(
                 "\tProcessing {}",
                 path.file_name().unwrap().to_string_lossy()
@@ -64,10 +64,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             let config = DistanceForestConfig {
                 n_trees: 100,
                 min_samples_split: 2,
-                max_features: tree::tree::MaxFeatures::All,
+                max_features: tree::tree::MaxFeatures::Log2,
                 max_depth: None,
                 criterion: tree::tree::Criterion::Gini,
-                bootstrap: false,
+                bootstrap: true,
             };
             let mut model = DistanceForest::new(config);
             //let mut ds_train = ds_train.iter().map(|x| Sample{data: Arc::new(zscore(&x.data)), target: x.target}).collect::<Vec<_>>();
@@ -80,6 +80,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!("\t\tPrediction time: {:?}", start_time.elapsed());
             let acc = accuracy_score(&y_pred, &y_true);
             mean_acc.push(acc);
+
             println!("\t\tAccuracy: {}", acc);
             wtr.write_record(&[
                 path.file_name().unwrap().to_string_lossy().to_string(),

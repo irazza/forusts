@@ -123,17 +123,17 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
         trees.par_iter().enumerate().for_each(|(i, tree)| {
             let transformed_x1 = self.transform(&x1, i);
             let transformed_x2 = self.transform(&x2, i);
-            let x1_nodes = transformed_x1
+            let x1_leaves = transformed_x1
                 .iter()
                 .map(|x| tree.predict_leaf(x))
                 .collect::<Vec<_>>();
-            let x2_nodes = transformed_x2
+            let x2_leaves = transformed_x2
                 .iter()
                 .map(|x| tree.predict_leaf(x))
                 .collect::<Vec<_>>();
 
-            for (i, &x1_node) in x1_nodes.iter().enumerate() {
-                for (j, &x2_node) in x2_nodes.iter().enumerate() {
+            for (i, &x1_node) in x1_leaves.iter().enumerate() {
+                for (j, &x2_node) in x2_leaves.iter().enumerate() {
                     distance_matrix[i][j].fetch_add(
                         ((x1_node as *const Node<_>) != (x2_node as *const Node<_>)) as usize,
                         Ordering::Relaxed,
@@ -321,6 +321,14 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
         } else {
             self.compute_anomaly_scores(data)
         }
+    }
+    fn compute_as_per_tree(&self, data: &[Sample]) -> Vec<Vec<f64>> {
+        let mut scores = Vec::new();
+        for (i, tree) in self.get_trees().iter().enumerate() {
+            let transformed_x = self.transform(data, i);
+            scores.push(transformed_x.iter().map(|s| Self::path_length(tree, s)).collect());
+        }
+        scores
     }
     fn compute_enhanced_anomaly_scores(&self, data: &[Sample]) -> Vec<f64> {
         let mut scores = Vec::new();

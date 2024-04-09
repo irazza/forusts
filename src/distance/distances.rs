@@ -5,6 +5,9 @@ use std::{
 
 use dashmap::DashMap;
 use lazy_static::lazy_static;
+use rayon::vec;
+
+const MSM_C: f64 = 1.0;
 
 use crate::utils::float_handling::FloatEq;
 
@@ -160,4 +163,74 @@ pub fn dtw(x1: &[f64], x2: &[f64]) -> f64 {
     DTW_CACHE.insert(key_cache, distance);
 
     distance
+}
+
+#[test]
+pub fn test_msm() {
+    let s1 = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+    let s2 = vec![10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0];
+    let result = msm(&s1, &s2);
+    println!("MSM: {}", result);
+}
+
+lazy_static! {
+    static ref MSM_CACHE: DashMap<(Vec<FloatEq>, Vec<FloatEq>), f64> = DashMap::new();
+}
+pub fn msm(x1: &[f64], x2: &[f64]) -> f64 {
+
+    // MSM_CACHE
+    let x1_cache = x1.iter().copied().map(FloatEq).collect::<Vec<_>>();
+    let x2_cache = x2.iter().copied().map(FloatEq).collect::<Vec<_>>();
+    let mut key_cache = (x1_cache, x2_cache);
+
+    if let Some(value) = MSM_CACHE.get(&key_cache) {
+        return *value.value();
+    }
+
+    let n = x1.len();
+    let m = x2.len();
+
+    let sakoe_chiba = 1.0;
+    let sakoe_chiba_window_radius = (n as f64 + 1.0) * sakoe_chiba;
+
+    let alpha = ((m) as f64) / ((n) as f64);
+
+    let mut previous = vec![0.0; m];
+    let mut current = vec![0.0; m];
+    previous[0] = (x1[0] - x2[0]).abs();
+    for j in 1..m {
+        previous[j] = previous[j - 1] + msm_cost_function(x2[j], x1[0], x2[j - 1]);
+    }
+
+    for i in 1..n {
+        let lower = alpha * (i as f64) - sakoe_chiba_window_radius;
+        let upper = alpha * (i as f64) + sakoe_chiba_window_radius;
+
+        let lower = max(1, lower.ceil() as usize);
+        let upper = min(m, upper.floor() as usize);
+
+        current[..].fill(f64::INFINITY);
+
+        current[0] = previous[0] + msm_cost_function(x1[i], x1[i - 1], x2[0]);
+        for j in lower..upper {
+            current[j] = (previous[j - 1] + (x1[i] - x2[j]).abs())
+                .min(previous[j] + msm_cost_function(x1[i], x1[i - 1], x2[j]))
+                .min(current[j - 1] + msm_cost_function(x2[j], x1[i], x2[j - 1]));
+        }
+        swap(&mut previous, &mut current);
+    }
+    let distance = previous[m-1];
+
+    DTW_CACHE.insert(key_cache.clone(), distance);
+    swap(&mut key_cache.0, &mut key_cache.1);
+    DTW_CACHE.insert(key_cache, distance);
+
+    return distance;
+}
+fn msm_cost_function(x_i: f64, x_i_1: f64, y_j: f64) -> f64 {
+    if (x_i >= x_i_1 && x_i <= y_j) || (x_i_1 >= x_i && x_i >= y_j) {
+        MSM_C
+    } else {
+        MSM_C + (x_i - x_i_1).abs().min((x_i - y_j).abs())
+    }
 }

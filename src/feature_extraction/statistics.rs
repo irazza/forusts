@@ -264,3 +264,13 @@ pub fn fisher_score(
         num / den
     }
 }
+
+pub fn transpose(x: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+    let mut transposed = vec![vec![0.0; x.len()]; x[0].len()];
+    for i in 0..x.len() {
+        for j in 0..x[i].len() {
+            transposed[j][i] = x[i][j];
+        }
+    }
+    transposed
+}

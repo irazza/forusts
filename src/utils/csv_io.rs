@@ -1,10 +1,37 @@
 use csv::ReaderBuilder;
 use std::error::Error;
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
 
 use crate::utils::structures::Sample;
+
+pub fn read_a_file(path_to_file: &str) -> Vec<String>{
+    // Open the file
+    let file = match File::open(path_to_file) {
+        Ok(file) => file,
+        Err(_) => {
+            panic!("Error: Unable to open the file");
+        }
+    };
+
+    // Create a buffer reader to read the file line by line
+    let reader = BufReader::new(file);
+
+    // Create a vector to store the lines
+    let mut lines: Vec<String> = Vec::new();
+
+    // Read each line and push it into the vector
+    for line in reader.lines() {
+        match line {
+            Ok(line) => lines.push(line),
+            Err(_) => {
+                panic!("Error: Unable to read a line from the file");
+            }
+        }
+    }
+    lines
+}
 
 pub fn read_csv(
     path: impl AsRef<Path>,

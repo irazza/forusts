@@ -228,6 +228,8 @@ fn roc_curve(y_pred: &[f64], y_true: &[isize]) -> (Vec<f64>, Vec<f64>, Vec<f64>)
     let mut fprs = Vec::new();
     let thresholds = unique(y_pred);
 
+    
+
     // Iterate through a range of thresholds
     for threshold in &thresholds {
         // Create a binary vector based on the current threshold

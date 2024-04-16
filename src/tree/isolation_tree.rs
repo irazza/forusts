@@ -4,7 +4,8 @@ use crate::{
     tree::tree::Tree,
     utils::structures::Sample,
 };
-use rand::{seq::SliceRandom, thread_rng, Rng};
+use rand::{seq::SliceRandom, thread_rng, Rng, SeedableRng};
+use rand_chacha::ChaCha8Rng;
 
 #[derive(Clone, Debug)]
 pub struct IsolationTreeConfig {
@@ -65,44 +66,77 @@ impl Tree for IsolationTree {
         return new_impurity == f64::MAX;
     }
     fn get_split(&self, samples: &[Sample]) -> (Self::SplitParameters, f64) {
-        // Generate a random subsample (MaxFeatures) of features (length of sample)
-        let mut features_subsample = (0..samples[0].data.len()).collect::<Vec<_>>();
-        features_subsample.shuffle(&mut thread_rng());
-        let mut feature_counter = 0;
+        //let mut rng = ChaCha8Rng::seed_from_u64(samples.len() as u64);
+        let mut rng = thread_rng();
+        let mut thresholds = Vec::new();
+        let mut feature_idx = 0;
 
-        let mut thresholds = [f64::NAN].to_vec();
-        while thresholds.len() == 1 && feature_counter < features_subsample.len() {
-            thresholds = samples
-                .iter()
-                .map(|f| f.data[features_subsample[feature_counter]])
-                .collect::<Vec<f64>>();
-            thresholds.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        // Iterate over feature to find a features which can be splitted
+        let mut flag = true;
+        while flag {
+            // Choose a random feature
+            feature_idx = rng.gen_range(0..samples[0].data.len());
+
+            // Choose a random threshold
+            thresholds = samples.iter().map(|f| f.data[feature_idx]).collect::<Vec<f64>>();
+            thresholds.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
             thresholds.dedup();
-            feature_counter += 1;
+
+            // If there is only one threshold, choose another feature
+            if thresholds.len() > 1 {
+                flag = false;
+            }
+
         }
-        if feature_counter == features_subsample.len() {
-            // No split found
-            return (
-                SplitTest {
-                    feature: usize::MAX,
-                    threshold: f64::MAX,
-                },
-                f64::MAX,
-            );
-        }
-        let best_feature = features_subsample[feature_counter - 1];
-        let best_threshold = if thresholds.len() == 2 {
-            thresholds[1]
-        } else {
-            thresholds[thread_rng().gen_range(1..thresholds.len() - 1)]
-        };
-        let best_impurity = f64::NAN;
+
+        let threshold_idx = rng.gen_range(1..thresholds.len());
+        let threshold = (thresholds[threshold_idx] + thresholds[threshold_idx - 1]) / 2.0;
+
         (
             SplitTest {
-                feature: best_feature,
-                threshold: best_threshold,
+                feature: feature_idx,
+                threshold,
             },
-            best_impurity,
+            rng.gen_range(f64::EPSILON..1.0),
         )
+        // // Generate a random subsample (MaxFeatures) of features (length of sample)
+        // let mut features_subsample = (0..samples[0].data.len()).collect::<Vec<_>>();
+        // features_subsample.shuffle(&mut thread_rng());
+        // let mut feature_counter = 0;
+
+        // let mut thresholds = [f64::NAN].to_vec();
+        // while thresholds.len() == 1 && feature_counter < features_subsample.len() {
+        //     thresholds = samples
+        //         .iter()
+        //         .map(|f| f.data[features_subsample[feature_counter]])
+        //         .collect::<Vec<f64>>();
+        //     thresholds.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        //     thresholds.dedup();
+        //     feature_counter += 1;
+        // }
+        // if feature_counter == features_subsample.len() {
+        //     // No split found
+        //     return (
+        //         SplitTest {
+        //             feature: usize::MAX,
+        //             threshold: f64::MAX,
+        //         },
+        //         f64::MAX,
+        //     );
+        // }
+        // let best_feature = features_subsample[feature_counter - 1];
+        // let best_threshold = if thresholds.len() == 2 {
+        //     thresholds[1]
+        // } else {
+        //     thresholds[thread_rng().gen_range(1..thresholds.len() - 1)]
+        // };
+        // let best_impurity = f64::NAN;
+        // (
+        //     SplitTest {
+        //         feature: best_feature,
+        //         threshold: best_threshold,
+        //     },
+        //     best_impurity,
+        // )
     }
 }

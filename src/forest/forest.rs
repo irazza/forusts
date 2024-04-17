@@ -356,8 +356,8 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
             let mut average_depth = 0.0;
             let trees: &Vec<T> = self.get_trees();
             for (i, tree) in trees.iter().enumerate() {
-                let transformed_x = self.transform(sample, i).into_iter().next().unwrap();
-                average_depth += Self::path_length(tree, &transformed_x);
+                let transformed_x = self.transform(sample, i);
+                average_depth += Self::path_length(tree, &transformed_x[0]);
             }
             average_depth /= self.get_forest_config().n_trees as f64;
             return ANOMALY_SCORE.powf(-average_depth / denominator);

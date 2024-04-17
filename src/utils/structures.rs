@@ -7,7 +7,7 @@ use std::{
     sync::Arc,
 };
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone, PartialOrd)]
 pub struct Sample {
     pub target: isize,
     pub data: Arc<Vec<f64>>,

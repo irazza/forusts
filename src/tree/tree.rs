@@ -103,7 +103,7 @@ pub trait Tree: Sync + Send {
         max_depth: usize,
         impurity: f64,
     ) -> Node<Self::SplitParameters> {
-        let current_depth = max(1, self.get_max_depth() - max_depth);
+        let current_depth =  self.get_max_depth() - max_depth; // max(1, self.get_max_depth() - max_depth);
 
         if self.pre_split_conditions(samples, current_depth) {
             return Node::Leaf {

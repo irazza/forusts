@@ -1,7 +1,7 @@
 use crate::feature_extraction::statistics::EULER_MASCHERONI;
 use crate::forest::forest::{Forest, OutlierForest};
 use crate::forest::isolation_forest::{IsolationForest, IsolationForestConfig};
-use crate::metrics::classification::roc_auc_score;
+use crate::metrics::classification::{roc_auc_score, roc_auc_score_c};
 use crate::utils::csv_io::read_csv;
 use csv::Writer;
 use feature_extraction::statistics::transpose;
@@ -34,6 +34,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             path.file_name().unwrap().to_string_lossy()
         );
         let mut ds = read_csv(path, b',', false)?;
+        // ds.sort_unstable_by(|a, b| a.partial_cmp(&b).unwrap());
+        // ds.dedup();
+        // println!("\t{} samples with {} features", ds.len(), ds[0].data.len());
+        // let class_0 = ds.iter().filter(|s| s.target == 0).count() as f64;
+        // let class_1 = ds.iter().filter(|s| s.target == 1).count() as f64;
+        // println!("\tClass 0: {}, Class 1: {}", class_0/ds.len() as f64, class_1/ds.len() as f64);
         let y_true = ds.iter().map(|s| s.target).collect::<Vec<_>>();
 
         let config = IsolationForestConfig {
@@ -45,9 +51,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         let mut model = IsolationForest::new(config);
         model.fit(&mut ds);
         let mut anomaly_scores = model.compute_as_per_tree(&ds);
-        let roc_auc = roc_auc_score(&model.score_samples(&ds), &y_true);
+        let roc_auc = roc_auc_score( &model.score_samples(&ds), &y_true);
         println!("\tROC AUC: {}", roc_auc);
-        //
         anomaly_scores.push(y_true.clone().iter().map(|s| *s as f64).collect::<Vec<_>>());
         // Transpose the anomaly scores
         let transposed = transpose(anomaly_scores.clone());
@@ -59,7 +64,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             scores_wrt.write_record(transposed[i].iter().map(|s| s.to_string()).collect::<Vec<_>>())?;
         }
         scores_wrt.flush()?;
-
     }
     Ok(())
 }

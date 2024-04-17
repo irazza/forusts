@@ -228,6 +228,70 @@ fn roc_curve(y_pred: &[f64], y_true: &[isize]) -> (Vec<f64>, Vec<f64>, Vec<f64>)
     let mut fprs = Vec::new();
     let thresholds = unique(y_pred);
 
+    let mut pred_with_true_class = y_pred.iter().copied().zip(y_true.iter().copied()).collect::<Vec<_>>(); 
+    pred_with_true_class.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+
+    let mut true_positives = 0;
+    let mut false_positives = 0;
+
+    let mut false_negatives = pred_with_true_class.iter().filter(|x| x.1 == 1).count();
+    let mut true_negatives = pred_with_true_class.iter().filter(|x| x.1 == 0).count();
+
+    let mut index = 0; 
+
+    // Iterate through a range of thresholds
+    for threshold in &thresholds {
+        // Create a binary vector based on the current threshold
+        while index < pred_with_true_class.len() && pred_with_true_class[index].0 < *threshold {
+            if pred_with_true_class[index].1 == 1 {
+                true_positives += 1;
+                false_negatives -= 1;
+            } else {
+                false_positives += 1;
+                true_negatives -= 1;
+            }
+            index += 1;
+        }
+
+        let not_zero = |x: usize| if x == 0 { 1 } else { x };
+        
+        // Store TPR, FPR, and threshold for the current iteration
+        tprs.push(1.0 - true_positives as f64 / not_zero(true_positives + false_negatives) as f64);
+        fprs.push(1.0 - false_positives as f64 / not_zero(true_negatives + false_positives) as f64);
+    }
+    (fprs, tprs, thresholds)
+}
+
+pub fn roc_auc_score_c(y_pred: &[f64], y_true: &[isize]) -> f64 {
+    // Calculate ROC curve
+    let (fprs, tprs, _) = roc_curve_c(y_pred, y_true);
+
+    // Calculate AUC from the ROC curve
+    let auc_value = auc(&fprs, &tprs);
+
+    auc_value
+}
+
+fn roc_curve_c(y_pred: &[f64], y_true: &[isize]) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+    // Ensure the input vectors have the same length
+    assert_eq!(
+        y_pred.len(),
+        y_true.len(),
+        "Input vectors must have the same length"
+    );
+
+    // Ensure that is a binary problem
+    assert_eq!(
+        unique(y_true).len(),
+        2,
+        "ROC curve is only defined for binary problems"
+    );
+
+    // Initialize vectors to store true positive rate (sensitivity), false positive rate, and thresholds
+    let mut tprs = Vec::new();
+    let mut fprs = Vec::new();
+    let thresholds = unique(y_pred);
+
     
 
     // Iterate through a range of thresholds

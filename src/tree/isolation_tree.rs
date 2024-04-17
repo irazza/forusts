@@ -1,3 +1,5 @@
+use core::panic;
+
 use super::{node::Node, tree::SplitTest};
 use crate::{
     forest::forest::{OutlierForestConfig, OutlierTree},
@@ -22,8 +24,8 @@ pub struct IsolationTree {
 impl OutlierTree for IsolationTree {
     fn from_outlier_config(max_samples: usize, config: &OutlierForestConfig) -> Self {
         Self::new(IsolationTreeConfig {
-            max_depth: config.max_depth.unwrap_or(max_samples.ilog2() as usize + 1),
-            min_samples_split: 2,
+            max_depth: config.max_depth.unwrap_or((max_samples as f64).log2().ceil() as usize),
+            min_samples_split: 1,
             // Setted to 2 to avoid empty child when splitting when there are only two samples
         })
     }
@@ -54,28 +56,29 @@ impl Tree for IsolationTree {
             return true;
         }
         // Base case: samples are the same object
-        let first_sample = &samples[0];
-        let is_all_same_data = samples.iter().all(|v| v == first_sample);
+        let first_sample = &samples[0].data;
+        let is_all_same_data = samples.iter().all(|v| &v.data == first_sample);
         if is_all_same_data {
             return true;
         }
+
         return false;
     }
     fn post_split_conditions(&self, new_impurity: f64, _old_impurity: f64) -> bool {
         // Base case: no split found
-        return new_impurity == f64::MAX;
+        return false;
     }
     fn get_split(&self, samples: &[Sample]) -> (Self::SplitParameters, f64) {
         //let mut rng = ChaCha8Rng::seed_from_u64(samples.len() as u64);
         let mut rng = thread_rng();
         let mut thresholds = Vec::new();
-        let mut feature_idx = 0;
+        let mut candidate = None;
 
         // Iterate over feature to find a features which can be splitted
-        let mut flag = true;
-        while flag {
-            // Choose a random feature
-            feature_idx = rng.gen_range(0..samples[0].data.len());
+        let mut features = (0..samples[0].data.len()).collect::<Vec<_>>();
+        features.shuffle(&mut rng);
+
+        for feature_idx in features {
 
             // Choose a random threshold
             thresholds = samples.iter().map(|f| f.data[feature_idx]).collect::<Vec<f64>>();
@@ -84,59 +87,19 @@ impl Tree for IsolationTree {
 
             // If there is only one threshold, choose another feature
             if thresholds.len() > 1 {
-                flag = false;
+                candidate = Some(feature_idx);
+                break;
             }
-
         }
 
-        let threshold_idx = rng.gen_range(1..thresholds.len());
-        let threshold = (thresholds[threshold_idx] + thresholds[threshold_idx - 1]) / 2.0;
+        let threshold = thresholds[rng.gen_range(1..thresholds.len())];
 
         (
             SplitTest {
-                feature: feature_idx,
+                feature: candidate.unwrap(),
                 threshold,
             },
             rng.gen_range(f64::EPSILON..1.0),
         )
-        // // Generate a random subsample (MaxFeatures) of features (length of sample)
-        // let mut features_subsample = (0..samples[0].data.len()).collect::<Vec<_>>();
-        // features_subsample.shuffle(&mut thread_rng());
-        // let mut feature_counter = 0;
-
-        // let mut thresholds = [f64::NAN].to_vec();
-        // while thresholds.len() == 1 && feature_counter < features_subsample.len() {
-        //     thresholds = samples
-        //         .iter()
-        //         .map(|f| f.data[features_subsample[feature_counter]])
-        //         .collect::<Vec<f64>>();
-        //     thresholds.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        //     thresholds.dedup();
-        //     feature_counter += 1;
-        // }
-        // if feature_counter == features_subsample.len() {
-        //     // No split found
-        //     return (
-        //         SplitTest {
-        //             feature: usize::MAX,
-        //             threshold: f64::MAX,
-        //         },
-        //         f64::MAX,
-        //     );
-        // }
-        // let best_feature = features_subsample[feature_counter - 1];
-        // let best_threshold = if thresholds.len() == 2 {
-        //     thresholds[1]
-        // } else {
-        //     thresholds[thread_rng().gen_range(1..thresholds.len() - 1)]
-        // };
-        // let best_impurity = f64::NAN;
-        // (
-        //     SplitTest {
-        //         feature: best_feature,
-        //         threshold: best_threshold,
-        //     },
-        //     best_impurity,
-        // )
     }
 }

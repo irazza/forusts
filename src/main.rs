@@ -1,8 +1,7 @@
-#![allow(dead_code)]
-use crate::feature_extraction::statistics::mean;
-use crate::forest::distance_forest::{DistanceForest, DistanceForestConfig};
-use crate::forest::forest::Forest;
-use crate::metrics::classification::accuracy_score;
+use crate::feature_extraction::statistics::EULER_MASCHERONI;
+use crate::forest::forest::{Forest, OutlierForest};
+use crate::forest::isolation_forest::{IsolationForest, IsolationForestConfig};
+use crate::metrics::classification::{roc_auc_score, roc_auc_score_c};
 use crate::utils::csv_io::read_csv;
 use crate::utils::structures::ZScoreTransformer;
 
@@ -19,8 +18,7 @@ mod utils;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Settings for the experiments
-    let n_repetitions = 10;
-    let paths = fs::read_dir("/media/aazzari/DATA/UCRArchive_2018")?;
+    let paths = fs::read_dir("../DATA/ADDatasets/")?;
 
     let mut datasets = Vec::new();
     for entry in paths {
@@ -93,3 +91,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Mean accuracy: {}", mean(&mean_acc));
     Ok(())
 }
+
+// let denominator = (2.0 * (f64::ln(model.get_max_samples() as f64 - 1.0) + EULER_MASCHERONI))
+        //     - 2.0 * ((model.get_max_samples() as f64 - 1.0) / model.get_max_samples() as f64);
+        // let mut ans = Vec::new();
+        // for i in 0..anomaly_scores[0].len() {
+        //     let mut ascore = 0.0;        //     for t in anomaly_scores.iter() {
+        //         ascore += t[i];
+        //     }
+        //     ascore /= denominator;
+        //     ans.push(2.0f64.powf(-ascore/model.get_trees().len() as f64));
+        // }
+
+        // let scores = model.score_samples(&ds);
+
+        // assert_eq!(ans.len(), y_true.len());

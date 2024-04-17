@@ -4,7 +4,7 @@ use crate::forest::distance_forest::{DistanceForest, DistanceForestConfig};
 use crate::forest::forest::Forest;
 use crate::metrics::classification::accuracy_score;
 use crate::utils::csv_io::read_csv;
-//use crate::utils::structures::ZScoreTransformer;
+use crate::utils::structures::ZScoreTransformer;
 
 use std::error::Error;
 use std::fs::{self};
@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     for i in 0..n_repetitions {
         println!("Repetition {}", i + 1);
         //let mut predictions = Vec::new();
-        for path in &datasets {
+        for path in &datasets[1..2] {
             println!(
                 "\tProcessing {}",
                 path.file_name().unwrap().to_string_lossy()
@@ -50,19 +50,19 @@ fn main() -> Result<(), Box<dyn Error>> {
                 path.file_name().unwrap().to_string_lossy()
             ));
 
-            //let mut zst = ZScoreTransformer::new();
+            let mut zst = ZScoreTransformer::new();
 
-            let mut ds_train = read_csv(train_path, b'\t', false)?;
+            let ds_train = read_csv(train_path, b'\t', false)?;
 
-            //let mut ds_train = zst.fit_transform(&ds_train);
+            let mut ds_train = zst.fit_transform(&ds_train);
 
             let ds_test = read_csv(test_path, b'\t', false)?;
-            //let ds_test = zst.transform(&ds_test);
+            let ds_test = zst.transform(&ds_test);
 
             let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
 
             let config = DistanceForestConfig {
-                n_trees: 100,
+                n_trees: 500,
                 min_samples_split: 2,
                 max_features: tree::tree::MaxFeatures::Log2,
                 max_depth: None,
@@ -82,6 +82,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             mean_acc.push(acc);
 
             println!("\t\tAccuracy: {}", acc);
+            break;
             wtr.write_record(&[
                 path.file_name().unwrap().to_string_lossy().to_string(),
                 acc.to_string(),

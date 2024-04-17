@@ -95,7 +95,9 @@ pub fn twe(x1: &[f64], x2: &[f64]) -> f64 {
         swap(&mut previous, &mut current);
     }
     let distance = previous[m];
-
+    if TWE_CACHE.len() > 1e6 as usize {
+        return distance;
+    }
     TWE_CACHE.insert(key_cache.clone(), distance);
     swap(&mut key_cache.0, &mut key_cache.1);
     TWE_CACHE.insert(key_cache, distance);
@@ -158,10 +160,12 @@ pub fn dtw(x1: &[f64], x2: &[f64]) -> f64 {
 
     let distance = previous[m].sqrt();
 
+    if DTW_CACHE.len() > 1e6 as usize {
+        return distance;
+    }
     DTW_CACHE.insert(key_cache.clone(), distance);
     swap(&mut key_cache.0, &mut key_cache.1);
     DTW_CACHE.insert(key_cache, distance);
-
     distance
 }
 

@@ -7,6 +7,7 @@ pub mod forest;
 pub mod isolation_forest;
 pub mod mep_isolation_forest;
 //pub mod mp_isolation_forest;
+pub mod distance_set_forest;
 pub mod random_forest;
 pub mod sc_isolation_forest;
 pub mod time_series_forest;

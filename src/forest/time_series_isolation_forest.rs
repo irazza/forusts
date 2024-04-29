@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::sync::Arc;
 
 use crate::feature_extraction::statistics::{mean, slope, stddev};
@@ -18,6 +19,11 @@ grid_search_tuning! {
     pub struct TimeSeriesIsolationForestConfig[TimeSeriesIsolationForestConfigTuning] {
         pub n_intervals: usize,
         pub outlier_config: OutlierForestConfig [OutlierForestConfigTuning],
+    }
+    impl Debug for TimeSeriesIsolationForestConfig {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "TimeSeriesIsolationForestConfig")
+        }
     }
 }
 impl TuningConfig for TimeSeriesIsolationForestConfigTuning {

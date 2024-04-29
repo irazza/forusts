@@ -6,7 +6,7 @@ use std::path::Path;
 
 use crate::utils::structures::Sample;
 
-pub fn read_a_file(path_to_file: &str) -> Vec<String>{
+pub fn read_a_file(path_to_file: &str) -> Vec<String> {
     // Open the file
     let file = match File::open(path_to_file) {
         Ok(file) => file,

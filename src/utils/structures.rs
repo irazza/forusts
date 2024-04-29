@@ -1,5 +1,5 @@
 use hashbrown::HashMap;
-use rand::seq::SliceRandom;
+use rand::{seq::SliceRandom, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::{max, min},
@@ -32,18 +32,19 @@ impl Sample {
 }
 
 pub fn train_test_split(
-    data: &Vec<Sample>,
+    data: &[Sample],
     test_size: f64,
     stratify: bool,
-    random_state: &mut rand_chacha::ChaCha8Rng,
+    random_state: Option<rand_chacha::ChaCha8Rng>,
 ) -> (Vec<Sample>, Vec<Sample>) {
     if data.len() < 2 && (test_size > 0. && test_size < 0.5) {
         panic!("The dataset is too small to be splitted.");
     }
     let mut indices: Vec<usize> = (0..data.len()).collect();
-
+    let mut random_state =
+        random_state.unwrap_or(rand_chacha::ChaCha8Rng::from_rng(rand::thread_rng()).unwrap());
     // Shuffle indices
-    indices.shuffle(random_state);
+    indices.shuffle(&mut random_state);
 
     let test_size = (data.len() as f64 * test_size) as usize;
     let test_size = min(data.len() - 1, max(1, test_size));
@@ -89,8 +90,8 @@ pub fn train_test_split(
             idx += 1;
         }
     }
-    train_data.shuffle(random_state);
-    test_data.shuffle(random_state);
+    train_data.shuffle(&mut random_state);
+    test_data.shuffle(&mut random_state);
     (train_data, test_data)
 }
 
@@ -223,8 +224,6 @@ impl ZScoreTransformer {
 //         for sample in samples {
 //             *class_counts.entry(sample.target).or_insert(0) += 1;
 //         }
-
-
 
 //         let mut best_clusters = HashMap::new();
 //         let mut best_inertia = std::f64::INFINITY;

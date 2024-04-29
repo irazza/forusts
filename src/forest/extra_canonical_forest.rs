@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::feature_extraction::catch22::compute_catch;
 use crate::forest::forest::Forest;
 use crate::grid_search_tuning;
@@ -8,6 +6,8 @@ use crate::tree::extra_tree::ExtraTree;
 use crate::utils::structures::Sample;
 use crate::utils::tuning::TuningConfig;
 use rand::{seq::SliceRandom, thread_rng, Rng};
+use std::fmt::Debug;
+use std::sync::Arc;
 
 use super::forest::{
     ClassificationForest, ClassificationForestConfig, ClassificationForestConfigTuning,
@@ -21,6 +21,11 @@ grid_search_tuning! {
 pub struct ExtraCanonicalForestConfig [ExtraCanonicalForestConfigTuning]{
     pub n_intervals: usize,
     pub classification_config: ClassificationForestConfig [ClassificationForestConfigTuning],
+}
+impl Debug for ExtraCanonicalForestConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ExtraCanonicalForestConfig")
+    }
 }
 }
 impl TuningConfig for ExtraCanonicalForestConfigTuning {

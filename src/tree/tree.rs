@@ -9,7 +9,7 @@ use crate::{feature_extraction::statistics::stddev, utils::structures::Sample};
 
 use super::node::{LeafClassification, Node};
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub enum MaxFeatures {
     All,
     Sqrt,
@@ -24,7 +24,16 @@ impl MaxFeatures {
         }
     }
 }
-#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
+impl Debug for MaxFeatures {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MaxFeatures::All => write!(f, "A"),
+            MaxFeatures::Sqrt => write!(f, "S"),
+            MaxFeatures::Log2 => write!(f, "L"),
+        }
+    }
+}
+#[derive(Copy, Clone, Serialize, Deserialize)]
 pub enum Criterion {
     Gini,
     Entropy,
@@ -40,7 +49,7 @@ impl Criterion {
     }
 }
 
-impl Display for Criterion {
+impl Debug for Criterion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Criterion::Gini => write!(f, "G"),
@@ -105,7 +114,7 @@ pub trait Tree: Sync + Send {
         max_depth: usize,
         impurity: f64,
     ) -> Node<Self::SplitParameters> {
-        let current_depth =  self.get_max_depth() - max_depth; // max(1, self.get_max_depth() - max_depth);
+        let current_depth = self.get_max_depth() - max_depth; // max(1, self.get_max_depth() - max_depth);
 
         if self.pre_split_conditions(samples, current_depth) {
             return Node::Leaf {
@@ -127,6 +136,15 @@ pub trait Tree: Sync + Send {
         }
 
         let (left_data, right_data) = Self::split(samples, &best_split_parameters);
+
+        if left_data.len() == 0 || right_data.len() == 0 {
+            return Node::Leaf {
+                class: Self::get_leaf_class(samples, Some(&best_split_parameters)),
+                depth: current_depth,
+                impurity: f64::EPSILON,
+                n_samples: samples.len(),
+            };
+        }
 
         assert!(
             left_data.len() > 0 && right_data.len() > 0,

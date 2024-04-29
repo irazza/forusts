@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::feature_extraction::statistics::{mean, slope, stddev};
 use crate::forest::forest::{ClassificationForest, Forest};
 use crate::grid_search_tuning;
@@ -7,6 +5,8 @@ use crate::tree::decision_tree::DecisionTree;
 use crate::utils::structures::Sample;
 use crate::utils::tuning::TuningConfig;
 use rand::{thread_rng, Rng};
+use std::fmt::Debug;
+use std::sync::Arc;
 
 use super::forest::{ClassificationForestConfig, ClassificationForestConfigTuning};
 
@@ -17,6 +17,11 @@ pub struct TimeSeriesForestConfig [TimeSeriesForestConfigTuning]{
     pub n_intervals: usize,
     pub min_interval_length: usize,
     pub classification_config: ClassificationForestConfig [ClassificationForestConfigTuning],
+}
+impl Debug for TimeSeriesForestConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TimeSeriesForestConfig")
+    }
 }
 }
 impl TuningConfig for TimeSeriesForestConfigTuning {

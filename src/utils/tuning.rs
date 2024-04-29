@@ -64,9 +64,12 @@ macro_rules! grid_search_tuning {
                 pub $field:ident: $type_:ty $([$tuning_impl:ident])?
             ),+ $(,)?
         }
+        impl $impl_name:ident for $impl_ty:ty {
+            $($body:tt)*
+        }
 
     ) => {
-        #[derive(Clone, Copy, serde::Serialize, serde::Deserialize, Debug)]
+        #[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
         pub struct $name {
             $(
                pub $field: $type_
@@ -77,6 +80,9 @@ macro_rules! grid_search_tuning {
             $(
                pub $field: $crate::generate_tuning_type!($type_$([$tuning_impl])?)
             ),+
+        }
+        impl $impl_name for $impl_ty {
+            $($body)*
         }
 
         impl crate::utils::tuning::GridSearch for $tuning_name {

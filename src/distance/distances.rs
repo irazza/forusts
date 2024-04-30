@@ -72,6 +72,35 @@ pub fn find_sakoe_chiba_band(x: &[Sample]) -> f64 {
     best_band
 }
 
+pub fn find_optimal_band(ds: &[Sample], dist_fn: fn(&[f64], &[f64], f64) -> f64, band_values: &[f64]) -> f64 {
+    let mut best_band = 0.0;
+    let mut best_error = f64::MAX;
+
+    //let band_values = (0..=100).step_by(10).map(|x| x as f64 / 100.0); // adjust as needed
+    // println!("Band values: {:?}", band_values.clone().collect::<Vec<_>>());
+    for band in band_values {
+        let mut total_error = 0.0;
+        for (i, sample) in ds.iter().enumerate() {
+            let mut rest_ds = ds.to_vec();
+            rest_ds.remove(i);
+            let mut distances = rest_ds.iter()
+                .map(|other_sample| (dist_fn(&sample.data, &other_sample.data, *band), other_sample.target))
+                .collect::<Vec<_>>();
+            distances.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+            let predicted_label = distances[0].1;
+            let error = if predicted_label == sample.target { 0.0 } else { 1.0 };
+            total_error += error;
+        }
+        let mean_error = total_error / ds.len() as f64;
+        if mean_error < best_error {
+            best_error = mean_error;
+            best_band = *band;
+        }
+    }
+
+    best_band
+}
+
 pub fn twe(x1: &[f64], x2: &[f64], sakoe_chiba: f64) -> f64 {
     let nu = 0.001;
     let lambda = 1.0;

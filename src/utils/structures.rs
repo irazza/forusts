@@ -1,6 +1,7 @@
-use hashbrown::HashMap;
-use rand::{seq::SliceRandom, SeedableRng};
+use hashbrown::{HashMap, HashSet};
+use rand::{seq::SliceRandom, thread_rng, SeedableRng};
 use serde::{Deserialize, Serialize};
+use core::num;
 use std::{
     cmp::{max, min},
     mem::swap,
@@ -118,6 +119,7 @@ impl KUnionFind {
         self.parent[x_root] = y_root;
     }
     pub fn get_clusters(&mut self, distances: &Vec<Vec<f64>>) -> Vec<Vec<usize>> {
+
         for (i, obj) in distances.iter().enumerate() {
             let mut nn = obj.iter().enumerate().collect::<Vec<_>>();
             nn.select_nth_unstable_by(self.k, |a, b| a.1.partial_cmp(b.1).unwrap());
@@ -125,6 +127,7 @@ impl KUnionFind {
                 self.union(i, *j);
             }
         }
+
         let mut clusters = HashMap::new();
         for i in 0..distances.len() {
             let root = self.find(i);
@@ -190,6 +193,59 @@ impl ZScoreTransformer {
         let transformed = self.transform(samples);
         transformed
     }
+}
+
+fn mean_distance(points: &Vec<usize>, distance_matrix: &Vec<Vec<f64>>) -> usize {
+    let mut mean_distance = vec![0.0; distance_matrix.len()];
+    for &point in points {
+        for (m, &value) in mean_distance.iter_mut().zip(&distance_matrix[point]) {
+            *m += value / points.len() as f64;
+        }
+    }
+    mean_distance.iter().enumerate().min_by(|&(_, a), &(_, b)| a.partial_cmp(b).unwrap()).map(|(index, _)| index).unwrap()
+}
+
+pub fn k_means(k: usize, distance_matrix: &Vec<Vec<f64>>) -> Vec<usize> {
+    if distance_matrix.len() < k {
+        panic!("The number of clusters must be less than the number of samples.");
+    }
+    if distance_matrix.len() == k {
+        return (0..k).collect();
+    }
+    
+    let mut rng = thread_rng();
+    let mut centroids: Vec<usize> = vec![(0..distance_matrix.len()).collect::<Vec<_>>().choose(&mut rng).cloned().unwrap()];
+    for _ in 1..k {
+        let mut min_distances = vec![f64::MAX; distance_matrix.len()];
+        for point in 0..distance_matrix.len() {
+            for &centroid in &centroids {
+                let distance = distance_matrix[centroid][point];
+                if distance < min_distances[point] {
+                    min_distances[point] = distance;
+                }
+            }
+        }
+        let new_centroid = min_distances.iter().enumerate().max_by(|&(_, a), &(_, b)| a.partial_cmp(b).unwrap()).map(|(index, _)| index).unwrap();
+        centroids.push(new_centroid);
+    }
+    let mut labels = vec![0; distance_matrix.len()];
+    loop {
+        let mut clusters = vec![vec![]; k];
+        for point in 0..distance_matrix.len() {
+            let centroid_index = centroids.iter()
+                .enumerate()
+                .min_by(|&(_, &a), &(_, &b)| distance_matrix[a][point].partial_cmp(&distance_matrix[b][point]).unwrap())
+                .map(|(index, _)| index).unwrap();
+            clusters[centroid_index].push(point);
+            labels[point] = centroid_index;
+        }
+        let new_centroids: Vec<_> = clusters.iter().map(|points| mean_distance(points, distance_matrix)).collect();
+        if new_centroids == centroids {
+            break;
+        }
+        centroids = new_centroids;
+    }
+    labels
 }
 
 // pub struct KMeans {

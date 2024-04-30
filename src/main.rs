@@ -18,12 +18,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Settings for the experiments
     let config = DistanceSetForestConfig {
         classification_config: ClassificationForestConfig {
-            n_trees: 400,
+            n_trees: 100,
             min_samples_split: 2,
             max_features: tree::tree::MaxFeatures::Sqrt,
             max_depth: None,
             criterion: tree::tree::Criterion::Random,
-            bootstrap: true,
+            bootstrap: false,
         },
     };
     let paths = fs::read_dir("/media/aazzari/UCRArchive_2018/")?;
@@ -54,9 +54,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let ds_test = read_csv(test_path, b'\t', false)?;
 
-            if (ds_train.len() + ds_test.len() > 200) || (ds_train[0].data.len() > 1000) {
-                continue;
-            }
+            // if (ds_train.len() + ds_test.len() > 200) || (ds_train[0].data.len() > 1000) {
+            //     continue;
+            // }
             println!(
                 "\tProcessing {}",
                 path.file_name().unwrap().to_string_lossy()

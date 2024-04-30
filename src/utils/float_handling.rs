@@ -41,3 +41,15 @@ impl std::hash::Hash for FloatEq {
         self.0.to_bits().hash(state);
     }
 }
+
+impl std::cmp::PartialOrd for FloatEq {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+
+impl std::cmp::Ord for FloatEq {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.partial_cmp(&other.0).unwrap()
+    }
+}

@@ -9,7 +9,18 @@ pub fn accuracy_score(y_pred: &[isize], y_true: &[isize]) -> f64 {
         / (y_true.len() as f64)
 }
 
-pub fn precision_score(y_pred: &[usize], y_true: &[usize]) -> f64 {
+pub fn f1_score(y_pred: &[isize], y_true: &[isize]) -> f64 {
+    let precision = precision_score(y_pred, y_true);
+    let recall = recall_score(y_pred, y_true);
+
+    if precision + recall == 0.0 {
+        0.0
+    } else {
+        2.0 * (precision * recall) / (precision + recall)
+    }
+}
+
+pub fn precision_score(y_pred: &[isize], y_true: &[isize]) -> f64 {
     let confusion_matrix = confusion_matrix(y_pred, y_true);
     let mut precision = 0.0;
 
@@ -25,7 +36,7 @@ pub fn precision_score(y_pred: &[usize], y_true: &[usize]) -> f64 {
     precision / confusion_matrix.len() as f64
 }
 
-pub fn recall_score(y_pred: &[usize], y_true: &[usize]) -> f64 {
+pub fn recall_score(y_pred: &[isize], y_true: &[isize]) -> f64 {
     let confusion_matrix = confusion_matrix(y_pred, y_true);
     let mut recall = 0.0;
 
@@ -41,19 +52,19 @@ pub fn recall_score(y_pred: &[usize], y_true: &[usize]) -> f64 {
     recall / confusion_matrix.len() as f64
 }
 
-pub fn confusion_matrix(y_pred: &[usize], y_true: &[usize]) -> Vec<Vec<usize>> {
+pub fn confusion_matrix(y_pred: &[isize], y_true: &[isize]) -> Vec<Vec<usize>> {
     let n_unique_true = y_true.iter().max().unwrap() + 1;
     let n_unique_pred = y_pred.iter().max().unwrap() + 1;
     assert!(n_unique_pred > 1, "y_pred contains only one class");
-    let mut matrix = vec![vec![0; n_unique_true]; n_unique_true];
+    let mut matrix = vec![vec![0; n_unique_true as usize]; n_unique_true as usize];
     for (a, b) in y_pred.iter().zip(y_true.iter()) {
-        matrix[*a][*b] += 1;
+        matrix[*a as usize][*b as usize] += 1;
     }
 
     matrix
 }
 
-pub fn matthews_corrcoef(y_pred: &[usize], y_true: &[usize]) -> f64 {
+pub fn matthews_corrcoef(y_pred: &[isize], y_true: &[isize]) -> f64 {
     // Base case: only one class predicted
     if unique(y_true).len() == 1 || unique(y_pred).len() == 1 {
         return 0.0;
@@ -228,7 +239,11 @@ fn roc_curve(y_pred: &[f64], y_true: &[isize]) -> (Vec<f64>, Vec<f64>, Vec<f64>)
     let mut fprs = Vec::new();
     let thresholds = unique(y_pred);
 
-    let mut pred_with_true_class = y_pred.iter().copied().zip(y_true.iter().copied()).collect::<Vec<_>>(); 
+    let mut pred_with_true_class = y_pred
+        .iter()
+        .copied()
+        .zip(y_true.iter().copied())
+        .collect::<Vec<_>>();
     pred_with_true_class.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
 
     let mut true_positives = 0;
@@ -237,7 +252,7 @@ fn roc_curve(y_pred: &[f64], y_true: &[isize]) -> (Vec<f64>, Vec<f64>, Vec<f64>)
     let mut false_negatives = pred_with_true_class.iter().filter(|x| x.1 == 1).count();
     let mut true_negatives = pred_with_true_class.iter().filter(|x| x.1 == 0).count();
 
-    let mut index = 0; 
+    let mut index = 0;
 
     // Iterate through a range of thresholds
     for threshold in &thresholds {
@@ -254,7 +269,7 @@ fn roc_curve(y_pred: &[f64], y_true: &[isize]) -> (Vec<f64>, Vec<f64>, Vec<f64>)
         }
 
         let not_zero = |x: usize| if x == 0 { 1 } else { x };
-        
+
         // Store TPR, FPR, and threshold for the current iteration
         tprs.push(1.0 - true_positives as f64 / not_zero(true_positives + false_negatives) as f64);
         fprs.push(1.0 - false_positives as f64 / not_zero(true_negatives + false_positives) as f64);
@@ -291,8 +306,6 @@ fn roc_curve_c(y_pred: &[f64], y_true: &[isize]) -> (Vec<f64>, Vec<f64>, Vec<f64
     let mut tprs = Vec::new();
     let mut fprs = Vec::new();
     let thresholds = unique(y_pred);
-
-    
 
     // Iterate through a range of thresholds
     for threshold in &thresholds {

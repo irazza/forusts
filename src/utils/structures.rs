@@ -1,6 +1,7 @@
-use hashbrown::HashMap;
-use rand::seq::SliceRandom;
+use hashbrown::{HashMap, HashSet};
+use rand::{seq::SliceRandom, thread_rng, SeedableRng};
 use serde::{Deserialize, Serialize};
+use core::num;
 use std::{
     cmp::{max, min},
     mem::swap,
@@ -32,18 +33,19 @@ impl Sample {
 }
 
 pub fn train_test_split(
-    data: &Vec<Sample>,
+    data: &[Sample],
     test_size: f64,
     stratify: bool,
-    random_state: &mut rand_chacha::ChaCha8Rng,
+    random_state: Option<rand_chacha::ChaCha8Rng>,
 ) -> (Vec<Sample>, Vec<Sample>) {
     if data.len() < 2 && (test_size > 0. && test_size < 0.5) {
         panic!("The dataset is too small to be splitted.");
     }
     let mut indices: Vec<usize> = (0..data.len()).collect();
-
+    let mut random_state =
+        random_state.unwrap_or(rand_chacha::ChaCha8Rng::from_rng(rand::thread_rng()).unwrap());
     // Shuffle indices
-    indices.shuffle(random_state);
+    indices.shuffle(&mut random_state);
 
     let test_size = (data.len() as f64 * test_size) as usize;
     let test_size = min(data.len() - 1, max(1, test_size));
@@ -89,8 +91,8 @@ pub fn train_test_split(
             idx += 1;
         }
     }
-    train_data.shuffle(random_state);
-    test_data.shuffle(random_state);
+    train_data.shuffle(&mut random_state);
+    test_data.shuffle(&mut random_state);
     (train_data, test_data)
 }
 
@@ -117,6 +119,7 @@ impl KUnionFind {
         self.parent[x_root] = y_root;
     }
     pub fn get_clusters(&mut self, distances: &Vec<Vec<f64>>) -> Vec<Vec<usize>> {
+
         for (i, obj) in distances.iter().enumerate() {
             let mut nn = obj.iter().enumerate().collect::<Vec<_>>();
             nn.select_nth_unstable_by(self.k, |a, b| a.1.partial_cmp(b.1).unwrap());
@@ -124,6 +127,7 @@ impl KUnionFind {
                 self.union(i, *j);
             }
         }
+
         let mut clusters = HashMap::new();
         for i in 0..distances.len() {
             let root = self.find(i);
@@ -190,3 +194,148 @@ impl ZScoreTransformer {
         transformed
     }
 }
+
+fn mean_distance(points: &Vec<usize>, distance_matrix: &Vec<Vec<f64>>) -> usize {
+    let mut mean_distance = vec![0.0; distance_matrix.len()];
+    for &point in points {
+        for (m, &value) in mean_distance.iter_mut().zip(&distance_matrix[point]) {
+            *m += value / points.len() as f64;
+        }
+    }
+    mean_distance.iter().enumerate().min_by(|&(_, a), &(_, b)| a.partial_cmp(b).unwrap()).map(|(index, _)| index).unwrap()
+}
+
+pub fn k_means(k: usize, distance_matrix: &Vec<Vec<f64>>) -> Vec<usize> {
+    if distance_matrix.len() < k {
+        panic!("The number of clusters must be less than the number of samples.");
+    }
+    if distance_matrix.len() == k {
+        return (0..k).collect();
+    }
+    
+    let mut rng = thread_rng();
+    let mut centroids: Vec<usize> = vec![(0..distance_matrix.len()).collect::<Vec<_>>().choose(&mut rng).cloned().unwrap()];
+    for _ in 1..k {
+        let mut min_distances = vec![f64::MAX; distance_matrix.len()];
+        for point in 0..distance_matrix.len() {
+            for &centroid in &centroids {
+                let distance = distance_matrix[centroid][point];
+                if distance < min_distances[point] {
+                    min_distances[point] = distance;
+                }
+            }
+        }
+        let new_centroid = min_distances.iter().enumerate().max_by(|&(_, a), &(_, b)| a.partial_cmp(b).unwrap()).map(|(index, _)| index).unwrap();
+        centroids.push(new_centroid);
+    }
+    let mut labels = vec![0; distance_matrix.len()];
+    loop {
+        let mut clusters = vec![vec![]; k];
+        for point in 0..distance_matrix.len() {
+            let centroid_index = centroids.iter()
+                .enumerate()
+                .min_by(|&(_, &a), &(_, &b)| distance_matrix[a][point].partial_cmp(&distance_matrix[b][point]).unwrap())
+                .map(|(index, _)| index).unwrap();
+            clusters[centroid_index].push(point);
+            labels[point] = centroid_index;
+        }
+        let new_centroids: Vec<_> = clusters.iter().map(|points| mean_distance(points, distance_matrix)).collect();
+        if new_centroids == centroids {
+            break;
+        }
+        centroids = new_centroids;
+    }
+    labels
+}
+
+// pub struct KMeans {
+//     n_clusters: usize,
+//     max_iter: usize,
+//     tol: f64,
+//     n_init: usize,
+//     random_state: rand_chacha::ChaCha8Rng,
+// }
+
+// impl KMeans {
+//     pub fn new(
+//         n_clusters: usize,
+//         max_iter: usize,
+//         tol: f64,
+//         n_init: usize,
+//         rng: rand_chacha::ChaCha8Rng,
+//     ) -> Self {
+//         Self {
+//             n_clusters,
+//             max_iter,
+//             tol,
+//             n_init,
+//             random_state: rng,
+//         }
+//     }
+//     pub fn fit(&mut self, samples: &[Sample]) -> HashMap<usize, Vec<Arc<Vec<f64>>>> {
+//         let mut rng = rand_chacha::ChaCha8Rng::from_rng(thread_rng()).unwrap();
+
+//         // Pick a random sample of the n_cluster classes more present in the dataset
+//         let mut class_counts = HashMap::new();
+//         for sample in samples {
+//             *class_counts.entry(sample.target).or_insert(0) += 1;
+//         }
+
+//         let mut best_clusters = HashMap::new();
+//         let mut best_inertia = std::f64::INFINITY;
+
+//         for _ in 0..self.n_init {
+//             let mut clusters = HashMap::new();
+//             let mut inertia = 0.0;
+//             for _ in 0..self.max_iter {
+//                 clusters.clear();
+//                 for sample in samples {
+//                     let mut min_dist = std::f64::INFINITY;
+//                     let mut closest_centroid = 0;
+//                     for (i, centroid) in centroids.iter().enumerate() {
+//                         let dist = twe(&sample.data, centroid);
+//                         if dist < min_dist {
+//                             min_dist = dist;
+//                             closest_centroid = i;
+//                         }
+//                     }
+//                     inertia += min_dist;
+//                     clusters
+//                         .entry(closest_centroid)
+//                         .or_insert(Vec::new())
+//                         .push(sample.data.clone());
+//                 }
+
+//                 let mut new_centroids = vec![vec![0.0; samples[0].data.len()]; self.n_clusters];
+//                 for (i, samples) in clusters.iter() {
+//                     for sample in samples {
+//                         for (j, &x) in sample.iter().enumerate() {
+//                             new_centroids[*i][j] += x;
+//                         }
+//                     }
+//                     let n_samples = samples.len() as f64;
+//                     for j in 0..new_centroids[*i].len() {
+//                         new_centroids[*i][j] /= n_samples;
+//                     }
+//                 }
+//                 let mut converged = true;
+//                 for (i, centroid) in centroids.iter().enumerate() {
+//                     let dist = twe(&centroid, &new_centroids[i]);
+//                     if dist > self.tol {
+//                         converged = false;
+//                         break;
+//                     }
+//                 }
+//                 if converged {
+//                     break;
+//                 }
+//                 centroids = new_centroids;
+//             }
+//             if inertia < best_inertia {
+//                 best_inertia = inertia;
+//                 best_clusters = clusters.clone();
+//             }
+//         }
+//         best_clusters
+//     }
+// }

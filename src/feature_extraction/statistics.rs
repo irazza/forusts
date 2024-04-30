@@ -7,20 +7,20 @@ pub const EULER_MASCHERONI: f64 =
 
 pub fn mean(x: &[f64]) -> f64 {
     let mean = x.iter().sum::<f64>() / x.len() as f64;
-    assert!(mean.is_finite(), "{:?}", x);
+    assert!(mean.is_finite());
     mean
 }
 
 pub fn max(x: &[f64]) -> f64 {
-    let max = x.iter().fold(f64::MIN, |max, &val| max.max(val));
+    let max = x.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
     assert!(max.is_finite());
-    max
+    *max
 }
 
 pub fn min(x: &[f64]) -> f64 {
-    let min = x.iter().fold(f64::MAX, |min, &val| min.min(val));
+    let min = x.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
     assert!(min.is_finite());
-    min
+    *min
 }
 
 pub fn sum(x: Vec<Vec<f64>>, axis: usize) -> Vec<f64> {
@@ -32,7 +32,7 @@ pub fn sum(x: Vec<Vec<f64>>, axis: usize) -> Vec<f64> {
             }
         }
         sum
-    } else if axis == 1{
+    } else if axis == 1 {
         let mut sum = vec![0.0; x.len()];
         for i in 0..x.len() {
             sum[i] = x[i].iter().sum();

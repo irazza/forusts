@@ -11,8 +11,11 @@ use hashbrown::HashMap;
 use parking_lot::Mutex;
 use rand::{seq::SliceRandom, thread_rng, Rng};
 use rayon::prelude::*;
+use std::fmt::Debug;
 use std::{
+    any::type_name,
     cmp::max,
+    fmt::Formatter,
     sync::atomic::{AtomicUsize, Ordering},
 };
 
@@ -40,6 +43,19 @@ grid_search_tuning! {
         pub criterion: Criterion,
         pub bootstrap: bool,
     }
+    impl Debug for ClassificationForestConfig {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            let full_type_name = type_name::<Self>();
+            let struct_name = full_type_name.split("::").last().unwrap_or(full_type_name);
+            let struct_name = struct_name.chars().take(struct_name.len() - 6).collect::<String>();
+            write!(
+                f,
+                "{}_{}_{:?}_{:?}",
+                struct_name, self.n_trees, self.max_features, self.criterion
+            )
+        }
+    }
+
 }
 
 pub trait ClassificationTree: Tree {
@@ -274,6 +290,15 @@ grid_search_tuning! {
         pub enhanced_anomaly_score: bool,
         pub max_depth: Option<usize>,
     }
+    impl Debug for OutlierForestConfig {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            write!(
+                f,
+                "OutlierForestConfig {{ n_trees: {}, enhanced_anomaly_score: {}, max_depth: {:?} }}",
+                self.n_trees, self.enhanced_anomaly_score, self.max_depth
+            )
+        }
+    }
 }
 
 pub trait OutlierTree: Tree {
@@ -325,7 +350,12 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
         let mut scores = Vec::new();
         for (i, tree) in self.get_trees().iter().enumerate() {
             let transformed_x = self.transform(data, i);
-            scores.push(transformed_x.iter().map(|s| Self::path_length(tree, s)).collect());
+            scores.push(
+                transformed_x
+                    .iter()
+                    .map(|s| Self::path_length(tree, s))
+                    .collect(),
+            );
         }
         scores
     }

@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::sync::Arc;
 
 use crate::feature_extraction::catch22::compute_catch;
@@ -19,6 +20,11 @@ pub struct CanonicalIntervalForestConfig [CanonicalIntervalForestConfigTuning]{
     pub n_intervals: usize,
     pub min_interval_length: usize,
     pub classification_config: ClassificationForestConfig [ClassificationForestConfigTuning],
+}
+impl Debug for CanonicalIntervalForestConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CanonicalIntervalForestConfig")
+    }
 }
 }
 impl TuningConfig for CanonicalIntervalForestConfigTuning {

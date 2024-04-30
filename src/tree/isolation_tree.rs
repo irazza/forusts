@@ -24,7 +24,9 @@ pub struct IsolationTree {
 impl OutlierTree for IsolationTree {
     fn from_outlier_config(max_samples: usize, config: &OutlierForestConfig) -> Self {
         Self::new(IsolationTreeConfig {
-            max_depth: config.max_depth.unwrap_or((max_samples as f64).log2().ceil() as usize),
+            max_depth: config
+                .max_depth
+                .unwrap_or((max_samples as f64).log2().ceil() as usize),
             min_samples_split: 1,
             // Setted to 2 to avoid empty child when splitting when there are only two samples
         })
@@ -79,9 +81,11 @@ impl Tree for IsolationTree {
         features.shuffle(&mut rng);
 
         for feature_idx in features {
-
             // Choose a random threshold
-            thresholds = samples.iter().map(|f| f.data[feature_idx]).collect::<Vec<f64>>();
+            thresholds = samples
+                .iter()
+                .map(|f| f.data[feature_idx])
+                .collect::<Vec<f64>>();
             thresholds.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
             thresholds.dedup();
 

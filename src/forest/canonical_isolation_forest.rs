@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::feature_extraction::catch22::{compute_catch, compute_catch_features};
 use crate::grid_search_tuning;
 use crate::utils::structures::Sample;
@@ -9,6 +7,8 @@ use crate::{
     tree::isolation_tree::IsolationTree,
 };
 use rand::{seq::SliceRandom, thread_rng, Rng};
+use std::fmt::Debug;
+use std::sync::Arc;
 
 use super::forest::{OutlierForestConfig, OutlierForestConfigTuning};
 
@@ -20,6 +20,11 @@ grid_search_tuning! {
     pub struct CanonicalIsolationForestConfig[CanonicalIsolationForestConfigTuning] {
         pub n_intervals: usize,
         pub outlier_config: OutlierForestConfig [OutlierForestConfigTuning],
+    }
+    impl Debug for CanonicalIsolationForestConfig {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "CanonicalIsolationForestConfig")
+        }
     }
 }
 impl TuningConfig for CanonicalIsolationForestConfigTuning {

@@ -1,10 +1,8 @@
-use crate::feature_extraction::statistics::EULER_MASCHERONI;
-use crate::forest::forest::{Forest, OutlierForest};
-use crate::forest::isolation_forest::{IsolationForest, IsolationForestConfig};
-use crate::metrics::classification::{roc_auc_score, roc_auc_score_c};
+use crate::forest::distance_set_forest::{DistanceSetForest, DistanceSetForestConfig};
+use crate::forest::forest::{ClassificationForestConfig, Forest};
+use crate::metrics::classification::accuracy_score;
 use crate::utils::csv_io::read_csv;
-use csv::Writer;
-use feature_extraction::statistics::transpose;
+
 use std::error::Error;
 use std::fs::{self};
 
@@ -18,8 +16,18 @@ mod utils;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Settings for the experiments
-    let paths = fs::read_dir("../DATA/ADDatasets/")?;
-
+    let config = DistanceSetForestConfig {
+        classification_config: ClassificationForestConfig {
+            n_trees: 100,
+            min_samples_split: 2,
+            max_features: tree::tree::MaxFeatures::Sqrt,
+            max_depth: None,
+            criterion: tree::tree::Criterion::Random,
+            bootstrap: false,
+        },
+    };
+    let paths = fs::read_dir("/media/aazzari/UCRArchive_2018/")?;
+    let n_repetitions = 10;
     let mut datasets = Vec::new();
     for entry in paths {
         // Unwrap the entry or handle the error, if any.
@@ -27,58 +35,54 @@ fn main() -> Result<(), Box<dyn Error>> {
         datasets.push(entry.path());
     }
     datasets.sort_by_key(|dir| dir.file_name().unwrap().to_string_lossy().to_string());
-    for path in &datasets {
-        //let mut roc_aucs = Vec::new();
-        println!(
-            "Processing {}",
-            path.file_name().unwrap().to_string_lossy()
-        );
-        let mut ds = read_csv(path, b',', false)?;
-        // ds.sort_unstable_by(|a, b| a.partial_cmp(&b).unwrap());
-        // ds.dedup();
-        // println!("\t{} samples with {} features", ds.len(), ds[0].data.len());
-        // let class_0 = ds.iter().filter(|s| s.target == 0).count() as f64;
-        // let class_1 = ds.iter().filter(|s| s.target == 1).count() as f64;
-        // println!("\tClass 0: {}, Class 1: {}", class_0/ds.len() as f64, class_1/ds.len() as f64);
-        let y_true = ds.iter().map(|s| s.target).collect::<Vec<_>>();
+    let mut wtr = csv::Writer::from_path(format!("{:?}.csv", config))?;
+    wtr.write_record(&["Dataset", "ACC"])?;
+    wtr.flush()?;
+    for i in 0..n_repetitions {
+        println!("Repetition {}", i + 1);
+        for path in &datasets {
+            let train_path = path.join(format!(
+                "{}_TRAIN.tsv",
+                path.file_name().unwrap().to_string_lossy()
+            ));
+            let test_path = path.join(format!(
+                "{}_TEST.tsv",
+                path.file_name().unwrap().to_string_lossy()
+            ));
 
-        let config = IsolationForestConfig {
-            n_trees: 1000,
-            enhanced_anomaly_score: false,
-            max_depth: None,
-            
-        };
-        let mut model = IsolationForest::new(config);
-        model.fit(&mut ds);
-        let mut anomaly_scores = model.compute_as_per_tree(&ds);
-        let roc_auc = roc_auc_score( &model.score_samples(&ds), &y_true);
-        println!("\tROC AUC: {}", roc_auc);
-        anomaly_scores.push(y_true.clone().iter().map(|s| *s as f64).collect::<Vec<_>>());
-        // Transpose the anomaly scores
-        let transposed = transpose(anomaly_scores.clone());
-        // Get the name of the dataset
-        let out_path = path.file_stem().unwrap().to_string_lossy();
-        fs::create_dir_all(format!("s+sspr24/{}", out_path))?;
-        let mut scores_wrt = Writer::from_path(format!("s+sspr24/{}/{}_scores.csv", out_path, out_path))?;
-        for i in 0..transposed.len() {
-            scores_wrt.write_record(transposed[i].iter().map(|s| s.to_string()).collect::<Vec<_>>())?;
+            let mut ds_train = read_csv(train_path, b'\t', false)?;
+
+            let ds_test = read_csv(test_path, b'\t', false)?;
+
+            // if (ds_train.len() + ds_test.len() > 200) || (ds_train[0].data.len() > 1000) {
+            //     continue;
+            // }
+            println!(
+                "\tProcessing {}",
+                path.file_name().unwrap().to_string_lossy()
+            );
+
+            let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
+
+            let mut model = DistanceSetForest::new(config);
+
+            let start_time = std::time::Instant::now();
+            model.fit(&mut ds_train);
+            println!("\t\tTraining time: {:?}", start_time.elapsed());
+
+            let start_time = std::time::Instant::now();
+            let y_pred = model.predict(&ds_test);
+            println!("\t\tPrediction time: {:?}", start_time.elapsed());
+
+            let acc = accuracy_score(&y_pred, &y_true);
+            println!("\tAccuracy: {}", acc);
+
+            wtr.write_record(&[
+                path.file_name().unwrap().to_string_lossy().to_string(),
+                acc.to_string(),
+            ])?;
+            wtr.flush()?;
         }
-        scores_wrt.flush()?;
     }
     Ok(())
 }
-
-// let denominator = (2.0 * (f64::ln(model.get_max_samples() as f64 - 1.0) + EULER_MASCHERONI))
-        //     - 2.0 * ((model.get_max_samples() as f64 - 1.0) / model.get_max_samples() as f64);
-        // let mut ans = Vec::new();
-        // for i in 0..anomaly_scores[0].len() {
-        //     let mut ascore = 0.0;        //     for t in anomaly_scores.iter() {
-        //         ascore += t[i];
-        //     }
-        //     ascore /= denominator;
-        //     ans.push(2.0f64.powf(-ascore/model.get_trees().len() as f64));
-        // }
-
-        // let scores = model.score_samples(&ds);
-
-        // assert_eq!(ans.len(), y_true.len());

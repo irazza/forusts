@@ -3,13 +3,13 @@ use core::fmt::Debug;
 use hashbrown::HashMap;
 use rand::{thread_rng, Rng};
 use serde_derive::{Deserialize, Serialize};
-use std::{cmp::max, ops::Deref};
+use std::{cmp::max, fmt::Display, ops::Deref};
 
 use crate::{feature_extraction::statistics::stddev, utils::structures::Sample};
 
 use super::node::{LeafClassification, Node};
 
-#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub enum MaxFeatures {
     All,
     Sqrt,
@@ -19,31 +19,42 @@ impl MaxFeatures {
     pub fn convert(&self, n_features: usize) -> usize {
         match self {
             MaxFeatures::All => n_features,
-            MaxFeatures::Sqrt => (n_features as f64).sqrt() as usize,
-            MaxFeatures::Log2 => (n_features as f64).log2() as usize,
+            MaxFeatures::Sqrt => max(1, (n_features as f64).sqrt() as usize),
+            MaxFeatures::Log2 => max(1, (n_features as f64).log2() as usize),
         }
     }
 }
-#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
+impl Debug for MaxFeatures {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MaxFeatures::All => write!(f, "A"),
+            MaxFeatures::Sqrt => write!(f, "S"),
+            MaxFeatures::Log2 => write!(f, "L"),
+        }
+    }
+}
+#[derive(Copy, Clone, Serialize, Deserialize)]
 pub enum Criterion {
     Gini,
     Entropy,
     Random,
 }
 impl Criterion {
-    pub fn to_string(self) -> &'static str {
-        match self {
-            Criterion::Gini => "gini",
-            Criterion::Entropy => "entropy",
-            Criterion::Random => "random",
-        }
-    }
-
     pub fn to_fn<T: Tree>(self) -> fn(&HashMap<isize, usize>) -> f64 {
         match self {
             Criterion::Gini => T::gini_impurity,
             Criterion::Entropy => T::entropy_impurity,
             Criterion::Random => T::random_impurity,
+        }
+    }
+}
+
+impl Debug for Criterion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Criterion::Gini => write!(f, "G"),
+            Criterion::Entropy => write!(f, "E"),
+            Criterion::Random => write!(f, "R"),
         }
     }
 }
@@ -94,7 +105,7 @@ pub trait Tree: Sync + Send {
     fn fit(&mut self, data: &[Sample]) {
         let _n_features = data[0].data.len();
         let data = &mut data.to_vec();
-        let root = self.build_tree(data, self.get_max_depth(), f64::MAX);
+        let root = self.build_tree(data, self.get_max_depth(), 0.0);
         self.set_root(root);
     }
     fn build_tree(
@@ -103,7 +114,7 @@ pub trait Tree: Sync + Send {
         max_depth: usize,
         impurity: f64,
     ) -> Node<Self::SplitParameters> {
-        let current_depth =  self.get_max_depth() - max_depth; // max(1, self.get_max_depth() - max_depth);
+        let current_depth = self.get_max_depth() - max_depth; // max(1, self.get_max_depth() - max_depth);
 
         if self.pre_split_conditions(samples, current_depth) {
             return Node::Leaf {
@@ -125,6 +136,15 @@ pub trait Tree: Sync + Send {
         }
 
         let (left_data, right_data) = Self::split(samples, &best_split_parameters);
+
+        if left_data.len() == 0 || right_data.len() == 0 {
+            return Node::Leaf {
+                class: Self::get_leaf_class(samples, Some(&best_split_parameters)),
+                depth: current_depth,
+                impurity: f64::EPSILON,
+                n_samples: samples.len(),
+            };
+        }
 
         assert!(
             left_data.len() > 0 && right_data.len() > 0,

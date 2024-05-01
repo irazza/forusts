@@ -23,16 +23,27 @@ fn main() -> Result<(), Box<dyn Error>> {
             max_features: tree::tree::MaxFeatures::Sqrt,
             max_depth: None,
             criterion: tree::tree::Criterion::Random,
-            bootstrap: false,
+            bootstrap: true,
         },
     };
-    let paths = fs::read_dir("/media/aazzari/UCRArchive_2018/")?;
+
+    // TODO: Intersect the dataset with Proximity Forest
+    let path = "/media/aazzari/UCRArchive_2018";
+    // read ProximityForest_r1.csv and extract the dataset in the first column
+    let datasets_name = fs::read_to_string("ProximityForest_r1.csv")?;
+    let mut paths = datasets_name.lines();
+    // Skip header
+    paths.next();
+    let paths = paths
+        .map(|s| s.split(",").collect::<Vec<_>>()[1])
+        .collect::<Vec<_>>();
+
     let n_repetitions = 10;
     let mut datasets = Vec::new();
     for entry in paths {
-        // Unwrap the entry or handle the error, if any.
-        let entry = entry?;
-        datasets.push(entry.path());
+        let complete_path = format!("{}/{}/", path, entry);
+        // Push the PathBuf of the dataset
+        datasets.push(std::path::PathBuf::from(complete_path));
     }
     datasets.sort_by_key(|dir| dir.file_name().unwrap().to_string_lossy().to_string());
     let mut wtr = csv::Writer::from_path(format!("{:?}.csv", config))?;

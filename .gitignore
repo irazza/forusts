@@ -6,9 +6,8 @@ admep*.csv
 fftw-3.3.10/
 perf.*
 SCAMP_/*
-*.csv
+DistanceSet*.csv
 UCR_Archive2018_AD/*
-*.csv
 catch22/*
 UCRArchive_2018/*
 comparisons/*

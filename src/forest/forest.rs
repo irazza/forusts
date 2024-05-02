@@ -59,18 +59,19 @@ grid_search_tuning! {
 }
 
 pub trait ClassificationTree: Tree {
-    fn from_classification_config(config: &ClassificationForestConfig) -> Self;
+    type TreeConfig: Sync + Send;
+    fn from_classification_config(config: &Self::TreeConfig) -> Self;
 }
 
 pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
-    fn get_forest_config(&self) -> &ClassificationForestConfig;
+    fn get_forest_config(&self) -> (&ClassificationForestConfig, &T::TreeConfig);
     fn fit_(&mut self, data: &mut [Sample]) {
         self.compute_intervals(data[0].data.len());
         let mut trees = Vec::new();
-        let config = self.get_forest_config();
+        let (config, tree_config) = self.get_forest_config();
         trees.par_extend((0..config.n_trees).into_par_iter().map(|i| {
             let transformed_data = self.transform(data, i);
-            let mut tree = T::from_classification_config(&config);
+            let mut tree = T::from_classification_config(&tree_config);
             if config.bootstrap {
                 let bootstrap_indices = (0..transformed_data.len())
                     .collect::<Vec<_>>()
@@ -110,7 +111,7 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
 
         for i in 0..n_samples {
             let mut class_counts = HashMap::new();
-            for j in 0..self.get_forest_config().n_trees {
+            for j in 0..self.get_forest_config().0.n_trees {
                 let class = predictions[j][i];
                 *class_counts.entry(class).or_insert(0) += 1;
             }
@@ -160,7 +161,7 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
             .into_iter()
             .map(|d| {
                 d.into_iter()
-                    .map(|d| d.into_inner() as f64 / self.get_forest_config().n_trees as f64)
+                    .map(|d| d.into_inner() as f64 / self.get_forest_config().0.n_trees as f64)
                     .collect()
             })
             .collect()
@@ -197,7 +198,7 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
             .into_iter()
             .map(|d| {
                 d.into_iter()
-                    .map(|d| d.into_inner() as f64 / self.get_forest_config().n_trees as f64)
+                    .map(|d| d.into_inner() as f64 / self.get_forest_config().0.n_trees as f64)
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<Vec<_>>>()
@@ -235,7 +236,7 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
             .map(|d| {
                 d.into_iter()
                     .map(|d| {
-                        1.0 - (d.into_inner() as f64 / self.get_forest_config().n_trees as f64)
+                        1.0 - (d.into_inner() as f64 / self.get_forest_config().0.n_trees as f64)
                     })
                     .collect()
             })
@@ -277,7 +278,7 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
             .into_iter()
             .map(|d| {
                 d.into_iter()
-                    .map(|d| d.into_inner() as f64 / self.get_forest_config().n_trees as f64)
+                    .map(|d| d.into_inner() as f64 / self.get_forest_config().0.n_trees as f64)
                     .collect()
             })
             .collect()

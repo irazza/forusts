@@ -41,7 +41,7 @@ impl Forest<DistanceTree> for DistanceForest {
     }
 }
 impl ClassificationForest<DistanceTree> for DistanceForest {
-    fn get_forest_config(&self) -> &ClassificationForestConfig {
-        &self.config
+    fn get_forest_config(&self) -> (&ClassificationForestConfig, &ClassificationForestConfig) {
+        (&self.config, &self.config)
     }
 }

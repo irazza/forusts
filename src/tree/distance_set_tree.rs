@@ -1,7 +1,7 @@
 use crate::{
-    distance::{self, distances::{self, find_optimal_band}},
+    distance::{self, distances::{self, find_optimal_band, Distance}},
     feature_extraction::statistics::{mean, stddev, unique},
-    forest::forest::{ClassificationForestConfig, ClassificationTree},
+    forest::{distance_set_forest::DistanceSetForestConfig, forest::{ClassificationForestConfig, ClassificationTree}},
     utils::structures::{k_means, KUnionFind, Sample},
 };
 use std::{cmp::max, fmt::Debug, sync::Arc};
@@ -83,6 +83,7 @@ pub struct DistanceSetTreeConfig {
     pub min_samples_split: usize,
     pub criterion: Criterion,
     pub max_features: MaxFeatures,
+    pub distance: Distance,
 }
 
 #[derive(Clone, Debug)]
@@ -92,12 +93,14 @@ pub struct DistanceSetTree {
 }
 
 impl ClassificationTree for DistanceSetTree {
-    fn from_classification_config(config: &ClassificationForestConfig) -> Self {
+    type TreeConfig = DistanceSetForestConfig;
+    fn from_classification_config(config: &Self::TreeConfig) -> Self {
         Self::new(DistanceSetTreeConfig {
-            max_depth: config.max_depth.unwrap_or(usize::MAX),
-            min_samples_split: config.min_samples_split,
-            criterion: config.criterion,
-            max_features: config.max_features,
+            max_depth: config.classification_config.max_depth.unwrap_or(usize::MAX),
+            min_samples_split: config.classification_config.min_samples_split,
+            criterion: config.classification_config.criterion,
+            max_features: config.classification_config.max_features,
+            distance: config.distance,
         })
     }
 }

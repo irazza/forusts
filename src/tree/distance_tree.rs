@@ -75,6 +75,7 @@ pub struct DistanceTree {
 }
 
 impl ClassificationTree for DistanceTree {
+    type TreeConfig = ClassificationForestConfig;
     fn from_classification_config(config: &ClassificationForestConfig) -> Self {
         Self::new(DistanceTreeConfig {
             max_depth: config.max_depth.unwrap_or(usize::MAX),

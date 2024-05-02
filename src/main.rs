@@ -1,3 +1,5 @@
+use distance::distances::Distance;
+
 use crate::forest::distance_set_forest::{DistanceSetForest, DistanceSetForestConfig};
 use crate::forest::forest::{ClassificationForestConfig, Forest};
 use crate::metrics::classification::accuracy_score;
@@ -17,6 +19,7 @@ mod utils;
 fn main() -> Result<(), Box<dyn Error>> {
     // Settings for the experiments
     let config = DistanceSetForestConfig {
+        distance: Distance::ADTW,
         classification_config: ClassificationForestConfig {
             n_trees: 100,
             min_samples_split: 2,

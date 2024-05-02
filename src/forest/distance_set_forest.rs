@@ -2,6 +2,7 @@ use core::fmt::Debug;
 use std::any::type_name;
 use std::fmt::Formatter;
 
+use crate::distance::distances::Distance;
 use crate::grid_search_tuning;
 use crate::tree::distance_set_tree::DistanceSetTree;
 use crate::tree::distance_tree::DistanceTree;
@@ -13,6 +14,7 @@ use super::forest::{ClassificationForestConfig, ClassificationForestConfigTuning
 
 grid_search_tuning! {
     pub struct DistanceSetForestConfig[DistanceSetForestTuning]{
+        pub distance: Distance,
         pub classification_config: ClassificationForestConfig [ClassificationForestConfigTuning],
     }
     impl Debug for DistanceSetForestConfig {
@@ -22,8 +24,8 @@ grid_search_tuning! {
             let struct_name = struct_name.chars().take(struct_name.len() - 6).collect::<String>();
             write!(
                 f,
-                "{}_{}_{:?}_{:?}",
-                struct_name, self.classification_config.n_trees, self.classification_config.max_features, self.classification_config.criterion
+                "{}_{}_{:?}_{:?}_{}",
+                struct_name, self.classification_config.n_trees, self.classification_config.max_features, self.classification_config.criterion, self.distance
             )
         }
     }
@@ -63,7 +65,7 @@ impl Forest<DistanceSetTree> for DistanceSetForest {
     }
 }
 impl ClassificationForest<DistanceSetTree> for DistanceSetForest {
-    fn get_forest_config(&self) -> &ClassificationForestConfig {
-        &self.config.classification_config
+    fn get_forest_config(&self) -> (&ClassificationForestConfig, &DistanceSetForestConfig) {
+        (&self.config.classification_config, &self.config)
     }
 }

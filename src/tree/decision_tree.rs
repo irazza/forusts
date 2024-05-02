@@ -25,6 +25,7 @@ pub struct DecisionTree {
 }
 
 impl ClassificationTree for DecisionTree {
+    type TreeConfig = ClassificationForestConfig;
     fn from_classification_config(config: &ClassificationForestConfig) -> Self {
         Self::new(DecisionTreeConfig {
             criterion: config.criterion,

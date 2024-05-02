@@ -39,7 +39,7 @@ impl Forest<DecisionTree> for RandomForest {
     }
 }
 impl ClassificationForest<DecisionTree> for RandomForest {
-    fn get_forest_config(&self) -> &ClassificationForestConfig {
-        &self.config
+    fn get_forest_config(&self) -> (&ClassificationForestConfig, &ClassificationForestConfig) {
+        (&self.config, &self.config)
     }
 }

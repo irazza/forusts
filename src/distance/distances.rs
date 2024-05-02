@@ -1,12 +1,13 @@
 use std::{
     cmp::{max, min},
-    mem::swap,
+    mem::swap, path::Display,
 };
 
 use dashmap::DashMap;
 use lazy_static::lazy_static;
 use rand::{thread_rng, Rng};
 use rayon::vec;
+use serde::{Deserialize, Serialize};
 
 const MSM_C: f64 = 1.0;
 
@@ -17,6 +18,38 @@ use crate::{
         structures::{train_test_split, Sample},
     },
 };
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum Distance {
+    Euclidean,
+    DTW,
+    TWE,
+    MSM,
+    ADTW,
+}
+impl Distance {
+    pub fn distance(&self, x1: &[f64], x2: &[f64], sakoe_chiba: f64) -> f64 {
+        match self {
+            Distance::Euclidean => euclidean(x1, x2, sakoe_chiba),
+            Distance::DTW => dtw(x1, x2, sakoe_chiba),
+            Distance::TWE => twe(x1, x2, sakoe_chiba),
+            Distance::MSM => msm(x1, x2),
+            Distance::ADTW => adtw(x1, x2, sakoe_chiba),
+        }
+    }
+}
+impl std::fmt::Display for Distance {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Distance::Euclidean => write!(f, "eucl"),
+            Distance::DTW => write!(f, "dtw"),
+            Distance::TWE => write!(f, "twe"),
+            Distance::MSM => write!(f, "msm"),
+            Distance::ADTW => write!(f, "adtw"),
+        }
+    }
+
+}
 
 pub fn euclidean(x1: &[f64], x2: &[f64], _sakoe_chiba: f64) -> f64 {
     assert!(x1.len() == x2.len());

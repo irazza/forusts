@@ -24,6 +24,7 @@ pub struct ExtraTree {
 }
 
 impl ClassificationTree for ExtraTree {
+    type TreeConfig = ClassificationForestConfig;
     fn from_classification_config(config: &ClassificationForestConfig) -> Self {
         Self::new(ExtraTreeConfig {
             max_depth: config.max_depth.unwrap_or(usize::MAX),

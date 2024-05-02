@@ -103,7 +103,7 @@ impl Forest<DecisionTree> for CanonicalIntervalForest {
 }
 
 impl ClassificationForest<DecisionTree> for CanonicalIntervalForest {
-    fn get_forest_config(&self) -> &ClassificationForestConfig {
-        &self.config.classification_config
+    fn get_forest_config(&self) -> (&ClassificationForestConfig, &ClassificationForestConfig) {
+        (&self.config.classification_config, &self.config.classification_config)
     }
 }

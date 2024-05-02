@@ -111,7 +111,7 @@ impl Forest<ExtraTree> for ExtraCanonicalForest {
 }
 
 impl ClassificationForest<ExtraTree> for ExtraCanonicalForest {
-    fn get_forest_config(&self) -> &ClassificationForestConfig {
-        &self.config.classification_config
+    fn get_forest_config(&self) -> (&ClassificationForestConfig, &ClassificationForestConfig) {
+        (&self.config.classification_config, &self.config.classification_config)
     }
 }

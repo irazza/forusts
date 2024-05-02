@@ -28,14 +28,14 @@ pub enum Distance {
     ADTW,
 }
 impl Distance {
-    pub fn distance(&self, x1: &[f64], x2: &[f64], sakoe_chiba: f64) -> f64 {
+    pub fn distance(&self, x1: &[f64], x2: &[f64], band: f64) -> f64 {
         match self {
-            Distance::Euclidean => euclidean(x1, x2, sakoe_chiba),
-            Distance::DTW => dtw(x1, x2, sakoe_chiba),
-            Distance::TWE => twe(x1, x2, sakoe_chiba),
-            Distance::MSM => msm(x1, x2, sakoe_chiba),
-            Distance::ADTW => adtw(x1, x2, sakoe_chiba),
-        }
+            Distance::Euclidean => euclidean(x1, x2, band),
+            Distance::DTW => dtw(x1, x2, band),
+            Distance::TWE => twe(x1, x2, band),
+            Distance::MSM => msm(x1, x2, band),
+            Distance::ADTW => adtw(x1, x2, band),
+        }       
     }
     pub fn to_fn(&self) -> fn(&[f64], &[f64], f64) -> f64 {
         match self {
@@ -60,7 +60,7 @@ impl std::fmt::Display for Distance {
 
 }
 
-pub fn euclidean(x1: &[f64], x2: &[f64], _sakoe_chiba: f64) -> f64 {
+pub fn euclidean(x1: &[f64], x2: &[f64], _band: f64) -> f64 {
     assert!(x1.len() == x2.len());
     x1.iter()
         .zip(x2.iter())
@@ -77,41 +77,6 @@ pub fn test_twe() {
     let start = std::time::Instant::now();
     let result = twe(&s1, &s2, 1.0);
     println!("TWE: {}, time: {:?}", result, start.elapsed());
-}
-
-pub fn find_sakoe_chiba_band(x: &[Sample]) -> f64 {
-    // Using k=1NN to find the optimal band
-    let mut best_band = 0.0;
-    let mut band = 0.0;
-    let max_band = 1.0;
-    let mut best_accuracy = 0.0;
-
-    let (ds_train, ds_test) = train_test_split(x, 0.2, false, None);
-    let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
-
-    while band <= max_band {
-        // For every test sample, find the nearest neighbor in the training set
-        let mut y_pred = Vec::new();
-        for test_sample in ds_test.iter() {
-            let mut distances = vec![0.0; ds_train.len()];
-            for train_sample in ds_train.iter() {
-                distances.push(twe(&test_sample.data, &train_sample.data, band));
-            }
-            let min_distance = distances
-                .iter()
-                .enumerate()
-                .min_by(|a, b| a.1.partial_cmp(b.1).unwrap())
-                .unwrap();
-            y_pred.push(ds_train[min_distance.0].target);
-        }
-        let accuracy = accuracy_score(&y_pred, &y_true);
-        if accuracy > best_accuracy {
-            best_accuracy = accuracy;
-            best_band = band;
-        }
-        band += 0.1;
-    }
-    best_band
 }
 
 pub fn find_optimal_band(ds: &[Sample], dist_fn: fn(&[f64], &[f64], f64) -> f64, band_values: &[f64]) -> f64 {
@@ -143,7 +108,7 @@ pub fn find_optimal_band(ds: &[Sample], dist_fn: fn(&[f64], &[f64], f64) -> f64,
     best_band
 }
 
-pub fn twe(x1: &[f64], x2: &[f64], sakoe_chiba: f64) -> f64 {
+pub fn twe(x1: &[f64], x2: &[f64], band: f64) -> f64 {
     let nu = 0.001;
     let lambda = 1.0;
 
@@ -151,7 +116,7 @@ pub fn twe(x1: &[f64], x2: &[f64], sakoe_chiba: f64) -> f64 {
     let m = x2.len();
 
     let delete_addition = nu + lambda;
-    let sakoe_chiba_window_radius = (n as f64 + 1.0) * sakoe_chiba;
+    let sakoe_chiba_window_radius = (n as f64 + 1.0) * band;
 
     let alpha = ((m) as f64) / ((n) as f64);
 
@@ -209,7 +174,7 @@ pub fn test_dtw() {
 // lazy_static! {
 //     static ref DTW_CACHE: DashMap<(Vec<FloatEq>, Vec<FloatEq>), f64> = DashMap::new();
 // }
-pub fn dtw(x1: &[f64], x2: &[f64], sakoe_chiba: f64) -> f64 {
+pub fn dtw(x1: &[f64], x2: &[f64], band: f64) -> f64 {
     // // DTW_CACHE
     // let x1_cache = x1.iter().copied().map(FloatEq).collect::<Vec<_>>();
     // let x2_cache = x2.iter().copied().map(FloatEq).collect::<Vec<_>>();
@@ -222,7 +187,7 @@ pub fn dtw(x1: &[f64], x2: &[f64], sakoe_chiba: f64) -> f64 {
     let n = x1.len();
     let m = x2.len();
 
-    let sakoe_chiba_window_radius = (n as f64 + 1.0) * sakoe_chiba;
+    let sakoe_chiba_window_radius = (n as f64 + 1.0) * band;
 
     let alpha = ((m) as f64) / ((n) as f64);
 
@@ -272,11 +237,11 @@ pub fn test_msm() {
 lazy_static! {
     static ref MSM_CACHE: DashMap<(Vec<FloatEq>, Vec<FloatEq>), f64> = DashMap::new();
 }
-pub fn msm(x1: &[f64], x2: &[f64], sakoe_chiba: f64) -> f64 {
+pub fn msm(x1: &[f64], x2: &[f64], band: f64) -> f64 {
     let n = x1.len();
     let m = x2.len();
 
-    let sakoe_chiba_window_radius = (n as f64 + 1.0) * sakoe_chiba;
+    let sakoe_chiba_window_radius = (n as f64 + 1.0) * band;
 
     let alpha = ((m) as f64) / ((n) as f64);
 
@@ -316,9 +281,10 @@ fn msm_cost_function(x_i: f64, x_i_1: f64, y_j: f64) -> f64 {
     }
 }
 
-pub fn adtw(x1: &[f64], x2: &[f64], w: f64) -> f64 {
+pub fn adtw(x1: &[f64], x2: &[f64], band: f64) -> f64 {
     let n = x1.len();
     let m = x2.len();
+    let w = band;
 
     let mut current = vec![f64::INFINITY; m + 1];
     let mut previous = vec![f64::INFINITY; m + 1];

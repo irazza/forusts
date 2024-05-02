@@ -49,7 +49,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         datasets.push(std::path::PathBuf::from(complete_path));
     }
     datasets.sort_by_key(|dir| dir.file_name().unwrap().to_string_lossy().to_string());
-    let mut wtr = csv::Writer::from_path(format!("{:?}.csv", config))?;
+    let mut wtr = csv::Writer::from_path(format!("{:?}_rndband.csv", config))?;
     wtr.write_record(&["Dataset", "ACC"])?;
     wtr.flush()?;
     for i in 0..n_repetitions {

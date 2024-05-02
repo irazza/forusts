@@ -40,7 +40,7 @@ pub struct DistanceSetSplit {
     pub right_candidates: Vec<Arc<Vec<f64>>>,
     pub interval: (usize, usize),
     pub distance: Distance,
-    pub sakoe_chiba: f64,
+    pub band: f64,
 }
 impl Eq for DistanceSetSplit {}
 impl Ord for DistanceSetSplit {
@@ -53,12 +53,12 @@ impl SplitParameters for DistanceSetSplit {
         let mut left_distances = self
             .left_candidates
             .iter()
-            .map(|c| self.distance.distance(&c, &sample.data[self.interval.0..self.interval.1], self.sakoe_chiba))
+            .map(|c| self.distance.distance(&c, &sample.data[self.interval.0..self.interval.1], self.band))
             .collect::<Vec<_>>();
         let mut right_distances = self
             .right_candidates
             .iter()
-            .map(|c| self.distance.distance(&c, &sample.data[self.interval.0..self.interval.1], self.sakoe_chiba))
+            .map(|c| self.distance.distance(&c, &sample.data[self.interval.0..self.interval.1], self.band))
             .collect::<Vec<_>>();
 
         left_distances.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
@@ -160,7 +160,7 @@ impl Tree for DistanceSetTree {
         let start;
         let end;
         let ts_len = samples[0].data.len();
-        let min_interval = (rng.gen_range(0.0..1.0) * ts_len as f64).ceil() as usize;
+        let min_interval = (rng.gen_range(0.1..1.0) * ts_len as f64).ceil() as usize;
         if min_interval == ts_len {
             start = 0;
             end = ts_len;
@@ -173,8 +173,9 @@ impl Tree for DistanceSetTree {
         let mut subsamples_indeces = (0..samples.len()).collect::<Vec<_>>();
         subsamples_indeces.shuffle(&mut rng);
         subsamples_indeces.truncate(max(2, self.config.max_features.convert(samples.len())));
-        let band_values = (1..=100).map(|x| (x as f64 / 100.0).powi(5)).collect::<Vec<_>>();
-        let sakoe_chiba = find_optimal_band(&subsamples_indeces.iter().map(|i| Sample{data: Arc::new(samples[*i].data[start..end].to_vec()), target: samples[*i].target}).collect::<Vec<_>>(), self.config.distance.to_fn(), &band_values);
+        // let band_values = (1..=100).map(|x| (x as f64 / 100.0).powi(5)).collect::<Vec<_>>();
+        // let band = find_optimal_band(&subsamples_indeces.iter().map(|i| Sample{data: Arc::new(samples[*i].data[start..end].to_vec()), target: samples[*i].target}).collect::<Vec<_>>(), self.config.distance.to_fn(), &band_values);
+        let band = rng.gen_range(0.0..1.0);
 
         let subsamples_len = subsamples_indeces.len();
         let rand_split = rng.gen_range(1..subsamples_len);
@@ -187,7 +188,7 @@ impl Tree for DistanceSetTree {
                 right_candidates,
                 interval: (start, end),
                 distance: self.config.distance,
-                sakoe_chiba,
+                band,
             },
             rng.gen_range(f64::EPSILON..1.0),
         )

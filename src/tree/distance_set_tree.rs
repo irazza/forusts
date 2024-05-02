@@ -150,7 +150,7 @@ impl Tree for DistanceSetTree {
         for s in samples.iter() {
             leaf_samples.push(s.clone());
         }
-        LeafClassification::Complex(Arc::new(DistanceSetLeafClassification { leaf_samples, distance: parameters.unwrap().distance}))
+        LeafClassification::Complex(Arc::new(DistanceSetLeafClassification { leaf_samples, distance: Distance::ADTW}))
     }
     fn get_split(&self, samples: &[Sample]) -> (Self::SplitParameters, f64) {
         // let mut rng = ChaCha8Rng::seed_from_u64(42 as u64);

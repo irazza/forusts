@@ -164,7 +164,6 @@ pub trait Tree: Sync + Send {
             right: Box::new(right_subtree),
             depth: current_depth,
             impurity: best_impurity,
-            n_samples: samples.len(),
         }
     }
     fn predict(&self, x: &[Sample]) -> Vec<isize> {
@@ -172,6 +171,24 @@ pub trait Tree: Sync + Send {
             .map(|sample| self.predict_leaf(sample).get_class(&sample.data))
             .collect()
     }
+
+    fn get_leaves(&self) -> Vec<&Node<Self::SplitParameters>> {
+        let mut leaves = Vec::new();
+        let mut queue = vec![self.get_root()];
+
+        while !queue.is_empty() {
+            let node = queue.remove(0);
+            if let Node::Leaf { .. } = node {
+                leaves.push(node);
+            } else if let Node::Split { left, right, .. } = node {
+                queue.push(left);
+                queue.push(right);
+            }
+        }
+
+        leaves
+    }
+
     fn get_diameter(n: &Node<Self::SplitParameters>) -> (usize, usize) {
         match n {
             Node::Leaf { .. } => (1, 1),
@@ -196,7 +213,6 @@ pub trait Tree: Sync + Send {
             right,
             depth: _,
             impurity: _,
-            n_samples: _,
         } = node
         {
             path.push(split_params);
@@ -217,7 +233,6 @@ pub trait Tree: Sync + Send {
             right,
             depth: _,
             impurity: _,
-            n_samples: _,
         } = node
         {
             if split_params.split(x, false) {

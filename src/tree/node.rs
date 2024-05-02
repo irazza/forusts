@@ -25,7 +25,6 @@ pub enum Node<S: SplitParameters> {
         right: Box<Node<S>>,
         depth: usize,
         impurity: f64,
-        n_samples: usize,
     },
 }
 
@@ -52,7 +51,6 @@ impl<S: SplitParameters> Node<S> {
                 right: _,
                 depth: _,
                 impurity: _,
-                n_samples: _,
             } => return split_params,
         }
     }
@@ -70,7 +68,6 @@ impl<S: SplitParameters> Node<S> {
                 right: _,
                 depth,
                 impurity: _,
-                n_samples: _,
             } => return *depth,
         }
     }
@@ -94,7 +91,6 @@ impl<S: SplitParameters> Node<S> {
                 right: _,
                 depth: _,
                 impurity: _,
-                n_samples: _,
             } => panic!("Cannot get class of a split node"),
         }
     }
@@ -113,8 +109,7 @@ impl<S: SplitParameters> Node<S> {
                 right: _,
                 depth: _,
                 impurity: _,
-                n_samples,
-            } => return *n_samples,
+            } => panic!("Cannot get samples of a split node"),
         }
     }
 }

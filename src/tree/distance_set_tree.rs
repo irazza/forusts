@@ -1,8 +1,8 @@
 use crate::{
-    distance::{self, distances::{self, find_optimal_band, Distance}},
-    feature_extraction::statistics::{mean, stddev, unique},
-    forest::{distance_set_forest::DistanceSetForestConfig, forest::{ClassificationForestConfig, ClassificationTree}},
-    utils::structures::{k_means, KUnionFind, Sample},
+    distance::distances::{find_optimal_band, Distance},
+    feature_extraction::statistics::mean,
+    forest::{distance_set_forest::DistanceSetForestConfig, forest::ClassificationTree},
+    utils::structures::Sample,
 };
 use std::{cmp::max, fmt::Debug, sync::Arc};
 
@@ -11,14 +11,12 @@ use super::{
     tree::{Criterion, MaxFeatures, SplitParameters, Tree},
 };
 
-use hashbrown::HashSet;
 use rand::{seq::SliceRandom, thread_rng, Rng};
-
-const DIST_FN: fn(&[f64], &[f64], f64) -> f64 = distances::adtw; //distances::adtw;
 
 #[derive(Debug)]
 pub struct DistanceSetLeafClassification {
     pub leaf_samples: Vec<Sample>,
+    pub distance: Distance,
 }
 impl LeafClassifier for DistanceSetLeafClassification {
     fn classify(&self, x: &[f64]) -> isize {
@@ -26,7 +24,7 @@ impl LeafClassifier for DistanceSetLeafClassification {
         let mut best_distance = f64::MAX;
 
         for s in &self.leaf_samples {
-            let distance = (DIST_FN)(&s.data, x, 1.0);
+            let distance = self.distance.distance(&s.data, x, 1.0);
             if distance < best_distance {
                 best_distance = distance;
                 best_class = s.target;
@@ -41,6 +39,7 @@ pub struct DistanceSetSplit {
     pub left_candidates: Vec<Arc<Vec<f64>>>,
     pub right_candidates: Vec<Arc<Vec<f64>>>,
     pub interval: (usize, usize),
+    pub distance: Distance,
     pub sakoe_chiba: f64,
 }
 impl Eq for DistanceSetSplit {}
@@ -54,12 +53,12 @@ impl SplitParameters for DistanceSetSplit {
         let mut left_distances = self
             .left_candidates
             .iter()
-            .map(|c| (DIST_FN)(&c, &sample.data[self.interval.0..self.interval.1], self.sakoe_chiba))
+            .map(|c| self.distance.distance(&c, &sample.data[self.interval.0..self.interval.1], self.sakoe_chiba))
             .collect::<Vec<_>>();
         let mut right_distances = self
             .right_candidates
             .iter()
-            .map(|c| (DIST_FN)(&c, &sample.data[self.interval.0..self.interval.1], self.sakoe_chiba))
+            .map(|c| self.distance.distance(&c, &sample.data[self.interval.0..self.interval.1], self.sakoe_chiba))
             .collect::<Vec<_>>();
 
         left_distances.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
@@ -151,7 +150,7 @@ impl Tree for DistanceSetTree {
         for s in samples.iter() {
             leaf_samples.push(s.clone());
         }
-        LeafClassification::Complex(Arc::new(DistanceSetLeafClassification { leaf_samples }))
+        LeafClassification::Complex(Arc::new(DistanceSetLeafClassification { leaf_samples, distance: parameters.unwrap().distance}))
     }
     fn get_split(&self, samples: &[Sample]) -> (Self::SplitParameters, f64) {
         // let mut rng = ChaCha8Rng::seed_from_u64(42 as u64);
@@ -175,7 +174,7 @@ impl Tree for DistanceSetTree {
         subsamples_indeces.shuffle(&mut rng);
         subsamples_indeces.truncate(max(2, self.config.max_features.convert(samples.len())));
         let band_values = (1..=100).map(|x| (x as f64 / 100.0).powi(5)).collect::<Vec<_>>();
-        let sakoe_chiba = find_optimal_band(&subsamples_indeces.iter().map(|i| Sample{data: Arc::new(samples[*i].data[start..end].to_vec()), target: samples[*i].target}).collect::<Vec<_>>(), DIST_FN, &band_values);
+        let sakoe_chiba = find_optimal_band(&subsamples_indeces.iter().map(|i| Sample{data: Arc::new(samples[*i].data[start..end].to_vec()), target: samples[*i].target}).collect::<Vec<_>>(), self.config.distance.to_fn(), &band_values);
 
         let subsamples_len = subsamples_indeces.len();
         let rand_split = rng.gen_range(1..subsamples_len);
@@ -187,6 +186,7 @@ impl Tree for DistanceSetTree {
                 left_candidates,
                 right_candidates,
                 interval: (start, end),
+                distance: self.config.distance,
                 sakoe_chiba,
             },
             rng.gen_range(f64::EPSILON..1.0),

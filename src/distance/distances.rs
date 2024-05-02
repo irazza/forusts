@@ -19,7 +19,7 @@ use crate::{
     },
 };
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, PartialOrd)]
 pub enum Distance {
     Euclidean,
     DTW,
@@ -33,8 +33,17 @@ impl Distance {
             Distance::Euclidean => euclidean(x1, x2, sakoe_chiba),
             Distance::DTW => dtw(x1, x2, sakoe_chiba),
             Distance::TWE => twe(x1, x2, sakoe_chiba),
-            Distance::MSM => msm(x1, x2),
+            Distance::MSM => msm(x1, x2, sakoe_chiba),
             Distance::ADTW => adtw(x1, x2, sakoe_chiba),
+        }
+    }
+    pub fn to_fn(&self) -> fn(&[f64], &[f64], f64) -> f64 {
+        match self {
+            Distance::Euclidean => euclidean,
+            Distance::DTW => dtw,
+            Distance::TWE => twe,
+            Distance::MSM => msm,
+            Distance::ADTW => adtw,
         }
     }
 }
@@ -256,18 +265,17 @@ pub fn dtw(x1: &[f64], x2: &[f64], sakoe_chiba: f64) -> f64 {
 pub fn test_msm() {
     let s1 = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
     let s2 = vec![10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0];
-    let result = msm(&s1, &s2);
+    let result = msm(&s1, &s2, 1.0);
     println!("MSM: {}", result);
 }
 
 lazy_static! {
     static ref MSM_CACHE: DashMap<(Vec<FloatEq>, Vec<FloatEq>), f64> = DashMap::new();
 }
-pub fn msm(x1: &[f64], x2: &[f64]) -> f64 {
+pub fn msm(x1: &[f64], x2: &[f64], sakoe_chiba: f64) -> f64 {
     let n = x1.len();
     let m = x2.len();
 
-    let sakoe_chiba = 1.0;
     let sakoe_chiba_window_radius = (n as f64 + 1.0) * sakoe_chiba;
 
     let alpha = ((m) as f64) / ((n) as f64);

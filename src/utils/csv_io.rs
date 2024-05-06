@@ -1,7 +1,8 @@
+#![allow(dead_code)]
 use csv::ReaderBuilder;
 use std::error::Error;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader};
 use std::path::Path;
 
 use crate::utils::structures::Sample;

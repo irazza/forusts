@@ -1,23 +1,15 @@
-use std::{
-    cmp::{max, min},
-    mem::swap, path::Display,
-};
-
+#![allow(dead_code)]
 use dashmap::DashMap;
 use lazy_static::lazy_static;
-use rand::{thread_rng, Rng};
-use rayon::vec;
 use serde::{Deserialize, Serialize};
+use std::{
+    cmp::{max, min},
+    mem::swap,
+};
 
 const MSM_C: f64 = 1.0;
 
-use crate::{
-    metrics::classification::{self, accuracy_score},
-    utils::{
-        float_handling::FloatEq,
-        structures::{train_test_split, Sample},
-    },
-};
+use crate::utils::{float_handling::FloatEq, structures::Sample};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, PartialOrd)]
 pub enum Distance {
@@ -35,7 +27,7 @@ impl Distance {
             Distance::TWE => twe(x1, x2, band),
             Distance::MSM => msm(x1, x2, band),
             Distance::ADTW => adtw(x1, x2, band),
-        }       
+        }
     }
     pub fn to_fn(&self) -> fn(&[f64], &[f64], f64) -> f64 {
         match self {
@@ -57,7 +49,6 @@ impl std::fmt::Display for Distance {
             Distance::ADTW => write!(f, "adtw"),
         }
     }
-
 }
 
 pub fn euclidean(x1: &[f64], x2: &[f64], _band: f64) -> f64 {
@@ -79,7 +70,11 @@ pub fn test_twe() {
     println!("TWE: {}, time: {:?}", result, start.elapsed());
 }
 
-pub fn find_optimal_band(ds: &[Sample], dist_fn: fn(&[f64], &[f64], f64) -> f64, band_values: &[f64]) -> f64 {
+pub fn find_optimal_band(
+    ds: &[Sample],
+    dist_fn: fn(&[f64], &[f64], f64) -> f64,
+    band_values: &[f64],
+) -> f64 {
     let mut best_band = 0.0;
     let mut best_error = f64::MAX;
 
@@ -90,12 +85,22 @@ pub fn find_optimal_band(ds: &[Sample], dist_fn: fn(&[f64], &[f64], f64) -> f64,
         for (i, sample) in ds.iter().enumerate() {
             let mut rest_ds = ds.to_vec();
             rest_ds.remove(i);
-            let mut distances = rest_ds.iter()
-                .map(|other_sample| (dist_fn(&sample.data, &other_sample.data, *band), other_sample.target))
+            let mut distances = rest_ds
+                .iter()
+                .map(|other_sample| {
+                    (
+                        dist_fn(&sample.data, &other_sample.data, *band),
+                        other_sample.target,
+                    )
+                })
                 .collect::<Vec<_>>();
             distances.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
             let predicted_label = distances[0].1;
-            let error = if predicted_label == sample.target { 0.0 } else { 1.0 };
+            let error = if predicted_label == sample.target {
+                0.0
+            } else {
+                1.0
+            };
             total_error += error;
         }
         let mean_error = total_error / ds.len() as f64;

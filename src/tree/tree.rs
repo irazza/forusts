@@ -3,7 +3,7 @@ use core::fmt::Debug;
 use hashbrown::HashMap;
 use rand::{thread_rng, Rng};
 use serde_derive::{Deserialize, Serialize};
-use std::{cmp::max, fmt::Display, ops::Deref};
+use std::{cmp::max, ops::Deref};
 
 use crate::{feature_extraction::statistics::stddev, utils::structures::Sample};
 
@@ -64,32 +64,37 @@ pub trait SplitParameters: Sync + Send + Debug + Ord + Eq {
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
-pub struct SplitTest {
+pub struct StandardSplit {
     pub feature: usize,
     pub threshold: f64,
 }
 
-impl Ord for SplitTest {
+impl Ord for StandardSplit {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.partial_cmp(other).unwrap()
     }
 }
-impl Eq for SplitTest {}
+impl Eq for StandardSplit {}
 
-impl SplitParameters for SplitTest {
+impl SplitParameters for StandardSplit {
     fn split(&self, sample: &Sample, _is_train: bool) -> bool {
         sample.data[self.feature] < self.threshold
     }
     fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample) -> f64 {
         let leaf = tree.predict_leaf(&x);
+
         let samples = leaf.get_samples() as f64;
-        if samples > 1.0 {
-            return leaf.get_depth() as f64
-                + (2.0 * (f64::ln(samples - 1.0) + EULER_MASCHERONI)
-                    - 2.0 * (samples - 1.0) / samples);
+        let path_length;
+
+        if samples <= 1.0 {
+            path_length = 0.0;
+        } else if samples == 2.0 {
+            path_length = 1.0;
         } else {
-            return leaf.get_depth() as f64;
+            path_length =
+                2.0 * (f64::ln(samples - 1.0) + EULER_MASCHERONI) - 2.0 * (samples - 1.0) / samples;
         }
+        path_length + leaf.get_depth() as f64
     }
 }
 pub trait Tree: Sync + Send {
@@ -101,71 +106,43 @@ pub trait Tree: Sync + Send {
     fn set_root(&mut self, root: Node<Self::SplitParameters>);
     fn get_split(&self, samples: &[Sample]) -> (Self::SplitParameters, f64);
     fn pre_split_conditions(&self, samples: &[Sample], current_depth: usize) -> bool;
-    fn post_split_conditions(&self, new_impurity: f64, old_impurity: f64) -> bool;
     fn fit(&mut self, data: &[Sample]) {
-        let _n_features = data[0].data.len();
-        let data = &mut data.to_vec();
-        let root = self.build_tree(data, self.get_max_depth(), 0.0);
+        let mut data = data.to_vec();
+        let root = self.build_tree(&mut data, 0, f64::INFINITY);
         self.set_root(root);
     }
     fn build_tree(
         &mut self,
         samples: &mut [Sample],
-        max_depth: usize,
-        impurity: f64,
+        depth: usize,
+        _impurity: f64,
     ) -> Node<Self::SplitParameters> {
-        let current_depth = self.get_max_depth() - max_depth; // max(1, self.get_max_depth() - max_depth);
-
-        if self.pre_split_conditions(samples, current_depth) {
+        if self.pre_split_conditions(samples, depth) {
             return Node::Leaf {
                 class: Self::get_leaf_class(samples, None),
-                depth: current_depth,
+                depth: depth,
                 impurity: f64::EPSILON,
                 n_samples: samples.len(),
             };
         }
 
         let (best_split_parameters, best_impurity) = self.get_split(samples);
-        if self.post_split_conditions(best_impurity, impurity) {
-            return Node::Leaf {
-                class: Self::get_leaf_class(samples, Some(&best_split_parameters)),
-                depth: current_depth,
-                impurity: f64::EPSILON,
-                n_samples: samples.len(),
-            };
-        }
 
         let (left_data, right_data) = Self::split(samples, &best_split_parameters);
 
-        if left_data.len() == 0 || right_data.len() == 0 {
-            return Node::Leaf {
-                class: Self::get_leaf_class(samples, Some(&best_split_parameters)),
-                depth: current_depth,
-                impurity: f64::EPSILON,
-                n_samples: samples.len(),
-            };
-        }
-
-        assert!(
-            left_data.len() > 0 && right_data.len() > 0,
-            "{} {} \n{}\n {:?}",
-            left_data.len(),
-            right_data.len(),
-            current_depth,
-            best_split_parameters
-        );
         // Split the data and recursively build the left and right subtrees
-        let left_subtree = self.build_tree(left_data, max_depth - 1, best_impurity);
-        let right_subtree = self.build_tree(right_data, max_depth - 1, best_impurity);
+        let left_subtree = self.build_tree(left_data, depth + 1, best_impurity);
+        let right_subtree = self.build_tree(right_data, depth + 1, best_impurity);
 
         Node::Split {
             split_params: best_split_parameters,
             left: Box::new(left_subtree),
             right: Box::new(right_subtree),
-            depth: current_depth,
+            depth: depth,
             impurity: best_impurity,
         }
     }
+
     fn predict(&self, x: &[Sample]) -> Vec<isize> {
         x.iter()
             .map(|sample| self.predict_leaf(sample).get_class(&sample.data))

@@ -24,15 +24,11 @@ impl Forest<DecisionTree> for RandomForest {
     fn predict(&self, data: &[Sample]) -> Vec<isize> {
         self.predict_(data)
     }
-    fn compute_intervals(&mut self, _n_features: usize) {}
     fn get_trees(&self) -> &Vec<DecisionTree> {
         &self.trees
     }
     fn get_trees_mut(&mut self) -> &mut Vec<DecisionTree> {
         &mut self.trees
-    }
-    fn transform<'a>(&self, data: &[Sample], _intervals_index: usize) -> Vec<Sample> {
-        data.to_vec()
     }
     fn tuning_predict(&self, _ds_train: &[Sample], ds_test: &[Sample]) -> Vec<Self::TuningType> {
         self.predict(ds_test)

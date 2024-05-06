@@ -1,14 +1,11 @@
 use super::{node::Node, tree::SplitParameters};
 use crate::feature_extraction::statistics::stddev;
-use crate::{
-    forest::forest::{OutlierForestConfig, OutlierTree},
-    tree::tree::Tree,
-    utils::structures::Sample,
-};
+use crate::forest::sc_isolation_forest::SCIsolationForestConfig;
+use crate::{forest::forest::OutlierTree, tree::tree::Tree, utils::structures::Sample};
 use rand::{seq::SliceRandom, thread_rng, Rng};
 
 const N_HYPERPLANES: usize = 10;
-const N_ATTRIBUTES: usize = 25;
+const N_ATTRIBUTES: usize = 2;
 
 #[derive(Clone, Debug)]
 pub struct SCIsolationTreeConfig {
@@ -65,22 +62,24 @@ impl SCIsolationTree {
             }
         }
         SplitHyperplane {
-            c: c,
+            c,
             means: means.to_vec(),
             idx_attributes: subsampled_features,
             p: best_p,
-            best_sd_gain: best_sd_gain,
+            best_sd_gain,
             limit: p[p.len() - 1] - p[0],
         }
     }
 }
 
 impl OutlierTree for SCIsolationTree {
-    fn from_outlier_config(max_samples: usize, config: &OutlierForestConfig) -> Self {
+    type TreeConfig = SCIsolationForestConfig;
+    fn from_outlier_config(config: &Self::TreeConfig) -> Self {
         Self::new(SCIsolationTreeConfig {
-            max_depth: config.max_depth.unwrap_or(max_samples.ilog2() as usize + 1),
-            min_samples_split: 2,
-            // Setted to 2 to avoid empty child when splitting when there are only two samples
+            max_depth: config
+                .max_depth
+                .unwrap_or(config.max_samples.ilog2() as usize + 1),
+            min_samples_split: config.min_samples_split,
         })
     }
 }
@@ -154,9 +153,6 @@ impl Tree for SCIsolationTree {
         if is_all_same_data {
             return true;
         }
-        return false;
-    }
-    fn post_split_conditions(&self, _new_impurity: f64, _old_impurity: f64) -> bool {
         return false;
     }
     fn get_split(&self, samples: &[Sample]) -> (SplitHyperplane, f64) {

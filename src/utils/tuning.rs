@@ -1,5 +1,5 @@
+#![allow(dead_code)]
 use crate::forest::forest::Forest;
-
 use crate::tree::tree::Tree;
 use crate::utils::structures::Sample;
 

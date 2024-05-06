@@ -1,9 +1,8 @@
+#![allow(dead_code)]
+use hashbrown::HashMap;
 use std::ops::{Add, Div};
 
-use hashbrown::HashMap;
-
-pub const EULER_MASCHERONI: f64 =
-    0.5772156649015328606065120900824024310421593359399235988057672348849;
+pub const EULER_MASCHERONI: f64 = 0.5772156649015329;
 
 pub fn mean(x: &[f64]) -> f64 {
     let mean = x.iter().sum::<f64>() / x.len() as f64;

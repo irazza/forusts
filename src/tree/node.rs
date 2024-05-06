@@ -37,23 +37,6 @@ impl<S: SplitParameters> Node<S> {
             n_samples: 0,
         }
     }
-    pub fn get_split_parameters(&self) -> &S {
-        match self {
-            Node::Leaf {
-                class: _,
-                depth: _,
-                impurity: _,
-                n_samples: _,
-            } => panic!("Cannot get split parameters of a leaf node"),
-            Node::Split {
-                split_params,
-                left: _,
-                right: _,
-                depth: _,
-                impurity: _,
-            } => return split_params,
-        }
-    }
     pub fn get_depth(&self) -> usize {
         match self {
             Node::Leaf {

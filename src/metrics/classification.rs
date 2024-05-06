@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::feature_extraction::statistics::unique;
 
 pub fn accuracy_score(y_pred: &[isize], y_true: &[isize]) -> f64 {

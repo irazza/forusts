@@ -5,7 +5,6 @@ use std::fmt::Formatter;
 use crate::distance::distances::Distance;
 use crate::grid_search_tuning;
 use crate::tree::distance_set_tree::DistanceSetTree;
-use crate::tree::distance_tree::DistanceTree;
 use crate::utils::structures::Sample;
 
 use crate::forest::forest::{ClassificationForest, Forest};
@@ -50,15 +49,11 @@ impl Forest<DistanceSetTree> for DistanceSetForest {
     fn predict(&self, data: &[Sample]) -> Vec<isize> {
         self.predict_(data)
     }
-    fn compute_intervals(&mut self, _n_features: usize) {}
     fn get_trees(&self) -> &Vec<DistanceSetTree> {
         &self.trees
     }
     fn get_trees_mut(&mut self) -> &mut Vec<DistanceSetTree> {
         &mut self.trees
-    }
-    fn transform<'a>(&self, data: &[Sample], _intervals_index: usize) -> Vec<Sample> {
-        data.to_vec()
     }
     fn tuning_predict(&self, _ds_train: &[Sample], ds_test: &[Sample]) -> Vec<Self::TuningType> {
         self.predict(ds_test)

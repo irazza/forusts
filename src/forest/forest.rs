@@ -24,10 +24,8 @@ pub const ANOMALY_SCORE: f64 = 2.0;
 pub trait Forest<T: Tree>: Sync + Send {
     type Config;
     type TuningType;
-    fn compute_intervals(&mut self, n_features: usize);
     fn get_trees(&self) -> &Vec<T>;
     fn get_trees_mut(&mut self) -> &mut Vec<T>;
-    fn transform<'a>(&self, data: &[Sample], intervals_index: usize) -> Vec<Sample>;
     fn new(config: Self::Config) -> Self;
     fn fit(&mut self, data: &mut [Sample]);
     fn predict(&self, data: &[Sample]) -> Vec<isize>;
@@ -66,31 +64,24 @@ pub trait ClassificationTree: Tree {
 pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
     fn get_forest_config(&self) -> (&ClassificationForestConfig, &T::TreeConfig);
     fn fit_(&mut self, data: &mut [Sample]) {
-        self.compute_intervals(data[0].data.len());
         let mut trees = Vec::new();
         let (config, tree_config) = self.get_forest_config();
-        trees.par_extend((0..config.n_trees).into_par_iter().map(|i| {
-            let transformed_data = self.transform(data, i);
+        trees.par_extend((0..config.n_trees).into_par_iter().map(|_i| {
             let mut tree = T::from_classification_config(&tree_config);
             if config.bootstrap {
-                let bootstrap_indices = (0..transformed_data.len())
+                let bootstrap_indices = (0..data.len())
                     .collect::<Vec<_>>()
                     .iter()
-                    .map(|_| thread_rng().gen_range(0..transformed_data.len()))
+                    .map(|_| thread_rng().gen_range(0..data.len()))
                     .collect::<Vec<_>>();
                 tree.fit(
                     &mut bootstrap_indices
                         .iter()
-                        .map(|idx| transformed_data[*idx].to_ref())
+                        .map(|idx| data[*idx].to_ref())
                         .collect::<Vec<Sample>>(),
                 );
             } else {
-                tree.fit(
-                    &mut transformed_data
-                        .iter()
-                        .map(|x| x.to_ref())
-                        .collect::<Vec<Sample>>(),
-                );
+                tree.fit(&mut data.iter().map(|x| x.to_ref()).collect::<Vec<Sample>>());
             }
             tree
         }));
@@ -101,10 +92,7 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
         let mut predictions = Vec::new();
         // Make predictions for each sample using each tree in the forest
         let trees: &Vec<T> = self.get_trees();
-        predictions.par_extend(trees.par_iter().enumerate().map(|(i, tree)| {
-            let transformed_data = self.transform(data, i);
-            tree.predict(&transformed_data)
-        }));
+        predictions.par_extend(trees.par_iter().map(|tree| tree.predict(data)));
 
         // Combine predictions using a majority vote
         let mut final_predictions = vec![0; n_samples];
@@ -136,17 +124,9 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
             .map(|_| (0..x2.len()).map(|_| AtomicUsize::new(0)).collect())
             .collect();
         let trees: &Vec<T> = self.get_trees();
-        trees.par_iter().enumerate().for_each(|(i, tree)| {
-            let transformed_x1 = self.transform(&x1, i);
-            let transformed_x2 = self.transform(&x2, i);
-            let x1_leaves = transformed_x1
-                .iter()
-                .map(|x| tree.predict_leaf(x))
-                .collect::<Vec<_>>();
-            let x2_leaves = transformed_x2
-                .iter()
-                .map(|x| tree.predict_leaf(x))
-                .collect::<Vec<_>>();
+        trees.par_iter().for_each(|tree| {
+            let x1_leaves = x1.iter().map(|x| tree.predict_leaf(x)).collect::<Vec<_>>();
+            let x2_leaves = x2.iter().map(|x| tree.predict_leaf(x)).collect::<Vec<_>>();
 
             for (i, &x1_node) in x1_leaves.iter().enumerate() {
                 for (j, &x2_node) in x2_leaves.iter().enumerate() {
@@ -171,17 +151,9 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
             .map(|_| (0..x2.len()).map(|_| Mutex::new(0.0)).collect())
             .collect();
         let trees: &Vec<T> = self.get_trees();
-        trees.par_iter().enumerate().for_each(|(i, tree)| {
-            let transformed_x1 = self.transform(&x1, i);
-            let transformed_x2 = self.transform(&x2, i);
-            let x1_nodes = transformed_x1
-                .iter()
-                .map(|x| tree.predict_leaf(x))
-                .collect::<Vec<_>>();
-            let x2_nodes = transformed_x2
-                .iter()
-                .map(|x| tree.predict_leaf(x))
-                .collect::<Vec<_>>();
+        trees.par_iter().for_each(|tree| {
+            let x1_nodes = x1.iter().map(|x| tree.predict_leaf(x)).collect::<Vec<_>>();
+            let x2_nodes = x2.iter().map(|x| tree.predict_leaf(x)).collect::<Vec<_>>();
 
             for (i, &x1_node) in x1_nodes.iter().enumerate() {
                 let distances = tree.compute_ancestor(x1_node);
@@ -208,17 +180,9 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
             .map(|_| (0..x2.len()).map(|_| Mutex::new(0.0)).collect())
             .collect();
         let trees: &Vec<T> = self.get_trees();
-        trees.par_iter().enumerate().for_each(|(i, tree)| {
-            let transformed_x1 = self.transform(&x1, i);
-            let transformed_x2 = self.transform(&x2, i);
-            let x1_nodes = transformed_x1
-                .iter()
-                .map(|x| tree.predict_leaf(x))
-                .collect::<Vec<_>>();
-            let x2_nodes = transformed_x2
-                .iter()
-                .map(|x| tree.predict_leaf(x))
-                .collect::<Vec<_>>();
+        trees.par_iter().for_each(|tree| {
+            let x1_nodes = x1.iter().map(|x| tree.predict_leaf(x)).collect::<Vec<_>>();
+            let x2_nodes = x2.iter().map(|x| tree.predict_leaf(x)).collect::<Vec<_>>();
 
             for (i, &x1_node) in x1_nodes.iter().enumerate() {
                 let distances = tree.compute_ancestor(x1_node);
@@ -249,12 +213,9 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
             .collect();
 
         let trees: &Vec<T> = self.get_trees();
-        trees.par_iter().enumerate().for_each(|(i, tree)| {
-            let transformed_x1 = self.transform(&x1, i);
-            let transformed_x2 = self.transform(&x2, i);
-
-            for (i, x1) in transformed_x1.iter().enumerate() {
-                for (j, x2) in transformed_x2.iter().enumerate() {
+        trees.par_iter().for_each(|tree| {
+            for (i, x1) in x1.iter().enumerate() {
+                for (j, x2) in x2.iter().enumerate() {
                     let mut union = Vec::new();
                     union.extend(tree.get_splits(x1).into_iter());
                     union.extend(tree.get_splits(x2).into_iter());
@@ -290,6 +251,8 @@ grid_search_tuning! {
         pub n_trees: usize,
         pub enhanced_anomaly_score: bool,
         pub max_depth: Option<usize>,
+        pub min_samples_split: usize,
+        pub max_samples: usize,
     }
     impl Debug for OutlierForestConfig {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -303,29 +266,27 @@ grid_search_tuning! {
 }
 
 pub trait OutlierTree: Tree {
-    fn from_outlier_config(max_samples: usize, config: &OutlierForestConfig) -> Self;
+    type TreeConfig: Sync + Send;
+    fn from_outlier_config(config: &Self::TreeConfig) -> Self;
 }
-
 pub trait OutlierForest<T: OutlierTree>: Forest<T> {
-    fn get_forest_config(&self) -> &OutlierForestConfig;
+    fn get_forest_config(&self) -> (&OutlierForestConfig, &T::TreeConfig);
     fn set_max_samples(&mut self, max_samples: usize);
     fn get_max_samples(&self) -> usize;
     fn fit_(&mut self, data: &[Sample]) {
         let subsampling_ratio = f64::min(1.0, 256.0 / data.len() as f64);
         let max_samples = (data.len() as f64 * subsampling_ratio) as usize;
         self.set_max_samples(max_samples);
-        self.compute_intervals(data[0].data.len());
         let mut trees = Vec::new();
-        let config = self.get_forest_config();
-        trees.par_extend((0..config.n_trees).into_par_iter().map(|i| {
+        let (config, tree_config) = self.get_forest_config();
+        trees.par_extend((0..config.n_trees).into_par_iter().map(|_i| {
             let mut n_samples: Vec<usize> = (0..data.len()).collect();
             n_samples.shuffle(&mut rand::thread_rng());
-            let transformed_data = self.transform(data, i);
-            let mut tree = T::from_outlier_config(max_samples, config);
+            let mut tree = T::from_outlier_config(&tree_config);
             tree.fit(
                 &mut (0..max_samples)
                     .into_iter()
-                    .map(|i| transformed_data[n_samples[i]].to_ref())
+                    .map(|i| data[n_samples[i]].to_ref())
                     .collect::<Vec<Sample>>(),
             );
             tree
@@ -341,61 +302,36 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
         predictions
     }
     fn score_samples(&self, data: &[Sample]) -> Vec<f64> {
-        if self.get_forest_config().enhanced_anomaly_score {
-            self.compute_enhanced_anomaly_scores(data)
-        } else {
-            self.compute_anomaly_scores(data)
-        }
-    }
-    fn compute_as_per_tree(&self, data: &[Sample]) -> Vec<Vec<f64>> {
-        let mut scores = Vec::new();
-        for (i, tree) in self.get_trees().iter().enumerate() {
-            let transformed_x = self.transform(data, i);
-            scores.push(
-                transformed_x
-                    .iter()
-                    .map(|s| Self::path_length(tree, s))
-                    .collect(),
-            );
-        }
-        scores
-    }
-    fn compute_enhanced_anomaly_scores(&self, data: &[Sample]) -> Vec<f64> {
-        let mut scores = Vec::new();
-        let max_samples = self.get_max_samples() as f64;
-        let denominator = (2.0 * (f64::ln(max_samples - 1.0) + EULER_MASCHERONI))
-            - 2.0 * ((max_samples - 1.0) / max_samples);
-        scores.par_extend(data.par_windows(1).map(|sample| {
-            let mut average_as = 0.0;
-            let trees: &Vec<T> = self.get_trees();
-            for (i, tree) in trees.iter().enumerate() {
-                let transformed_x = self.transform(sample, i).into_iter().next().unwrap();
-                average_as +=
-                    ANOMALY_SCORE.powf(-Self::path_length(tree, &transformed_x) / denominator);
-            }
-            average_as /= self.get_forest_config().n_trees as f64;
-            return average_as;
-        }));
-        scores
+        self.compute_anomaly_scores(data)
     }
     fn compute_anomaly_scores(&self, data: &[Sample]) -> Vec<f64> {
         let mut scores = Vec::new();
+
         let max_samples = self.get_max_samples() as f64;
-        let denominator = (2.0 * (f64::ln(max_samples - 1.0) + EULER_MASCHERONI))
-            - 2.0 * ((max_samples - 1.0) / max_samples);
+        let denominator = (2.0 * (f64::ln(max_samples - 1.0) + EULER_MASCHERONI)
+            - 2.0 * (max_samples - 1.0) / max_samples)
+            * self.get_forest_config().0.n_trees as f64;
+
         scores.par_extend(data.par_windows(1).map(|sample| {
             let mut average_depth = 0.0;
+            let sample = &sample[0];
             let trees: &Vec<T> = self.get_trees();
-            for (i, tree) in trees.iter().enumerate() {
-                let transformed_x = self.transform(sample, i);
-                average_depth += Self::path_length(tree, &transformed_x[0]);
+            for tree in trees.iter() {
+                average_depth += Self::path_length(tree, sample) - 1.0;
             }
-            average_depth /= self.get_forest_config().n_trees as f64;
-            return ANOMALY_SCORE.powf(-average_depth / denominator);
+            let exponent = -average_depth / denominator;
+            assert!(
+                exponent.is_finite(),
+                "Anomaly score is not finite {} {}",
+                average_depth,
+                denominator
+            );
+            let score = ANOMALY_SCORE.powf(exponent);
+            return score;
         }));
         scores
     }
-    fn path_length(tree: &T, transformed_x: &Sample) -> f64 {
-        T::SplitParameters::path_length(tree, transformed_x)
+    fn path_length(tree: &T, x: &Sample) -> f64 {
+        T::SplitParameters::path_length(tree, x)
     }
 }

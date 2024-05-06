@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use super::statistics::{mean, slope, stddev};
 
 mod bindings {
@@ -36,7 +37,6 @@ pub fn compute_catch(i: usize) -> fn(&[f64]) -> f64 {
         _ => panic!("Invalid index for CATCH22 (valide range 0..25)"),
     }
 }
-
 pub fn compute_catch_features(x: &[f64]) -> Vec<f64> {
     let mut features = Vec::new();
     features.push(dn_outlier_include_n_001_mdrmd(x));

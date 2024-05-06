@@ -1,13 +1,12 @@
 use core::panic;
 
-use super::{node::Node, tree::SplitTest};
+use super::{node::Node, tree::StandardSplit};
 use crate::{
-    forest::forest::{OutlierForestConfig, OutlierTree},
+    forest::{forest::OutlierTree, isolation_forest::IsolationForestConfig},
     tree::tree::Tree,
     utils::structures::Sample,
 };
-use rand::{seq::SliceRandom, thread_rng, Rng, SeedableRng};
-use rand_chacha::ChaCha8Rng;
+use rand::{thread_rng, Rng};
 
 #[derive(Clone, Debug)]
 pub struct IsolationTreeConfig {
@@ -17,25 +16,25 @@ pub struct IsolationTreeConfig {
 
 #[derive(Clone, Debug)]
 pub struct IsolationTree {
-    root: Node<SplitTest>,
+    root: Node<StandardSplit>,
     config: IsolationTreeConfig,
 }
 
 impl OutlierTree for IsolationTree {
-    fn from_outlier_config(max_samples: usize, config: &OutlierForestConfig) -> Self {
+    type TreeConfig = IsolationForestConfig;
+    fn from_outlier_config(config: &Self::TreeConfig) -> Self {
         Self::new(IsolationTreeConfig {
             max_depth: config
                 .max_depth
-                .unwrap_or((max_samples as f64).log2().ceil() as usize),
-            min_samples_split: 1,
-            // Setted to 2 to avoid empty child when splitting when there are only two samples
+                .unwrap_or((config.max_samples as f64).log2() as usize + 1),
+            min_samples_split: 2,
         })
     }
 }
 
 impl Tree for IsolationTree {
     type Config = IsolationTreeConfig;
-    type SplitParameters = SplitTest;
+    type SplitParameters = StandardSplit;
     fn new(config: Self::Config) -> Self {
         Self {
             root: Node::new(),
@@ -63,44 +62,28 @@ impl Tree for IsolationTree {
         if is_all_same_data {
             return true;
         }
-
-        return false;
-    }
-    fn post_split_conditions(&self, new_impurity: f64, _old_impurity: f64) -> bool {
-        // Base case: no split found
         return false;
     }
     fn get_split(&self, samples: &[Sample]) -> (Self::SplitParameters, f64) {
-        //let mut rng = ChaCha8Rng::seed_from_u64(samples.len() as u64);
         let mut rng = thread_rng();
-        let mut thresholds = Vec::new();
-        let mut candidate = None;
 
-        // Iterate over feature to find a features which can be splitted
-        let mut features = (0..samples[0].data.len()).collect::<Vec<_>>();
-        features.shuffle(&mut rng);
+        let feature = rng.gen_range(0..samples[0].data.len());
+        let mut thresholds = samples
+            .iter()
+            .map(|f| f.data[feature])
+            .collect::<Vec<f64>>();
+        thresholds.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
+        thresholds.dedup();
 
-        for feature_idx in features {
-            // Choose a random threshold
-            thresholds = samples
-                .iter()
-                .map(|f| f.data[feature_idx])
-                .collect::<Vec<f64>>();
-            thresholds.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
-            thresholds.dedup();
-
-            // If there is only one threshold, choose another feature
-            if thresholds.len() > 1 {
-                candidate = Some(feature_idx);
-                break;
-            }
-        }
-
-        let threshold = thresholds[rng.gen_range(1..thresholds.len())];
+        let threshold = match thresholds.len() {
+            0 => panic!("Thresholds cannot be empty"),
+            1 => thresholds[0],
+            _ => thresholds[rng.gen_range(1..thresholds.len())],
+        };
 
         (
-            SplitTest {
-                feature: candidate.unwrap(),
+            StandardSplit {
+                feature: feature,
                 threshold,
             },
             rng.gen_range(f64::EPSILON..1.0),

@@ -10,7 +10,6 @@ use crate::{
 };
 use rand::{seq::SliceRandom, thread_rng, Rng};
 
-pub const MIN_INTERVAL_LEN: usize = 20;
 pub const TOT_ATTRIBUTES: usize = 25;
 
 #[derive(Clone, Debug, PartialOrd, PartialEq)]
@@ -64,12 +63,9 @@ pub struct CanonicalIsolationTree {
 
 impl OutlierTree for CanonicalIsolationTree {
     type TreeConfig = CanonicalIsolationForestConfig;
-    fn from_outlier_config(config: &Self::TreeConfig) -> Self {
+    fn from_outlier_config(config: &Self::TreeConfig, max_samples: usize) -> Self {
         Self::new(CanonicalIsolationTreeConfig {
-            max_depth: config
-                .outlier_config
-                .max_depth
-                .unwrap_or((config.outlier_config.max_samples as f64).log2() as usize + 1),
+            max_depth: max_samples.ilog2() as usize + 1,
             min_samples_split: config.outlier_config.min_samples_split,
             n_attributes: config.n_attributes,
             n_intervals: config.n_intervals,
@@ -97,8 +93,7 @@ impl Tree for CanonicalIsolationTree {
     }
     fn pre_split_conditions(&self, samples: &[Sample], current_depth: usize) -> bool {
         // Base case: not enough samples or max depth reached
-        if samples.len() <= self.config.min_samples_split || current_depth == self.config.max_depth
-        {
+        if samples.len() <= self.config.min_samples_split || current_depth == self.config.max_depth {
             return true;
         }
         // Base case: samples are the same object
@@ -113,9 +108,18 @@ impl Tree for CanonicalIsolationTree {
         let mut rng = thread_rng();
         // Generate n_intervals random intervals
         let mut intervals = Vec::new();
+        let mut start;
+        let mut end;
+        let ts_len = samples[0].data.len();
         for _ in 0..self.config.n_intervals {
-            let start = rng.gen_range(0..samples[0].data.len() - MIN_INTERVAL_LEN);
-            let end = rng.gen_range(start + MIN_INTERVAL_LEN..samples[0].data.len());
+            let min_interval = (rng.gen_range(0.1..1.0) * ts_len as f64).ceil() as usize;
+            if min_interval == ts_len {
+                start = 0;
+                end = ts_len;
+            } else {
+                start = rng.gen_range(0..ts_len - min_interval);
+                end = rng.gen_range(start + min_interval..ts_len);
+            }
 
             intervals.push((start, end));
         }

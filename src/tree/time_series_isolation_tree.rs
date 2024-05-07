@@ -72,12 +72,9 @@ pub struct TimeSeriesIsolationTree {
 
 impl OutlierTree for TimeSeriesIsolationTree {
     type TreeConfig = TimeSeriesIsolationForestConfig;
-    fn from_outlier_config(config: &Self::TreeConfig) -> Self {
+    fn from_outlier_config(config: &Self::TreeConfig, max_samples: usize) -> Self {
         Self::new(TimeSeriesIsolationTreeConfig {
-            max_depth: config
-                .outlier_config
-                .max_depth
-                .unwrap_or((config.outlier_config.max_samples as f64).log2() as usize + 1),
+            max_depth: max_samples.ilog2() as usize + 1,
             min_samples_split: config.outlier_config.min_samples_split,
             n_intervals: config.n_intervals,
         })
@@ -126,7 +123,6 @@ impl Tree for TimeSeriesIsolationTree {
 
             intervals.push((start, end));
         }
-
         // For each interval, compute the randomly selected features
         let mut transformed_samples = Vec::new();
         for sample in samples {

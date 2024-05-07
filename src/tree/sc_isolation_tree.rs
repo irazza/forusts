@@ -74,11 +74,9 @@ impl SCIsolationTree {
 
 impl OutlierTree for SCIsolationTree {
     type TreeConfig = SCIsolationForestConfig;
-    fn from_outlier_config(config: &Self::TreeConfig) -> Self {
+    fn from_outlier_config(config: &Self::TreeConfig, max_samples: usize) -> Self {
         Self::new(SCIsolationTreeConfig {
-            max_depth: config
-                .max_depth
-                .unwrap_or(config.max_samples.ilog2() as usize + 1),
+            max_depth: max_samples.ilog2() as usize + 1,
             min_samples_split: config.min_samples_split,
         })
     }

@@ -4,6 +4,7 @@ use crate::grid_search_tuning;
 use crate::tree::canonical_isolation_tree::CanonicalIsolationTree;
 use crate::utils::structures::Sample;
 use crate::utils::tuning::TuningConfig;
+use std::any::type_name;
 use std::fmt::Debug;
 
 grid_search_tuning! {
@@ -14,7 +15,14 @@ pub struct CanonicalIsolationForestConfig [CanonicalIsolationForestConfigTuning]
 }
 impl Debug for CanonicalIsolationForestConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "CanonicalIsolationForestConfig")
+        let full_type_name = type_name::<Self>();
+        let struct_name = full_type_name.split("::").last().unwrap_or(full_type_name);
+        let struct_name = struct_name.chars().take(struct_name.len() - 6).collect::<String>();
+        write!(
+            f,
+            "{}_{}_{}",
+            struct_name, self.outlier_config.n_trees, self.n_intervals
+        )
     }
 }
 }

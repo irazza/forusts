@@ -22,12 +22,10 @@ pub struct IsolationTree {
 
 impl OutlierTree for IsolationTree {
     type TreeConfig = IsolationForestConfig;
-    fn from_outlier_config(config: &Self::TreeConfig) -> Self {
+    fn from_outlier_config(config: &Self::TreeConfig, max_samples: usize) -> Self {
         Self::new(IsolationTreeConfig {
-            max_depth: config
-                .max_depth
-                .unwrap_or((config.max_samples as f64).log2() as usize + 1),
-            min_samples_split: 2,
+            max_depth: max_samples.ilog2() as usize + 1,
+            min_samples_split: config.min_samples_split,
         })
     }
 }

@@ -1,11 +1,11 @@
-use core::panic;
-use std::sync::Arc;
-use std::hash::Hash;
 use crate::{
     feature_extraction::statistics::{mean, slope, stddev, EULER_MASCHERONI},
     forest::{forest::OutlierTree, time_series_isolation_forest::TimeSeriesIsolationForestConfig},
     utils::structures::Sample,
 };
+use core::panic;
+use std::hash::Hash;
+use std::sync::Arc;
 
 use super::{
     node::Node,

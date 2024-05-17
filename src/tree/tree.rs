@@ -1,11 +1,11 @@
 use crate::feature_extraction::statistics::EULER_MASCHERONI;
+use crate::{feature_extraction::statistics::stddev, utils::structures::Sample};
 use core::fmt::Debug;
 use hashbrown::HashMap;
 use rand::{thread_rng, Rng};
 use serde_derive::{Deserialize, Serialize};
-use std::{cmp::max, ops::Deref};
 use std::hash::Hash;
-use crate::{feature_extraction::statistics::stddev, utils::structures::Sample};
+use std::{cmp::max, ops::Deref};
 
 use super::node::{LeafClassification, Node};
 
@@ -81,7 +81,6 @@ impl Hash for StandardSplit {
         self.feature.hash(state);
         self.threshold.to_bits().hash(state);
     }
-
 }
 
 impl SplitParameters for StandardSplit {

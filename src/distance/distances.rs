@@ -286,7 +286,6 @@ fn msm_cost_function(x_i: f64, x_i_1: f64, y_j: f64) -> f64 {
     }
 }
 
-
 pub fn test_adtw() {
     let s1 = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
     let s2 = vec![10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0];
@@ -306,7 +305,7 @@ pub fn adtw(x1: &[f64], x2: &[f64], band: f64) -> f64 {
     if let Some(value) = ADTW_CACHE.get(&key_cache) {
         return *value.value();
     }
-    
+
     let n = x1.len();
     let m = x2.len();
     let w = band;

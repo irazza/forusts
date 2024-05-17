@@ -7,7 +7,7 @@ use crate::grid_search_tuning;
 use crate::tree::distance_isolation_tree::DistanceIsolationTree;
 use crate::utils::structures::Sample;
 
-use crate::forest::forest::{OutlierForest, Forest};
+use crate::forest::forest::{Forest, OutlierForest};
 
 use super::forest::{OutlierForestConfig, OutlierForestConfigTuning};
 

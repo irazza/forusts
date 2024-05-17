@@ -1,5 +1,3 @@
-use core::panic;
-use std::hash::Hash;
 use super::{node::Node, tree::SplitParameters};
 use crate::{
     feature_extraction::{catch22::compute_catch, statistics::EULER_MASCHERONI},
@@ -7,7 +5,9 @@ use crate::{
     tree::tree::Tree,
     utils::structures::Sample,
 };
+use core::panic;
 use rand::{thread_rng, Rng};
+use std::hash::Hash;
 
 pub const MIN_INTERVAL_LEN: usize = 20;
 pub const TOT_ATTRIBUTES: usize = 25;
@@ -94,7 +94,8 @@ impl Tree for CanonicalIsolationTree {
     }
     fn pre_split_conditions(&self, samples: &[Sample], current_depth: usize) -> bool {
         // Base case: not enough samples or max depth reached
-        if samples.len() <= self.config.min_samples_split || current_depth == self.config.max_depth {
+        if samples.len() <= self.config.min_samples_split || current_depth == self.config.max_depth
+        {
             return true;
         }
         // Base case: samples are the same object

@@ -1,5 +1,3 @@
-use core::panic;
-use std::hash::Hash;
 use super::{node::Node, tree::SplitParameters};
 use crate::{
     feature_extraction::catch22::compute_catch,
@@ -10,7 +8,9 @@ use crate::{
     tree::tree::Tree,
     utils::structures::Sample,
 };
+use core::panic;
 use rand::{thread_rng, Rng};
+use std::hash::Hash;
 
 pub const MIN_INTERVAL_LEN: usize = 20;
 pub const TOT_ATTRIBUTES: usize = 25;

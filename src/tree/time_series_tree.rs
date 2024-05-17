@@ -1,5 +1,3 @@
-use std::sync::Arc;
-use std::hash::Hash;
 use super::{
     node::Node,
     tree::{Criterion, MaxFeatures, SplitParameters},
@@ -12,6 +10,8 @@ use crate::{
 };
 use hashbrown::HashMap;
 use rand::{seq::SliceRandom, thread_rng, Rng};
+use std::hash::Hash;
+use std::sync::Arc;
 
 pub const MIN_INTERVAL_LEN: usize = 3;
 pub const N_ATTRIBUTES: usize = 3;

@@ -25,7 +25,9 @@ impl LeafClassifier for DistanceSetLeafClassification {
         let mut best_distance = f64::MAX;
 
         for s in &self.leaf_samples {
-            let distance = self.distance.distance(&s.data, x, f64::log2(s.data.len() as f64).ceil());
+            let distance =
+                self.distance
+                    .distance(&s.data, x, f64::log2(s.data.len() as f64).ceil());
             if distance < best_distance {
                 best_distance = distance;
                 best_class = s.target;
@@ -59,12 +61,24 @@ impl SplitParameters for DistanceSetSplit {
         let left_distances = self
             .left_candidates
             .iter()
-            .map(|c| self.distance.distance(&c, &sample.data[self.interval.0..self.interval.1], self.band))
+            .map(|c| {
+                self.distance.distance(
+                    &c,
+                    &sample.data[self.interval.0..self.interval.1],
+                    self.band,
+                )
+            })
             .collect::<Vec<_>>();
         let right_distances = self
             .right_candidates
             .iter()
-            .map(|c| self.distance.distance(&c, &sample.data[self.interval.0..self.interval.1], self.band))
+            .map(|c| {
+                self.distance.distance(
+                    &c,
+                    &sample.data[self.interval.0..self.interval.1],
+                    self.band,
+                )
+            })
             .collect::<Vec<_>>();
 
         mean(&left_distances) < mean(&right_distances)
@@ -145,7 +159,10 @@ impl Tree for DistanceSetTree {
         for s in samples.iter() {
             leaf_samples.push(s.clone());
         }
-        LeafClassification::Complex(Arc::new(DistanceSetLeafClassification { leaf_samples, distance: Distance::DTW}))
+        LeafClassification::Complex(Arc::new(DistanceSetLeafClassification {
+            leaf_samples,
+            distance: Distance::DTW,
+        }))
     }
     fn get_split(&self, samples: &[Sample]) -> (Self::SplitParameters, f64) {
         // let mut rng = ChaCha8Rng::seed_from_u64(42 as u64);
@@ -173,13 +190,12 @@ impl Tree for DistanceSetTree {
         let mut left_candidates = Vec::new();
         let mut right_candidates = Vec::new();
         for (i, s) in subsamples_indices.iter().enumerate() {
-            if i%2 == 0 {
+            if i % 2 == 0 {
                 left_candidates.push(Arc::new(samples[*s].data[start..end].to_vec()));
             } else {
                 right_candidates.push(Arc::new(samples[*s].data[start..end].to_vec()));
             }
         }
-        
 
         (
             DistanceSetSplit {
@@ -194,29 +210,29 @@ impl Tree for DistanceSetTree {
     }
 }
 
-        // let mut distance_matrix = vec![vec![0.0; subsamples_indices.len()]; subsamples_indices.len()];
-        // let sakoe_chiba = f64::log2((end - start) as f64).ceil();
-        // for i in 0..subsamples_indices.len() - 1 {
-        //     for j in i+1..subsamples_indices.len() {
-        //         distance_matrix[i][j] = self.config.distance.to_fn()(
-        //             &samples[subsamples_indices[i]].data[start..end],
-        //             &samples[subsamples_indices[j]].data[start..end],
-        //             sakoe_chiba,
-        //         );
-        //         distance_matrix[j][i] = distance_matrix[i][j];
-        //     }
-        // }
+// let mut distance_matrix = vec![vec![0.0; subsamples_indices.len()]; subsamples_indices.len()];
+// let sakoe_chiba = f64::log2((end - start) as f64).ceil();
+// for i in 0..subsamples_indices.len() - 1 {
+//     for j in i+1..subsamples_indices.len() {
+//         distance_matrix[i][j] = self.config.distance.to_fn()(
+//             &samples[subsamples_indices[i]].data[start..end],
+//             &samples[subsamples_indices[j]].data[start..end],
+//             sakoe_chiba,
+//         );
+//         distance_matrix[j][i] = distance_matrix[i][j];
+//     }
+// }
 
-        // let clusters = k_means(2, &distance_matrix);
-        // let mut left_candidates = Vec::new();
-        // let mut right_candidates = Vec::new();
+// let clusters = k_means(2, &distance_matrix);
+// let mut left_candidates = Vec::new();
+// let mut right_candidates = Vec::new();
 
-        // assert_eq!(unique(&clusters).len(), 2, "{:?}", clusters);
+// assert_eq!(unique(&clusters).len(), 2, "{:?}", clusters);
 
-        // for (i, cluster) in clusters.iter().enumerate() {
-        //     if cluster == &0 {
-        //         left_candidates.push(Arc::new(samples[subsamples_indices[i]].data[start..end].to_vec()));
-        //     } else {
-        //         right_candidates.push(Arc::new(samples[subsamples_indices[i]].data[start..end].to_vec()));
-        //     }
-        // }
+// for (i, cluster) in clusters.iter().enumerate() {
+//     if cluster == &0 {
+//         left_candidates.push(Arc::new(samples[subsamples_indices[i]].data[start..end].to_vec()));
+//     } else {
+//         right_candidates.push(Arc::new(samples[subsamples_indices[i]].data[start..end].to_vec()));
+//     }
+// }

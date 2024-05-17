@@ -38,12 +38,24 @@ impl SplitParameters for DistanceIsolationSplit {
         let left_distances = self
             .left_candidates
             .iter()
-            .map(|c| self.distance.distance(&c, &sample.data[self.interval.0..self.interval.1], self.band))
+            .map(|c| {
+                self.distance.distance(
+                    &c,
+                    &sample.data[self.interval.0..self.interval.1],
+                    self.band,
+                )
+            })
             .collect::<Vec<_>>();
         let right_distances = self
             .right_candidates
             .iter()
-            .map(|c| self.distance.distance(&c, &sample.data[self.interval.0..self.interval.1], self.band))
+            .map(|c| {
+                self.distance.distance(
+                    &c,
+                    &sample.data[self.interval.0..self.interval.1],
+                    self.band,
+                )
+            })
             .collect::<Vec<_>>();
 
         mean(&left_distances) < mean(&right_distances)
@@ -145,13 +157,12 @@ impl Tree for DistanceIsolationTree {
         let mut left_candidates = Vec::new();
         let mut right_candidates = Vec::new();
         for (i, s) in subsamples_indices.iter().enumerate() {
-            if i%2 == 0 {
+            if i % 2 == 0 {
                 left_candidates.push(Arc::new(samples[*s].data[start..end].to_vec()));
             } else {
                 right_candidates.push(Arc::new(samples[*s].data[start..end].to_vec()));
             }
         }
-        
 
         (
             DistanceIsolationSplit {

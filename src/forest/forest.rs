@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::{
     feature_extraction::statistics::EULER_MASCHERONI,
     grid_search_tuning,
@@ -7,7 +8,7 @@ use crate::{
     },
     utils::structures::Sample,
 };
-use hashbrown::{HashMap, HashSet};
+use hashbrown::HashMap;
 use parking_lot::Mutex;
 use rand::{seq::SliceRandom, thread_rng, Rng};
 use rayon::prelude::*;

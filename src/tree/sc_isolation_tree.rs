@@ -3,7 +3,6 @@ use crate::feature_extraction::statistics::stddev;
 use crate::forest::sc_isolation_forest::SCIsolationForestConfig;
 use crate::{forest::forest::OutlierTree, tree::tree::Tree, utils::structures::Sample};
 use rand::{seq::SliceRandom, thread_rng, Rng};
-use std::hash::Hash;
 
 const N_HYPERPLANES: usize = 10;
 const N_ATTRIBUTES: usize = 2;
@@ -99,11 +98,6 @@ impl SplitHyperplane {
                 * (sample.data[self.idx_attributes[i]] - self.means[self.idx_attributes[i]]);
         }
         sum - self.p
-    }
-}
-impl Hash for SplitHyperplane {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        unreachable!();
     }
 }
 impl Eq for SplitHyperplane {}

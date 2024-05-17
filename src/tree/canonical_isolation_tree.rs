@@ -7,7 +7,6 @@ use crate::{
 };
 use core::panic;
 use rand::{thread_rng, Rng};
-use std::hash::Hash;
 
 pub const MIN_INTERVAL_LEN: usize = 20;
 pub const TOT_ATTRIBUTES: usize = 25;
@@ -22,11 +21,6 @@ impl Eq for CanonicalIsolationSplit {}
 impl Ord for CanonicalIsolationSplit {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.partial_cmp(other).unwrap()
-    }
-}
-impl Hash for CanonicalIsolationSplit {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        unreachable!();
     }
 }
 impl SplitParameters for CanonicalIsolationSplit {

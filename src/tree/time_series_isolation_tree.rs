@@ -4,7 +4,6 @@ use crate::{
     utils::structures::Sample,
 };
 use core::panic;
-use std::hash::Hash;
 use std::sync::Arc;
 
 use super::{
@@ -22,11 +21,6 @@ pub struct TimeSeriesIsolationSplit {
     pub interval: (usize, usize),
     pub feature: usize,
     pub threshold: f64,
-}
-impl Hash for TimeSeriesIsolationSplit {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        unreachable!();
-    }
 }
 impl Eq for TimeSeriesIsolationSplit {}
 impl Ord for TimeSeriesIsolationSplit {

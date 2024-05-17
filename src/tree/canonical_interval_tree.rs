@@ -12,7 +12,6 @@ use crate::{
 };
 use hashbrown::HashMap;
 use rand::{seq::SliceRandom, thread_rng, Rng};
-use std::hash::Hash;
 use std::sync::Arc;
 
 pub const MIN_INTERVAL_LEN: usize = 20;
@@ -28,11 +27,6 @@ impl Eq for CanonicalIntervalSplit {}
 impl Ord for CanonicalIntervalSplit {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.partial_cmp(other).unwrap()
-    }
-}
-impl Hash for CanonicalIntervalSplit {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        unreachable!();
     }
 }
 impl SplitParameters for CanonicalIntervalSplit {

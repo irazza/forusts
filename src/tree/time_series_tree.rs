@@ -10,7 +10,6 @@ use crate::{
 };
 use hashbrown::HashMap;
 use rand::{seq::SliceRandom, thread_rng, Rng};
-use std::hash::Hash;
 use std::sync::Arc;
 
 pub const MIN_INTERVAL_LEN: usize = 3;
@@ -21,11 +20,6 @@ pub struct TimeSeriesSplit {
     pub interval: (usize, usize),
     pub feature: usize,
     pub threshold: f64,
-}
-impl Hash for TimeSeriesSplit {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        unreachable!();
-    }
 }
 impl Eq for TimeSeriesSplit {}
 impl Ord for TimeSeriesSplit {

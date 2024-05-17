@@ -62,7 +62,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let config = ExtremelyRandomizedCanonicalIntervalForestConfig {
                 classification_config: ClassificationForestConfig {
-                    n_trees: 100,
+                    n_trees: 500,
                     max_depth: None,
                     min_samples_split: 2,
                     max_features: tree::tree::MaxFeatures::Sqrt,

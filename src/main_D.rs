@@ -19,19 +19,19 @@ mod utils;
 fn main() -> Result<(), Box<dyn Error>> {
     // Settings for the experiments
     let config = DistanceSetForestConfig {
-        distance: Distance::TWE,
+        distance: Distance::DTW,
         classification_config: ClassificationForestConfig {
-            n_trees: 500,
+            n_trees: 100,
             min_samples_split: 2,
             max_features: tree::tree::MaxFeatures::Sqrt,
             max_depth: None,
             criterion: tree::tree::Criterion::Random,
-            bootstrap: true,
+            bootstrap: false,
         },
     };
 
     // TODO: Intersect the dataset with Proximity Forest
-    let path = "../DATA/UCRArchive_2018";
+    let path = "/media/aazzari/UCRArchive_2018";
     // read ProximityForest_r1.csv and extract the dataset in the first column
     let datasets_name = fs::read_to_string("ProximityForest_r1.csv")?;
     let mut paths = datasets_name.lines();
@@ -45,7 +45,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut datasets = Vec::new();
     for entry in paths {
         let complete_path = format!("{}/{}/", path, entry);
-        // Push the PathBuf of the dataset
         datasets.push(std::path::PathBuf::from(complete_path));
     }
     datasets.sort_by_key(|dir| dir.file_name().unwrap().to_string_lossy().to_string());
@@ -54,7 +53,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     wtr.flush()?;
     for i in 0..n_repetitions {
         println!("Repetition {}", i + 1);
-        for path in &datasets {
+        for path in &datasets[0..1] {
             let train_path = path.join(format!(
                 "{}_TRAIN.tsv",
                 path.file_name().unwrap().to_string_lossy()
@@ -68,9 +67,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let ds_test = read_csv(test_path, b'\t', false)?;
 
-            // if (ds_train.len() + ds_test.len() > 200) || (ds_train[0].data.len() > 1000) {
-            //     continue;
-            // }
             println!(
                 "\tProcessing {}",
                 path.file_name().unwrap().to_string_lossy()

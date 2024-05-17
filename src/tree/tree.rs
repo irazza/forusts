@@ -59,8 +59,8 @@ impl Debug for Criterion {
     }
 }
 pub trait SplitParameters: Sync + Send + Debug + Ord + Eq {
-    fn split(&self, samples: &Sample, is_train: bool) -> bool;
-    fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample) -> f64;
+    fn split(&self, sample: &Sample, is_train: bool) -> bool;
+    fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, sample: &Sample) -> f64;
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]

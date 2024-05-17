@@ -1,5 +1,4 @@
 use core::panic;
-use std::sync::Arc;
 
 use super::{node::Node, tree::SplitParameters};
 use crate::{
@@ -11,7 +10,7 @@ use crate::{
     tree::tree::Tree,
     utils::structures::Sample,
 };
-use rand::{seq::SliceRandom, thread_rng, Rng};
+use rand::{thread_rng, Rng};
 
 pub const MIN_INTERVAL_LEN: usize = 20;
 pub const TOT_ATTRIBUTES: usize = 25;
@@ -42,8 +41,6 @@ impl SplitParameters for ExtremelyRandomizedCanonicalIntervalSplit {
 pub struct ExtremelyRandomizedCanonicalIntervalTreeConfig {
     pub max_depth: usize,
     pub min_samples_split: usize,
-    pub n_attributes: usize,
-    pub n_intervals: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -58,8 +55,6 @@ impl ClassificationTree for ExtremelyRandomizedCanonicalIntervalTree {
         Self::new(ExtremelyRandomizedCanonicalIntervalTreeConfig {
             max_depth: config.classification_config.max_depth.unwrap_or(usize::MAX),
             min_samples_split: config.classification_config.min_samples_split,
-            n_attributes: config.n_attributes,
-            n_intervals: config.n_intervals,
         })
     }
 }
@@ -98,53 +93,29 @@ impl Tree for ExtremelyRandomizedCanonicalIntervalTree {
     }
     fn get_split(&self, samples: &[Sample]) -> (Self::SplitParameters, f64) {
         let mut rng = thread_rng();
-        // Generate n_intervals random intervals
-        let mut intervals = Vec::new();
-        for _ in 0..self.config.n_intervals {
-            let start = rng.gen_range(0..samples[0].data.len() - MIN_INTERVAL_LEN);
-            let end = rng.gen_range(start + MIN_INTERVAL_LEN..samples[0].data.len());
-            intervals.push((start, end));
+        // Generate a random interval
+        let sample_len = samples[0].data.len();
+        let start = rng.gen_range(0..sample_len - MIN_INTERVAL_LEN);
+        let end = rng.gen_range(start + MIN_INTERVAL_LEN..sample_len);
+        // Generate a random feature
+        let feature = rng.gen_range(0..TOT_ATTRIBUTES);
+        // Compute the feature in the interval for all samples, and keep unique values
+        let mut thresholds = vec![0.0; samples.len()];
+        for i in 0..samples.len() {
+            thresholds[i] = compute_catch(feature)(&samples[i].data[start..end]);
         }
-        // Select n_attributes random features from catch22
-        let mut attributes = (0..TOT_ATTRIBUTES).collect::<Vec<usize>>();
-        attributes.shuffle(&mut rng);
-        attributes.truncate(self.config.n_attributes);
-
-        // For each interval, compute the randomly selected features
-        let mut transformed_samples = Vec::new();
-        for sample in samples {
-            let mut transformed_sample = Vec::new();
-            for (start, end) in &intervals {
-                for i in &attributes {
-                    transformed_sample.push(compute_catch(*i)(&sample.data[*start..*end]));
-                }
-            }
-            transformed_samples.push(Sample {
-                data: Arc::new(transformed_sample),
-                target: sample.target,
-            });
-        }
-
-        // Select random feature
-        let feature = rng.gen_range(0..self.config.n_attributes * self.config.n_intervals);
-
-        let mut thresholds = transformed_samples
-            .iter()
-            .map(|f| f.data[feature])
-            .collect::<Vec<f64>>();
         thresholds.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
         thresholds.dedup();
-
+        // Select a random threshold
         let threshold = match thresholds.len() {
             0 => panic!("Thresholds cannot be empty"),
             1 => thresholds[0],
             _ => thresholds[rng.gen_range(1..thresholds.len())],
         };
-        let interval = intervals[feature / self.config.n_attributes];
-        let feature = attributes[feature % self.config.n_attributes];
+
         (
             ExtremelyRandomizedCanonicalIntervalSplit {
-                interval,
+                interval: (start, end),
                 feature,
                 threshold,
             },

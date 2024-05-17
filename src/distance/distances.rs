@@ -286,7 +286,27 @@ fn msm_cost_function(x_i: f64, x_i_1: f64, y_j: f64) -> f64 {
     }
 }
 
+
+pub fn test_adtw() {
+    let s1 = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+    let s2 = vec![10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0];
+    let result = adtw(&s1, &s2, 1.0);
+    println!("ADTW: {}", result);
+}
+
+lazy_static! {
+    static ref ADTW_CACHE: DashMap<(Vec<FloatEq>, Vec<FloatEq>), f64> = DashMap::new();
+}
 pub fn adtw(x1: &[f64], x2: &[f64], band: f64) -> f64 {
+    // DTW_CACHE
+    let x1_cache = x1.iter().copied().map(FloatEq).collect::<Vec<_>>();
+    let x2_cache = x2.iter().copied().map(FloatEq).collect::<Vec<_>>();
+    let mut key_cache = (x1_cache, x2_cache);
+
+    if let Some(value) = ADTW_CACHE.get(&key_cache) {
+        return *value.value();
+    }
+    
     let n = x1.len();
     let m = x2.len();
     let w = band;
@@ -308,5 +328,13 @@ pub fn adtw(x1: &[f64], x2: &[f64], band: f64) -> f64 {
     }
 
     let distance = previous[m].sqrt();
+
+    if ADTW_CACHE.len() > 1e6 as usize {
+        return distance;
+    }
+    ADTW_CACHE.insert(key_cache.clone(), distance);
+    swap(&mut key_cache.0, &mut key_cache.1);
+    ADTW_CACHE.insert(key_cache, distance);
+
     distance
 }

@@ -14,8 +14,6 @@ use super::forest::{
 
 grid_search_tuning! {
 pub struct ExtremelyRandomizedCanonicalIntervalForestConfig [ExtremelyRandomizedCanonicalIntervalForestConfigTuning]{
-    pub n_intervals: usize,
-    pub n_attributes: usize,
     pub classification_config: ClassificationForestConfig [ClassificationForestConfigTuning],
 }
 impl Debug for ExtremelyRandomizedCanonicalIntervalForestConfig {

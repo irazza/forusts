@@ -2,6 +2,7 @@ pub mod canonical_interval_tree;
 pub mod canonical_isolation_tree;
 pub mod decision_tree;
 pub mod distance_set_tree;
+pub mod distance_isolation_tree;
 pub mod extremely_randomized_canonical_interval_tree;
 pub mod isolation_tree;
 pub mod node;

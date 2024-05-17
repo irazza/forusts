@@ -11,4 +11,6 @@ UCR_Archive2018_AD/*
 catch22/*
 UCRArchive_2018/*
 comparisons/*
-Canonical*.csv
+*.csv
+*.svg
+perf*

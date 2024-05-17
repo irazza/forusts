@@ -213,14 +213,16 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
             .collect();
 
         let trees: &Vec<T> = self.get_trees();
-        trees.par_iter().for_each(|tree| {
+        trees.par_iter().for_each(| tree| {
             for (i, x1) in x1.iter().enumerate() {
                 for (j, x2) in x2.iter().enumerate() {
                     let mut union = Vec::new();
                     union.extend(tree.get_splits(x1).into_iter());
                     union.extend(tree.get_splits(x2).into_iter());
                     // Remove duplicates based on feature and threshold
-                    union.sort_unstable_by(|s1, s2| s1.cmp(s2));
+                    union.sort_by(|s1, s2| {
+                        s1.partial_cmp(s2).unwrap()
+                    });
                     union.dedup_by(|a, b| a == b);
                     let agree = union
                         .iter()

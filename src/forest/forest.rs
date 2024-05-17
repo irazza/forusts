@@ -7,7 +7,7 @@ use crate::{
     },
     utils::structures::Sample,
 };
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use parking_lot::Mutex;
 use rand::{seq::SliceRandom, thread_rng, Rng};
 use rayon::prelude::*;
@@ -215,24 +215,31 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
         let trees: &Vec<T> = self.get_trees();
         trees.par_iter().for_each(| tree| {
             for (i, x1) in x1.iter().enumerate() {
+                let x1_set: HashSet<&<T as Tree>::SplitParameters> = HashSet::from_iter(tree.get_splits(x1).into_iter());
                 for (j, x2) in x2.iter().enumerate() {
-                    let mut union = Vec::new();
-                    union.extend(tree.get_splits(x1).into_iter());
-                    union.extend(tree.get_splits(x2).into_iter());
-                    // Remove duplicates based on feature and threshold
-                    union.sort_by(|s1, s2| {
-                        s1.partial_cmp(s2).unwrap()
-                    });
-                    union.dedup_by(|a, b| a == b);
-                    let agree = union
-                        .iter()
+                    let x2_set = HashSet::from_iter(tree.get_splits(x2).into_iter());
+                    let union = x1_set.union(&x2_set).count() as f64;
+                    let not_intersect = x1_set.symmetric_difference(&x2_set);
+                    let agree = not_intersect
                         .filter(|s| s.split(x1, false) == s.split(x2, false))
                         .count() as f64;
+                    
+                    //let mut union = Vec::new();
+                    // union.extend(tree.get_splits(x1).into_iter());
+                    // union.extend(tree.get_splits(x2).into_iter());
+                    // union.sort_by(|s1, s2| {
+                    //     s1.partial_cmp(s2).unwrap()
+                    // });
+                    // union.dedup_by(|a, b| a == b);
+                    // let agree = union
+                    //     .iter()
+                    //     .filter(|s| s.split(x1, false) == s.split(x2, false))
+                    //     .count() as f64;
                     *distance_matrix[i][j].lock() += 1.0
-                        - if union.len() == 0 {
+                        - if union == 0.0 {
                             1.0
                         } else {
-                            agree / union.len() as f64
+                            agree / union
                         };
                 }
             }

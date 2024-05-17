@@ -1,6 +1,5 @@
 use core::panic;
-use std::sync::Arc;
-
+use std::hash::Hash;
 use super::{node::Node, tree::SplitParameters};
 use crate::{
     feature_extraction::{catch22::compute_catch, statistics::EULER_MASCHERONI},
@@ -8,8 +7,9 @@ use crate::{
     tree::tree::Tree,
     utils::structures::Sample,
 };
-use rand::{seq::SliceRandom, thread_rng, Rng};
+use rand::{thread_rng, Rng};
 
+pub const MIN_INTERVAL_LEN: usize = 20;
 pub const TOT_ATTRIBUTES: usize = 25;
 
 #[derive(Clone, Debug, PartialOrd, PartialEq)]
@@ -22,6 +22,11 @@ impl Eq for CanonicalIsolationSplit {}
 impl Ord for CanonicalIsolationSplit {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.partial_cmp(other).unwrap()
+    }
+}
+impl Hash for CanonicalIsolationSplit {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        unreachable!();
     }
 }
 impl SplitParameters for CanonicalIsolationSplit {
@@ -51,8 +56,6 @@ impl SplitParameters for CanonicalIsolationSplit {
 pub struct CanonicalIsolationTreeConfig {
     pub max_depth: usize,
     pub min_samples_split: usize,
-    pub n_attributes: usize,
-    pub n_intervals: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -67,8 +70,6 @@ impl OutlierTree for CanonicalIsolationTree {
         Self::new(CanonicalIsolationTreeConfig {
             max_depth: max_samples.ilog2() as usize + 1,
             min_samples_split: config.outlier_config.min_samples_split,
-            n_attributes: config.n_attributes,
-            n_intervals: config.n_intervals,
         })
     }
 }
@@ -106,61 +107,29 @@ impl Tree for CanonicalIsolationTree {
     }
     fn get_split(&self, samples: &[Sample]) -> (Self::SplitParameters, f64) {
         let mut rng = thread_rng();
-        // Generate n_intervals random intervals
-        let mut intervals = Vec::new();
-        let mut start;
-        let mut end;
-        let ts_len = samples[0].data.len();
-        for _ in 0..self.config.n_intervals {
-            let min_interval = (rng.gen_range(0.1..1.0) * ts_len as f64).ceil() as usize;
-            if min_interval == ts_len {
-                start = 0;
-                end = ts_len;
-            } else {
-                start = rng.gen_range(0..ts_len - min_interval);
-                end = rng.gen_range(start + min_interval..ts_len);
-            }
-
-            intervals.push((start, end));
+        // Generate a random interval
+        let sample_len = samples[0].data.len();
+        let start = rng.gen_range(0..sample_len - MIN_INTERVAL_LEN);
+        let end = rng.gen_range(start + MIN_INTERVAL_LEN..sample_len);
+        // Generate a random feature
+        let feature = rng.gen_range(0..TOT_ATTRIBUTES);
+        // Compute the feature in the interval for all samples, and keep unique values
+        let mut thresholds = vec![0.0; samples.len()];
+        for i in 0..samples.len() {
+            thresholds[i] = compute_catch(feature)(&samples[i].data[start..end]);
         }
-        // Select n_attributes random features from catch22
-        let mut attributes = (0..TOT_ATTRIBUTES).collect::<Vec<usize>>();
-        attributes.shuffle(&mut rng);
-        attributes.truncate(self.config.n_attributes);
-
-        // For each interval, compute the randomly selected features
-        let mut transformed_samples = Vec::new();
-        for sample in samples {
-            let mut transformed_sample = Vec::new();
-            for (start, end) in &intervals {
-                for i in &attributes {
-                    transformed_sample.push(compute_catch(*i)(&sample.data[*start..*end]));
-                }
-            }
-            transformed_samples.push(Sample {
-                data: Arc::new(transformed_sample),
-                target: sample.target,
-            });
-        }
-
-        let feature = rng.gen_range(0..self.config.n_attributes * self.config.n_intervals);
-        let mut thresholds = transformed_samples
-            .iter()
-            .map(|f| f.data[feature])
-            .collect::<Vec<f64>>();
         thresholds.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
         thresholds.dedup();
-
+        // Select a random threshold
         let threshold = match thresholds.len() {
             0 => panic!("Thresholds cannot be empty"),
             1 => thresholds[0],
             _ => thresholds[rng.gen_range(1..thresholds.len())],
         };
-        let interval = intervals[feature / self.config.n_attributes];
-        let feature = attributes[feature % self.config.n_attributes];
+
         (
             CanonicalIsolationSplit {
-                interval,
+                interval: (start, end),
                 feature,
                 threshold,
             },

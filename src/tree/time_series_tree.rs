@@ -1,5 +1,5 @@
 use std::sync::Arc;
-
+use std::hash::Hash;
 use super::{
     node::Node,
     tree::{Criterion, MaxFeatures, SplitParameters},
@@ -21,6 +21,11 @@ pub struct TimeSeriesSplit {
     pub interval: (usize, usize),
     pub feature: usize,
     pub threshold: f64,
+}
+impl Hash for TimeSeriesSplit {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        unreachable!();
+    }
 }
 impl Eq for TimeSeriesSplit {}
 impl Ord for TimeSeriesSplit {

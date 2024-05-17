@@ -1,6 +1,6 @@
 use core::panic;
 use std::sync::Arc;
-
+use std::hash::Hash;
 use crate::{
     feature_extraction::statistics::{mean, slope, stddev, EULER_MASCHERONI},
     forest::{forest::OutlierTree, time_series_isolation_forest::TimeSeriesIsolationForestConfig},
@@ -22,6 +22,11 @@ pub struct TimeSeriesIsolationSplit {
     pub interval: (usize, usize),
     pub feature: usize,
     pub threshold: f64,
+}
+impl Hash for TimeSeriesIsolationSplit {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        unreachable!();
+    }
 }
 impl Eq for TimeSeriesIsolationSplit {}
 impl Ord for TimeSeriesIsolationSplit {

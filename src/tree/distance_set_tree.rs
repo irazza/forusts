@@ -4,6 +4,7 @@ use crate::{
     forest::{distance_set_forest::DistanceSetForestConfig, forest::ClassificationTree},
     utils::structures::Sample,
 };
+use std::hash::Hash;
 use std::{cmp::max, fmt::Debug, sync::Arc};
 
 use super::{
@@ -41,6 +42,11 @@ pub struct DistanceSetSplit {
     pub interval: (usize, usize),
     pub distance: Distance,
     pub band: f64,
+}
+impl Hash for DistanceSetSplit {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        unreachable!();
+    }
 }
 impl Eq for DistanceSetSplit {}
 impl Ord for DistanceSetSplit {

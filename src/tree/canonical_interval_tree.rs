@@ -1,5 +1,5 @@
 use std::sync::Arc;
-
+use std::hash::Hash;
 use super::{
     node::Node,
     tree::{Criterion, MaxFeatures, SplitParameters},
@@ -28,6 +28,11 @@ impl Eq for CanonicalIntervalSplit {}
 impl Ord for CanonicalIntervalSplit {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.partial_cmp(other).unwrap()
+    }
+}
+impl Hash for CanonicalIntervalSplit {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        unreachable!();
     }
 }
 impl SplitParameters for CanonicalIntervalSplit {

@@ -1,5 +1,5 @@
 use core::panic;
-
+use std::hash::Hash;
 use super::{node::Node, tree::SplitParameters};
 use crate::{
     feature_extraction::catch22::compute_catch,
@@ -20,6 +20,14 @@ pub struct ExtremelyRandomizedCanonicalIntervalSplit {
     pub interval: (usize, usize),
     pub feature: usize,
     pub threshold: f64,
+}
+impl Hash for ExtremelyRandomizedCanonicalIntervalSplit {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.interval.0.hash(state);
+        self.interval.1.hash(state);
+        self.feature.hash(state);
+        self.threshold.to_bits().hash(state);
+    }
 }
 impl Eq for ExtremelyRandomizedCanonicalIntervalSplit {}
 impl Ord for ExtremelyRandomizedCanonicalIntervalSplit {

@@ -4,6 +4,7 @@ use crate::{
     forest::{distance_isolation_forest::DistanceIsolationForestConfig, forest::OutlierTree},
     utils::structures::Sample,
 };
+use std::hash::Hash;
 use std::{fmt::Debug, sync::Arc};
 
 use super::{
@@ -20,6 +21,11 @@ pub struct DistanceIsolationSplit {
     pub interval: (usize, usize),
     pub distance: Distance,
     pub band: f64,
+}
+impl Hash for DistanceIsolationSplit {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        unreachable!();
+    }
 }
 impl Eq for DistanceIsolationSplit {}
 impl Ord for DistanceIsolationSplit {

@@ -9,8 +9,6 @@ use std::fmt::Debug;
 
 grid_search_tuning! {
 pub struct CanonicalIsolationForestConfig [CanonicalIsolationForestConfigTuning]{
-    pub n_intervals: usize,
-    pub n_attributes: usize,
     pub outlier_config: OutlierForestConfig [OutlierForestConfigTuning],
 }
 impl Debug for CanonicalIsolationForestConfig {
@@ -20,8 +18,8 @@ impl Debug for CanonicalIsolationForestConfig {
         let struct_name = struct_name.chars().take(struct_name.len() - 6).collect::<String>();
         write!(
             f,
-            "{}_{}_{}",
-            struct_name, self.outlier_config.n_trees, self.n_intervals
+            "{}_{}",
+            struct_name, self.outlier_config.n_trees
         )
     }
 }

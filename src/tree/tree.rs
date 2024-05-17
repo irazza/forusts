@@ -4,7 +4,7 @@ use hashbrown::HashMap;
 use rand::{thread_rng, Rng};
 use serde_derive::{Deserialize, Serialize};
 use std::{cmp::max, ops::Deref};
-
+use std::hash::Hash;
 use crate::{feature_extraction::statistics::stddev, utils::structures::Sample};
 
 use super::node::{LeafClassification, Node};
@@ -58,7 +58,7 @@ impl Debug for Criterion {
         }
     }
 }
-pub trait SplitParameters: Sync + Send + Debug + Ord + Eq {
+pub trait SplitParameters: Sync + Send + Debug + Ord + Eq + Hash {
     fn split(&self, sample: &Sample, is_train: bool) -> bool;
     fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, sample: &Sample) -> f64;
 }
@@ -75,6 +75,14 @@ impl Ord for StandardSplit {
     }
 }
 impl Eq for StandardSplit {}
+
+impl Hash for StandardSplit {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.feature.hash(state);
+        self.threshold.to_bits().hash(state);
+    }
+
+}
 
 impl SplitParameters for StandardSplit {
     fn split(&self, sample: &Sample, _is_train: bool) -> bool {

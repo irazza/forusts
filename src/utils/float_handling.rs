@@ -24,6 +24,7 @@ impl std::hash::Hash for FloatVecEq {
     }
 }
 
+
 #[derive(Clone, Copy)]
 #[repr(transparent)]
 pub struct FloatEq(pub f64);

@@ -8,26 +8,23 @@ use crate::{
     tree::tree::Tree,
     utils::structures::Sample,
 };
+use dashmap::DashMap;
+use lazy_static::lazy_static;
 use core::panic;
 use rand::{thread_rng, Rng};
-use std::hash::Hash;
 
 pub const MIN_INTERVAL_LEN: usize = 20;
 pub const TOT_ATTRIBUTES: usize = 25;
+
+lazy_static! {
+    static ref ERCIF_CACHE: DashMap<(usize, usize, usize, usize), f64> = DashMap::new();
+}
 
 #[derive(Clone, Debug, PartialOrd, PartialEq)]
 pub struct ExtremelyRandomizedCanonicalIntervalSplit {
     pub interval: (usize, usize),
     pub feature: usize,
     pub threshold: f64,
-}
-impl Hash for ExtremelyRandomizedCanonicalIntervalSplit {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.interval.0.hash(state);
-        self.interval.1.hash(state);
-        self.feature.hash(state);
-        self.threshold.to_bits().hash(state);
-    }
 }
 impl Eq for ExtremelyRandomizedCanonicalIntervalSplit {}
 impl Ord for ExtremelyRandomizedCanonicalIntervalSplit {
@@ -37,8 +34,20 @@ impl Ord for ExtremelyRandomizedCanonicalIntervalSplit {
 }
 impl SplitParameters for ExtremelyRandomizedCanonicalIntervalSplit {
     fn split(&self, sample: &Sample, _is_train: bool) -> bool {
+
+        let key_cache = (sample.data.as_ptr() as usize, self.interval.0, self.interval.1, self.feature);
+        if let Some(value) = ERCIF_CACHE.get(&key_cache) {
+            return *value.value() < self.threshold;
+        }
+
         let feature = compute_catch(self.feature)(&sample.data[self.interval.0..self.interval.1]);
-        feature < self.threshold
+        // if ERCIF_CACHE.len() > 1e8 as usize {
+        //     println!("Cache size: {}", ERCIF_CACHE.len());
+        //     return feature < self.threshold;
+        // }
+        ERCIF_CACHE.insert(key_cache, feature);
+        return feature < self.threshold;
+        
     }
     fn path_length<T: Tree<SplitParameters = Self>>(_tree: &T, _x: &Sample) -> f64 {
         unreachable!();

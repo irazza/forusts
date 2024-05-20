@@ -46,8 +46,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     wtr.flush()?;
     for i in 0..n_repetitions {
         println!("Repetition {}", i + 1);
-        //let mut predictions = Vec::new();
-        for path in &datasets[1..2] {
+        for path in &datasets {
             println!("\tProcessing {}", path.file_name().to_string_lossy());
             let train_path = path
                 .path()
@@ -62,7 +61,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let config = ExtremelyRandomizedCanonicalIntervalForestConfig {
                 classification_config: ClassificationForestConfig {
-                    n_trees: 500,
+                    n_trees: 100,
                     max_depth: None,
                     min_samples_split: 2,
                     max_features: tree::tree::MaxFeatures::Sqrt,

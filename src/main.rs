@@ -4,6 +4,7 @@ use crate::forest::extremely_randomized_canonical_interval_forest::{
 use crate::forest::forest::{ClassificationForest, Forest};
 use crate::metrics::classification::accuracy_score;
 use crate::neighbors::nearest_neighbor::k_nearest_neighbor;
+use crate::tree::extremely_randomized_canonical_interval_tree::ERCIF_CACHE;
 use crate::utils::csv_io::read_csv;
 use forest::forest::ClassificationForestConfig;
 use std::error::Error;
@@ -126,6 +127,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 ratio_time.to_string(),
             ])?;
             wtr.flush()?;
+            ERCIF_CACHE.clear();
         }
     }
     Ok(())

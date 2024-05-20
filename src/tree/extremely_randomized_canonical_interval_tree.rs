@@ -8,16 +8,16 @@ use crate::{
     tree::tree::Tree,
     utils::structures::Sample,
 };
+use core::panic;
 use dashmap::DashMap;
 use lazy_static::lazy_static;
-use core::panic;
 use rand::{thread_rng, Rng};
 
 pub const MIN_INTERVAL_LEN: usize = 20;
 pub const TOT_ATTRIBUTES: usize = 25;
 
 lazy_static! {
-    static ref ERCIF_CACHE: DashMap<(usize, usize, usize, usize), f64> = DashMap::new();
+    pub static ref ERCIF_CACHE: DashMap<(usize, usize, usize, usize), f64> = DashMap::new();
 }
 
 #[derive(Clone, Debug, PartialOrd, PartialEq)]
@@ -34,8 +34,12 @@ impl Ord for ExtremelyRandomizedCanonicalIntervalSplit {
 }
 impl SplitParameters for ExtremelyRandomizedCanonicalIntervalSplit {
     fn split(&self, sample: &Sample, _is_train: bool) -> bool {
-
-        let key_cache = (sample.data.as_ptr() as usize, self.interval.0, self.interval.1, self.feature);
+        let key_cache = (
+            sample.data.as_ptr() as usize,
+            self.interval.0,
+            self.interval.1,
+            self.feature,
+        );
         if let Some(value) = ERCIF_CACHE.get(&key_cache) {
             return *value.value() < self.threshold;
         }
@@ -47,7 +51,6 @@ impl SplitParameters for ExtremelyRandomizedCanonicalIntervalSplit {
         // }
         ERCIF_CACHE.insert(key_cache, feature);
         return feature < self.threshold;
-        
     }
     fn path_length<T: Tree<SplitParameters = Self>>(_tree: &T, _x: &Sample) -> f64 {
         unreachable!();

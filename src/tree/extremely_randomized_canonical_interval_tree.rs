@@ -20,7 +20,7 @@ lazy_static! {
     pub static ref ERCIF_CACHE: DashMap<(usize, usize, usize, usize), f64> = DashMap::new();
 }
 
-#[derive(Clone, Debug, PartialOrd, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialOrd, PartialEq)]
 pub struct ExtremelyRandomizedCanonicalIntervalSplit {
     pub interval: (usize, usize),
     pub feature: usize,
@@ -45,10 +45,9 @@ impl SplitParameters for ExtremelyRandomizedCanonicalIntervalSplit {
         }
 
         let feature = compute_catch(self.feature)(&sample.data[self.interval.0..self.interval.1]);
-        // if ERCIF_CACHE.len() > 1e8 as usize {
-        //     println!("Cache size: {}", ERCIF_CACHE.len());
-        //     return feature < self.threshold;
-        // }
+        if ERCIF_CACHE.len() > 1e8 as usize {
+            ERCIF_CACHE.clear();
+        }
         ERCIF_CACHE.insert(key_cache, feature);
         return feature < self.threshold;
     }

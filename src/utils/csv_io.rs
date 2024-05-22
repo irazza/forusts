@@ -4,6 +4,7 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
+use std::sync::Arc;
 
 use crate::utils::structures::Sample;
 
@@ -49,6 +50,18 @@ pub fn read_csv(
 
     for result in reader.deserialize() {
         let record: Sample = result.unwrap();
+        // Replace NaNs with 0s
+        let record = Sample {
+            target: record.target,
+            data: Arc::new(
+                record
+                    .data
+                    .to_vec()
+                    .iter()
+                    .map(|v| if v.is_nan() { 0.0 } else { *v })
+                    .collect(),
+            ),
+        };
         samples.push(record);
     }
     Ok(samples)
@@ -86,6 +99,11 @@ pub fn vec_to_csv(path: impl AsRef<Path>, data: &[f64]) -> Result<(), Box<dyn Er
 }
 
 pub fn vec_vec_to_csv(path: impl AsRef<Path>, data: &[Vec<f64>]) -> Result<(), Box<dyn Error>> {
+    // Create path if it does not exist
+    let parent = path.as_ref().parent().unwrap();
+    if !parent.exists() {
+        std::fs::create_dir_all(parent)?;
+    }
     let mut csv_writer = csv::Writer::from_path(path)?;
     for record in data {
         csv_writer.write_record(record.iter().map(|v| v.to_string()))?;

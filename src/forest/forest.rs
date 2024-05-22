@@ -120,19 +120,26 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
 
         final_predictions
     }
-    fn pairwise_breiman(&self, x1: &[Sample], x2: &[Sample]) -> Vec<Vec<f64>> {
-        let distance_matrix: Vec<Vec<_>> = (0..x1.len())
-            .map(|_| (0..x2.len()).map(|_| AtomicUsize::new(0)).collect())
+    fn pairwise_breiman(&self, ds_test: &[Sample], ds_train: &[Sample]) -> Vec<Vec<f64>> {
+        let distance_matrix: Vec<Vec<_>> = (0..ds_test.len())
+            .map(|_| (0..ds_train.len()).map(|_| AtomicUsize::new(0)).collect())
             .collect();
         let trees: &Vec<T> = self.get_trees();
         trees.par_iter().for_each(|tree| {
-            let x1_leaves = x1.iter().map(|x| tree.predict_leaf(x)).collect::<Vec<_>>();
-            let x2_leaves = x2.iter().map(|x| tree.predict_leaf(x)).collect::<Vec<_>>();
+            let ds_test_leaves = ds_test
+                .iter()
+                .map(|x| tree.predict_leaf(x))
+                .collect::<Vec<_>>();
+            let ds_train_leaves = ds_train
+                .iter()
+                .map(|x| tree.predict_leaf(x))
+                .collect::<Vec<_>>();
 
-            for (i, &x1_node) in x1_leaves.iter().enumerate() {
-                for (j, &x2_node) in x2_leaves.iter().enumerate() {
+            for (i, &ds_test_node) in ds_test_leaves.iter().enumerate() {
+                for (j, &ds_train_node) in ds_train_leaves.iter().enumerate() {
                     distance_matrix[i][j].fetch_add(
-                        ((x1_node as *const Node<_>) != (x2_node as *const Node<_>)) as usize,
+                        ((ds_test_node as *const Node<_>) != (ds_train_node as *const Node<_>))
+                            as usize,
                         Ordering::Relaxed,
                     );
                 }
@@ -147,23 +154,30 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
             })
             .collect()
     }
-    fn pairwise_ancestor(&self, x1: &[Sample], x2: &[Sample]) -> Vec<Vec<f64>> {
-        let distance_matrix: Vec<Vec<_>> = (0..x1.len())
-            .map(|_| (0..x2.len()).map(|_| Mutex::new(0.0)).collect())
+    fn pairwise_ancestor(&self, ds_test: &[Sample], ds_train: &[Sample]) -> Vec<Vec<f64>> {
+        let distance_matrix: Vec<Vec<_>> = (0..ds_test.len())
+            .map(|_| (0..ds_train.len()).map(|_| Mutex::new(0.0)).collect())
             .collect();
         let trees: &Vec<T> = self.get_trees();
         trees.par_iter().for_each(|tree| {
-            let x1_nodes = x1.iter().map(|x| tree.predict_leaf(x)).collect::<Vec<_>>();
-            let x2_nodes = x2.iter().map(|x| tree.predict_leaf(x)).collect::<Vec<_>>();
+            let ds_test_nodes = ds_test
+                .iter()
+                .map(|x| tree.predict_leaf(x))
+                .collect::<Vec<_>>();
+            let ds_train_nodes = ds_train
+                .iter()
+                .map(|x| tree.predict_leaf(x))
+                .collect::<Vec<_>>();
 
-            for (i, &x1_node) in x1_nodes.iter().enumerate() {
-                let distances = tree.compute_ancestor(x1_node);
+            for (i, &ds_test_node) in ds_test_nodes.iter().enumerate() {
+                let distances = tree.compute_ancestor(ds_test_node);
 
-                for (j, &x2_node) in x2_nodes.iter().enumerate() {
-                    *distance_matrix[i][j].lock() += (x1_node.get_depth() + x2_node.get_depth()
-                        - 2 * distances[&(x2_node as *const Node<_>)].get_depth())
+                for (j, &ds_train_node) in ds_train_nodes.iter().enumerate() {
+                    *distance_matrix[i][j].lock() += (ds_test_node.get_depth()
+                        + ds_train_node.get_depth()
+                        - 2 * distances[&(ds_train_node as *const Node<_>)].get_depth())
                         as f64
-                        / max(x1_node.get_depth(), x2_node.get_depth()) as f64;
+                        / max(ds_test_node.get_depth(), ds_train_node.get_depth()) as f64;
                 }
             }
         });
@@ -176,22 +190,28 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
             })
             .collect::<Vec<Vec<_>>>()
     }
-    fn pairwise_zhu(&self, x1: &[Sample], x2: &[Sample]) -> Vec<Vec<f64>> {
-        let distance_matrix: Vec<Vec<_>> = (0..x1.len())
-            .map(|_| (0..x2.len()).map(|_| Mutex::new(0.0)).collect())
+    fn pairwise_zhu(&self, ds_test: &[Sample], ds_train: &[Sample]) -> Vec<Vec<f64>> {
+        let distance_matrix: Vec<Vec<_>> = (0..ds_test.len())
+            .map(|_| (0..ds_train.len()).map(|_| Mutex::new(0.0)).collect())
             .collect();
         let trees: &Vec<T> = self.get_trees();
         trees.par_iter().for_each(|tree| {
-            let x1_nodes = x1.iter().map(|x| tree.predict_leaf(x)).collect::<Vec<_>>();
-            let x2_nodes = x2.iter().map(|x| tree.predict_leaf(x)).collect::<Vec<_>>();
+            let ds_test_nodes = ds_test
+                .iter()
+                .map(|x| tree.predict_leaf(x))
+                .collect::<Vec<_>>();
+            let ds_train_nodes = ds_train
+                .iter()
+                .map(|x| tree.predict_leaf(x))
+                .collect::<Vec<_>>();
 
-            for (i, &x1_node) in x1_nodes.iter().enumerate() {
-                let distances = tree.compute_ancestor(x1_node);
+            for (i, &ds_test_node) in ds_test_nodes.iter().enumerate() {
+                let distances = tree.compute_ancestor(ds_test_node);
 
-                for (j, &x2_node) in x2_nodes.iter().enumerate() {
-                    *distance_matrix[i][j].lock() += distances[&(x2_node as *const Node<_>)]
+                for (j, &ds_train_node) in ds_train_nodes.iter().enumerate() {
+                    *distance_matrix[i][j].lock() += distances[&(ds_train_node as *const Node<_>)]
                         .get_depth() as f64
-                        / max(x1_node.get_depth(), x2_node.get_depth()) as f64;
+                        / max(ds_test_node.get_depth(), ds_train_node.get_depth()) as f64;
                 }
             }
         });
@@ -208,23 +228,25 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
             .collect()
     }
 
-    fn pairwise_ratiorf(&self, x1: &[Sample], x2: &[Sample]) -> Vec<Vec<f64>> {
-        let distance_matrix: Vec<Vec<_>> = (0..x1.len())
-            .map(|_| (0..x2.len()).map(|_| Mutex::new(0.0)).collect())
+    fn pairwise_ratiorf(&self, ds_test: &[Sample], ds_train: &[Sample]) -> Vec<Vec<f64>> {
+        let distance_matrix: Vec<Vec<_>> = (0..ds_test.len())
+            .map(|_| (0..ds_train.len()).map(|_| Mutex::new(0.0)).collect())
             .collect();
 
         let trees: &Vec<T> = self.get_trees();
         trees.par_iter().for_each(|tree| {
-            for (i, x1) in x1.iter().enumerate() {
-                for (j, x2) in x2.iter().enumerate() {
-                    let mut union = Vec::new();
-                    union.extend(tree.get_splits(x1).into_iter());
-                    union.extend(tree.get_splits(x2).into_iter());
-                    union.sort_by(|s1, s2| s1.partial_cmp(s2).unwrap());
-                    union.dedup_by(|a, b| a == b);
+            let mut union = Vec::new();
+            for (i, ds_test) in ds_test.iter().enumerate() {
+                let ds_test_splits = tree.get_splits(ds_test);
+                for (j, ds_train) in ds_train.iter().enumerate() {
+                    union.clear();
+                    union.extend(ds_test_splits.iter().copied());
+                    union.extend(tree.get_splits(ds_train).into_iter());
+                    union.sort_unstable();
+                    union.dedup();
                     let agree = union
                         .iter()
-                        .filter(|s| s.split(x1, false) == s.split(x2, false))
+                        .filter(|s| s.split(ds_test, false) == s.split(ds_train, false))
                         .count() as f64;
                     *distance_matrix[i][j].lock() += 1.0
                         - if union.len() == 0 {

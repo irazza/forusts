@@ -5,7 +5,7 @@ use crate::forest::forest::{ClassificationForest, Forest};
 use crate::metrics::classification::accuracy_score;
 use crate::neighbors::nearest_neighbor::k_nearest_neighbor;
 use crate::tree::extremely_randomized_canonical_interval_tree::ERCIF_CACHE;
-use crate::utils::csv_io::read_csv;
+use crate::utils::csv_io::{read_csv, vec_vec_to_csv};
 use forest::forest::ClassificationForestConfig;
 use std::error::Error;
 use std::fs::{self};
@@ -20,10 +20,9 @@ mod tree;
 mod utils;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut predictions = Vec::new();
     // Settings for the experiments
-    let n_repetitions = 1;
-    let paths = fs::read_dir("../UCRArchive_2018/")?;
+    let n_repetitions = 10;
+    let paths = fs::read_dir("/media/aazzari/UCRArchive_2018/")?;
 
     let mut datasets = Vec::new();
     for entry in paths {
@@ -58,6 +57,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let mut ds_train = read_csv(train_path, b'\t', false)?;
             let ds_test = read_csv(test_path, b'\t', false)?;
+
             let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
 
             let config = ExtremelyRandomizedCanonicalIntervalForestConfig {
@@ -80,7 +80,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             let breiman_time = std::time::Instant::now();
             let breiman_distance = model.pairwise_breiman(&ds_test, &ds_train);
             let breiman_time = breiman_time.elapsed().as_secs_f64();
-            println!("\tBreiman distance computed in {}s", breiman_time);
             let prediction_breiman = k_nearest_neighbor(
                 1,
                 &ds_train.iter().map(|v| v.target).collect::<Vec<_>>(),
@@ -91,7 +90,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             let zhu_time = std::time::Instant::now();
             let zhu_distance = model.pairwise_zhu(&ds_test, &ds_train);
             let zhu_time = zhu_time.elapsed().as_secs_f64();
-            println!("\tZhu distance computed in {}s", zhu_time);
             let prediction_zhu = k_nearest_neighbor(
                 1,
                 &ds_train.iter().map(|v| v.target).collect::<Vec<_>>(),
@@ -100,10 +98,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             let accuracy_zhu = accuracy_score(&prediction_zhu, &y_true);
             let ratio_time = std::time::Instant::now();
             let ratiorf_distance = model.pairwise_ratiorf(&ds_test, &ds_train);
-            println!(
-                "\tRatioRF distance computed in {}s",
-                ratio_time.elapsed().as_secs_f64()
-            );
+
             let ratio_time = ratio_time.elapsed().as_secs_f64();
             let prediction_ratiorf = k_nearest_neighbor(
                 1,
@@ -111,12 +106,37 @@ fn main() -> Result<(), Box<dyn Error>> {
                 &ratiorf_distance,
             );
             let accuracy_ratiorf = accuracy_score(&prediction_ratiorf, &y_true);
-
-            predictions.push([accuracy_breiman, accuracy_zhu, accuracy_ratiorf].to_vec());
             println!(
-                "\tBreiman: {}\n\tZhu: {}\n\tRatioRF: {}",
+                "\t\tBreiman: {}\n\t\tZhu: {}\n\t\tRatioRF: {}",
                 accuracy_breiman, accuracy_zhu, accuracy_ratiorf
             );
+            vec_vec_to_csv(
+                format!(
+                    "/media/aazzari/ERCIF_DISTANCES/{}/{}_breiman{}.csv",
+                    path.file_name().to_string_lossy(),
+                    path.file_name().to_string_lossy(),
+                    i
+                ),
+                &breiman_distance,
+            )?;
+            vec_vec_to_csv(
+                format!(
+                    "/media/aazzari/ERCIF_DISTANCES/{}/{}_zhu{}.csv",
+                    path.file_name().to_string_lossy(),
+                    path.file_name().to_string_lossy(),
+                    i
+                ),
+                &zhu_distance,
+            )?;
+            vec_vec_to_csv(
+                format!(
+                    "/media/aazzari/ERCIF_DISTANCES/{}/{}_ratiorf{}.csv",
+                    path.file_name().to_string_lossy(),
+                    path.file_name().to_string_lossy(),
+                    i
+                ),
+                &ratiorf_distance,
+            )?;
             wtr.write_record(&[
                 path.file_name().to_string_lossy().to_string(),
                 accuracy_breiman.to_string(),

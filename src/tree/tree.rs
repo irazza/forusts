@@ -193,7 +193,7 @@ pub trait Tree: Sync + Send {
         } = node
         {
             path.push(split_params);
-            if split_params.split(x, true) {
+            if split_params.split(x, false) {
                 node = left;
             } else {
                 node = right;

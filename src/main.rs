@@ -22,6 +22,16 @@ mod utils;
 fn main() -> Result<(), Box<dyn Error>> {
     // Settings for the experiments
     let n_repetitions = 10;
+    let config = ExtremelyRandomizedCanonicalIntervalForestConfig {
+        classification_config: ClassificationForestConfig {
+            n_trees: 100,
+            max_depth: None,
+            min_samples_split: 2,
+            max_features: tree::tree::MaxFeatures::Sqrt,
+            criterion: Criterion::Random,
+            bootstrap: true,
+        },
+    };
     let paths = fs::read_dir("/media/aazzari/UCRArchive_2018/")?;
 
     let mut datasets = Vec::new();
@@ -33,7 +43,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
     datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
-    let mut wtr = csv::Writer::from_path("ercif.csv")?;
+    let mut wtr = csv::Writer::from_path(format!("{:?}.csv", config))?;
     wtr.write_record(&[
         "Dataset",
         "Breiman",
@@ -59,17 +69,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             let ds_test = read_csv(test_path, b'\t', false)?;
 
             let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
-
-            let config = ExtremelyRandomizedCanonicalIntervalForestConfig {
-                classification_config: ClassificationForestConfig {
-                    n_trees: 100,
-                    max_depth: None,
-                    min_samples_split: 2,
-                    max_features: tree::tree::MaxFeatures::Sqrt,
-                    criterion: Criterion::Random,
-                    bootstrap: true,
-                },
-            };
 
             let mut model = ExtremelyRandomizedCanonicalIntervalForest::new(config);
             let model_time = std::time::Instant::now();

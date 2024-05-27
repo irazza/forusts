@@ -146,31 +146,37 @@ impl Tree for ExtremelyRandomizedCanonicalIntervalTree {
     fn get_split(&self, samples: &[Sample]) -> (Self::SplitParameters, f64) {
         let mut rng = thread_rng();
 
-        let interval_idx = rng.gen_range(0..self.intervals.len());
-        let (start, end) = self.intervals[interval_idx];
+        // Shuffle the intervals and attributes
+        let mut intervals = self.intervals.clone();
+        intervals.shuffle(&mut rng);
+        let mut attributes = self.attributes.clone();
+        attributes.shuffle(&mut rng);
 
-        let feature_idx = rng.gen_range(0..self.attributes.len());
-        let feature = self.attributes[feature_idx];
 
-        // Compute the thresholds for all the samples, and store them in the cache
         let mut thresholds = vec![0.0; samples.len()];
-        for (i, sample) in samples.iter().enumerate() {
-            // Create the key for the cache
-            let key_cache = (sample.data.as_ptr() as usize, start, end, feature);
-
-            if let Some(value) = ERCIF_CACHE.get(&key_cache) {
-                thresholds[i] = *value.value();
-                continue;
+        let mut start = 0;
+        let mut end = 0;
+        let mut attribute = 0;
+        'outer: for (s, e) in &intervals {
+            for a in &attributes {
+                thresholds = vec![0.0; samples.len()];
+                for (i, sample) in samples.iter().enumerate() {
+                    let feature = compute_catch(*a)(&sample.data[*s..*e]);
+                    thresholds[i] = feature;
+                }
+                thresholds.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
+                thresholds.dedup();
+                if thresholds.len() == 1 {
+                    continue;
+                } else {
+                    start = *s;
+                    end = *e;
+                    attribute = *a;
+                    break 'outer;
+                }
             }
-
-            let feature = compute_catch(feature)(&sample.data[start..end]);
-            if ERCIF_CACHE.len() > 1e8 as usize {
-                ERCIF_CACHE.clear();
-            }
-            ERCIF_CACHE.insert(key_cache, feature);
-            thresholds[i] = feature;
         }
-
+        // Generate random threshold
         let min_feature = *thresholds
             .iter()
             .min_by(|a, b| a.partial_cmp(b).unwrap())
@@ -179,20 +185,61 @@ impl Tree for ExtremelyRandomizedCanonicalIntervalTree {
             .iter()
             .max_by(|a, b| a.partial_cmp(b).unwrap())
             .unwrap();
-
         let threshold;
         if next_up(min_feature) > max_feature {
             threshold = min_feature;
         } else {
             threshold = rng.gen_range(next_up(min_feature)..=max_feature);
         }
-        (
-            ExtremelyRandomizedCanonicalIntervalSplit {
-                interval: (start, end),
-                feature,
-                threshold,
-            },
-            rng.gen_range(f64::EPSILON..1.0),
-        )
+        // Generate the new split
+        (ExtremelyRandomizedCanonicalIntervalSplit { interval: (start, end), feature: attribute, threshold: threshold}, rng.gen_range(f64::EPSILON..1.0))
     }
 }
+
+// let interval_idx = rng.gen_range(0..self.intervals.len());
+        // let (start, end) = self.intervals[interval_idx];
+
+        // let feature_idx = rng.gen_range(0..self.attributes.len());
+        // let feature = self.attributes[feature_idx];
+
+        // // Compute the thresholds for all the samples, and store them in the cache
+        // let mut thresholds = vec![0.0; samples.len()];
+        // for (i, sample) in samples.iter().enumerate() {
+        //     // Create the key for the cache
+        //     let key_cache = (sample.data.as_ptr() as usize, start, end, feature);
+
+        //     if let Some(value) = ERCIF_CACHE.get(&key_cache) {
+        //         thresholds[i] = *value.value();
+        //         continue;
+        //     }
+
+        //     let feature = compute_catch(feature)(&sample.data[start..end]);
+        //     if ERCIF_CACHE.len() > 1e8 as usize {
+        //         ERCIF_CACHE.clear();
+        //     }
+        //     ERCIF_CACHE.insert(key_cache, feature);
+        //     thresholds[i] = feature;
+        // }
+        // let min_feature = *thresholds
+        //     .iter()
+        //     .min_by(|a, b| a.partial_cmp(b).unwrap())
+        //     .unwrap();
+        // let max_feature = *thresholds
+        //     .iter()
+        //     .max_by(|a, b| a.partial_cmp(b).unwrap())
+        //     .unwrap();
+
+        // let threshold;
+        // if next_up(min_feature) > max_feature {
+        //     threshold = min_feature;
+        // } else {
+        //     threshold = rng.gen_range(next_up(min_feature)..=max_feature);
+        // }
+        // (
+        //     ExtremelyRandomizedCanonicalIntervalSplit {
+        //         interval: (start, end),
+        //         feature,
+        //         threshold,
+        //     },
+        //     rng.gen_range(f64::EPSILON..1.0),
+        // )

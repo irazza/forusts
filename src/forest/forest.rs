@@ -12,6 +12,7 @@ use hashbrown::HashMap;
 use parking_lot::Mutex;
 use rand::{seq::SliceRandom, thread_rng, Rng};
 use rayon::prelude::*;
+use std::cmp::min;
 use std::fmt::Debug;
 use std::{
     any::type_name,
@@ -277,11 +278,14 @@ grid_search_tuning! {
         pub max_samples: f64,
     }
     impl Debug for OutlierForestConfig {
-        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            let full_type_name = type_name::<Self>();
+            let struct_name = full_type_name.split("::").last().unwrap_or(full_type_name);
+            let struct_name = struct_name.chars().take(struct_name.len() - 6).collect::<String>();
             write!(
                 f,
-                "OutlierForestConfig {{ n_trees: {}, enhanced_anomaly_score: {}, max_depth: {:?} }}",
-                self.n_trees, self.enhanced_anomaly_score, self.max_depth
+                "{}_{}",
+                struct_name, self.n_trees,
             )
         }
     }
@@ -298,7 +302,7 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
     fn fit_(&mut self, data: &[Sample]) {
         let mut trees = Vec::new();
         let config_max_samples = self.get_forest_config().0.max_samples;
-        let max_samples = (data.len() as f64 * config_max_samples) as usize;
+        let max_samples = min(256, (data.len() as f64 * config_max_samples) as usize);
         self.set_max_samples(max_samples);
         let (config, tree_config) = self.get_forest_config();
         trees.par_extend((0..config.n_trees).into_par_iter().map(|_i| {
@@ -329,25 +333,17 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
     fn compute_anomaly_scores(&self, data: &[Sample]) -> Vec<f64> {
         let mut scores = Vec::new();
         let max_samples = self.get_max_samples() as f64;
-        let denominator = (2.0 * (f64::ln(max_samples - 1.0) + EULER_MASCHERONI)
-            - 2.0 * (max_samples - 1.0) / max_samples)
-            * self.get_forest_config().0.n_trees as f64;
-
+        let average_path_length_max_samples = 2.0 * (f64::ln(max_samples - 1.0) + EULER_MASCHERONI)
+            - 2.0 * (max_samples - 1.0) / max_samples;
         scores.par_extend(data.par_windows(1).map(|sample| {
             let mut average_depth = 0.0;
             let sample = &sample[0];
             let trees: &Vec<T> = self.get_trees();
             for tree in trees.iter() {
-                average_depth += Self::path_length(tree, sample) - 1.0;
+                average_depth += Self::path_length(tree, sample);
             }
-            let exponent = -average_depth / denominator;
-            assert!(
-                exponent.is_finite(),
-                "Anomaly score is not finite {} {}",
-                average_depth,
-                denominator
-            );
-            let score = ANOMALY_SCORE.powf(exponent);
+            let score = ANOMALY_SCORE
+                .powf(-average_depth / (average_path_length_max_samples * trees.len() as f64));
             return score;
         }));
         scores

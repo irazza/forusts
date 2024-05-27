@@ -15,6 +15,9 @@ use super::forest::{
 
 grid_search_tuning! {
 pub struct ExtremelyRandomizedCanonicalIntervalForestConfig [ExtremelyRandomizedCanonicalIntervalForestConfigTuning]{
+    pub n_intervals: usize,
+    pub n_attributes: usize,
+    pub ts_length: usize,
     pub classification_config: ClassificationForestConfig [ClassificationForestConfigTuning],
 }
 impl Debug for ExtremelyRandomizedCanonicalIntervalForestConfig {
@@ -24,8 +27,8 @@ impl Debug for ExtremelyRandomizedCanonicalIntervalForestConfig {
         let struct_name = struct_name.chars().take(struct_name.len() - 6).collect::<String>();
         write!(
             f,
-            "{}_{}",
-            struct_name, self.classification_config.n_trees
+            "{}_{}_{}_{}",
+            struct_name, self.classification_config.n_trees, self.n_intervals, self.n_attributes
         )
     }
 }

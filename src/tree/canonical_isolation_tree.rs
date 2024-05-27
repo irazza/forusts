@@ -1,3 +1,5 @@
+use std::cmp::max;
+
 use super::{node::Node, tree::SplitParameters};
 use crate::{
     feature_extraction::{catch22::compute_catch, statistics::EULER_MASCHERONI},
@@ -5,11 +7,17 @@ use crate::{
     tree::tree::Tree,
     utils::structures::Sample,
 };
-use core::panic;
-use rand::{thread_rng, Rng};
+use dashmap::DashMap;
+use lazy_static::lazy_static;
+use rand::{seq::SliceRandom, thread_rng, Rng};
 
 pub const MIN_INTERVAL_LEN: usize = 20;
+pub const MIN_INTERVAL_PERCENTAGE: f64 = 0.1;
 pub const TOT_ATTRIBUTES: usize = 25;
+
+lazy_static! {
+    pub static ref CISOF_CACHE: DashMap<(usize, usize, usize, usize), f64> = DashMap::new();
+}
 
 #[derive(Clone, Debug, PartialOrd, PartialEq)]
 pub struct CanonicalIsolationSplit {
@@ -25,8 +33,22 @@ impl Ord for CanonicalIsolationSplit {
 }
 impl SplitParameters for CanonicalIsolationSplit {
     fn split(&self, sample: &Sample, _is_train: bool) -> bool {
+        let key_cache = (
+            sample.data.as_ptr() as usize,
+            self.interval.0,
+            self.interval.1,
+            self.feature,
+        );
+        if let Some(value) = CISOF_CACHE.get(&key_cache) {
+            return *value.value() < self.threshold;
+        }
+
         let feature = compute_catch(self.feature)(&sample.data[self.interval.0..self.interval.1]);
-        feature < self.threshold
+        // if CISOF_CACHE.len() > 1e8 as usize {
+        //     CISOF_CACHE.clear();
+        // }
+        CISOF_CACHE.insert(key_cache, feature);
+        return feature < self.threshold;
     }
     fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample) -> f64 {
         let leaf = tree.predict_leaf(x);
@@ -42,28 +64,36 @@ impl SplitParameters for CanonicalIsolationSplit {
             path_length =
                 2.0 * (f64::ln(samples - 1.0) + EULER_MASCHERONI) - 2.0 * (samples - 1.0) / samples;
         }
-        path_length + leaf.get_depth() as f64
+        path_length + leaf.get_depth() as f64 - 1.0
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Copy)]
 pub struct CanonicalIsolationTreeConfig {
     pub max_depth: usize,
     pub min_samples_split: usize,
+    pub n_intervals: usize,
+    pub n_attributes: usize,
+    pub ts_length: usize,
 }
 
 #[derive(Clone, Debug)]
 pub struct CanonicalIsolationTree {
     root: Node<CanonicalIsolationSplit>,
     config: CanonicalIsolationTreeConfig,
+    intervals: Vec<(usize, usize)>,
+    attributes: Vec<usize>,
 }
 
 impl OutlierTree for CanonicalIsolationTree {
     type TreeConfig = CanonicalIsolationForestConfig;
     fn from_outlier_config(config: &Self::TreeConfig, max_samples: usize) -> Self {
         Self::new(CanonicalIsolationTreeConfig {
-            max_depth: max_samples.ilog2() as usize + 1,
+            max_depth: (max_samples as f64).max(2.0).log2().ceil() as usize + 1,
             min_samples_split: config.outlier_config.min_samples_split,
+            n_intervals: config.n_intervals,
+            n_attributes: config.n_attributes,
+            ts_length: config.ts_length,
         })
     }
 }
@@ -75,6 +105,29 @@ impl Tree for CanonicalIsolationTree {
         Self {
             root: Node::new(),
             config,
+            intervals: {
+                let mut rng = thread_rng();
+                let mut intervals = vec![(0, 3000); config.n_intervals];
+                if config.ts_length < MIN_INTERVAL_LEN {
+                    panic!("Time series length too short");
+                }
+                let min_interval = max(
+                    MIN_INTERVAL_LEN,
+                    (config.ts_length as f64 * MIN_INTERVAL_PERCENTAGE).ceil() as usize,
+                );
+                for j in 0..config.n_intervals {
+                    let start = rng.gen_range(0..config.ts_length - min_interval);
+                    let end = rng.gen_range(start + min_interval..config.ts_length);
+                    intervals[j] = (start, end);
+                }
+                intervals
+            },
+            attributes: {
+                let mut attributes = (0..TOT_ATTRIBUTES).collect::<Vec<_>>();
+                attributes.shuffle(&mut thread_rng());
+                attributes.truncate(config.n_attributes);
+                attributes
+            },
         }
     }
     fn get_max_depth(&self) -> usize {
@@ -102,26 +155,47 @@ impl Tree for CanonicalIsolationTree {
     }
     fn get_split(&self, samples: &[Sample]) -> (Self::SplitParameters, f64) {
         let mut rng = thread_rng();
-        // Generate a random interval
-        let sample_len = samples[0].data.len();
-        let start = rng.gen_range(0..sample_len - MIN_INTERVAL_LEN);
-        let end = rng.gen_range(start + MIN_INTERVAL_LEN..sample_len);
-        // Generate a random feature
-        let feature = rng.gen_range(0..TOT_ATTRIBUTES);
-        // Compute the feature in the interval for all samples, and keep unique values
-        let mut thresholds = vec![0.0; samples.len()];
-        for i in 0..samples.len() {
-            thresholds[i] = compute_catch(feature)(&samples[i].data[start..end]);
-        }
-        thresholds.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
-        thresholds.dedup();
-        // Select a random threshold
-        let threshold = match thresholds.len() {
-            0 => panic!("Thresholds cannot be empty"),
-            1 => thresholds[0],
-            _ => thresholds[rng.gen_range(1..thresholds.len())],
-        };
 
+        let interval_idx = rng.gen_range(0..self.intervals.len());
+        let (start, end) = self.intervals[interval_idx];
+
+        let feature_idx = rng.gen_range(0..self.attributes.len());
+        let feature = self.attributes[feature_idx];
+
+        // Compute the thresholds for all the samples, and store them in the cache
+        let mut thresholds = vec![0.0; samples.len()];
+        for (i, sample) in samples.iter().enumerate() {
+            // Create the key for the cache
+            let key_cache = (sample.data.as_ptr() as usize, start, end, feature);
+
+            if let Some(value) = CISOF_CACHE.get(&key_cache) {
+                thresholds[i] = *value.value();
+                continue;
+            }
+
+            let feature = compute_catch(feature)(&sample.data[start..end]);
+            // if CISOF_CACHE.len() > 1e8 as usize {
+            //     CISOF_CACHE.clear();
+            // }
+            CISOF_CACHE.insert(key_cache, feature);
+            thresholds[i] = feature;
+        }
+
+        let min_feature = *thresholds
+            .iter()
+            .min_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap();
+        let max_feature = *thresholds
+            .iter()
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap();
+
+        let threshold;
+        if f64::abs(max_feature - min_feature) < f64::EPSILON {
+            threshold = min_feature;
+        } else {
+            threshold = rng.gen_range(min_feature + f64::EPSILON..max_feature);
+        }
         (
             CanonicalIsolationSplit {
                 interval: (start, end),

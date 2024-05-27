@@ -81,7 +81,7 @@ impl SplitParameters for StandardSplit {
         sample.data[self.feature] < self.threshold
     }
     fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample) -> f64 {
-        let leaf = tree.predict_leaf(&x);
+        let leaf = tree.predict_leaf(x);
 
         let samples = leaf.get_samples() as f64;
         let path_length;
@@ -94,7 +94,7 @@ impl SplitParameters for StandardSplit {
             path_length =
                 2.0 * (f64::ln(samples - 1.0) + EULER_MASCHERONI) - 2.0 * (samples - 1.0) / samples;
         }
-        path_length + leaf.get_depth() as f64
+        path_length + leaf.get_depth() as f64 - 1.0
     }
 }
 pub trait Tree: Sync + Send {
@@ -108,15 +108,10 @@ pub trait Tree: Sync + Send {
     fn pre_split_conditions(&self, samples: &[Sample], current_depth: usize) -> bool;
     fn fit(&mut self, data: &[Sample]) {
         let mut data = data.to_vec();
-        let root = self.build_tree(&mut data, 0, f64::INFINITY);
+        let root = self.build_tree(&mut data, 1);
         self.set_root(root);
     }
-    fn build_tree(
-        &mut self,
-        samples: &mut [Sample],
-        depth: usize,
-        _impurity: f64,
-    ) -> Node<Self::SplitParameters> {
+    fn build_tree(&mut self, samples: &mut [Sample], depth: usize) -> Node<Self::SplitParameters> {
         if self.pre_split_conditions(samples, depth) {
             return Node::Leaf {
                 class: Self::get_leaf_class(samples, None),
@@ -131,8 +126,8 @@ pub trait Tree: Sync + Send {
         let (left_data, right_data) = Self::split(samples, &best_split_parameters);
 
         // Split the data and recursively build the left and right subtrees
-        let left_subtree = self.build_tree(left_data, depth + 1, best_impurity);
-        let right_subtree = self.build_tree(right_data, depth + 1, best_impurity);
+        let left_subtree = self.build_tree(left_data, depth + 1);
+        let right_subtree = self.build_tree(right_data, depth + 1);
 
         Node::Split {
             split_params: best_split_parameters,

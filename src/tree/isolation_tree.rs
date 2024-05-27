@@ -1,5 +1,3 @@
-use core::panic;
-
 use super::{node::Node, tree::StandardSplit};
 use crate::{
     forest::{forest::OutlierTree, isolation_forest::IsolationForestConfig},
@@ -24,7 +22,7 @@ impl OutlierTree for IsolationTree {
     type TreeConfig = IsolationForestConfig;
     fn from_outlier_config(config: &Self::TreeConfig, max_samples: usize) -> Self {
         Self::new(IsolationTreeConfig {
-            max_depth: max_samples.ilog2() as usize + 1,
+            max_depth: (max_samples as f64).max(2.0).log2().ceil() as usize + 1,
             min_samples_split: config.min_samples_split,
         })
     }
@@ -66,18 +64,22 @@ impl Tree for IsolationTree {
         let mut rng = thread_rng();
 
         let feature = rng.gen_range(0..samples[0].data.len());
-        let mut thresholds = samples
+
+        let min_feature = samples
             .iter()
             .map(|f| f.data[feature])
-            .collect::<Vec<f64>>();
-        thresholds.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
-        thresholds.dedup();
+            .fold(f64::INFINITY, f64::min);
+        let max_feature = samples
+            .iter()
+            .map(|f| f.data[feature])
+            .fold(f64::NEG_INFINITY, f64::max);
 
-        let threshold = match thresholds.len() {
-            0 => panic!("Thresholds cannot be empty"),
-            1 => thresholds[0],
-            _ => thresholds[rng.gen_range(1..thresholds.len())],
-        };
+        let threshold;
+        if f64::abs(max_feature - min_feature) < f64::EPSILON {
+            threshold = min_feature;
+        } else {
+            threshold = rng.gen_range(min_feature + f64::EPSILON..max_feature);
+        }
 
         (
             StandardSplit {

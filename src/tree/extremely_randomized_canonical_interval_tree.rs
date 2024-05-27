@@ -6,7 +6,7 @@ use crate::{
         forest::ClassificationTree,
     },
     tree::tree::Tree,
-    utils::structures::Sample,
+    utils::{float_handling::next_up, structures::Sample},
 };
 use core::panic;
 use dashmap::DashMap;
@@ -164,9 +164,9 @@ impl Tree for ExtremelyRandomizedCanonicalIntervalTree {
             }
 
             let feature = compute_catch(feature)(&sample.data[start..end]);
-            // if ERCIF_CACHE.len() > 1e8 as usize {
-            //     ERCIF_CACHE.clear();
-            // }
+            if ERCIF_CACHE.len() > 1e8 as usize {
+                ERCIF_CACHE.clear();
+            }
             ERCIF_CACHE.insert(key_cache, feature);
             thresholds[i] = feature;
         }
@@ -181,10 +181,10 @@ impl Tree for ExtremelyRandomizedCanonicalIntervalTree {
             .unwrap();
 
         let threshold;
-        if f64::abs(max_feature - min_feature) < f64::EPSILON {
+        if next_up(min_feature) > max_feature {
             threshold = min_feature;
         } else {
-            threshold = rng.gen_range(min_feature + f64::EPSILON..max_feature);
+            threshold = rng.gen_range(next_up(min_feature)..=max_feature);
         }
         (
             ExtremelyRandomizedCanonicalIntervalSplit {

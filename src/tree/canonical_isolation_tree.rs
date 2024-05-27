@@ -1,5 +1,5 @@
 use std::cmp::max;
-
+use crate::utils::float_handling::next_up;
 use super::{node::Node, tree::SplitParameters};
 use crate::{
     feature_extraction::{catch22::compute_catch, statistics::EULER_MASCHERONI},
@@ -191,10 +191,10 @@ impl Tree for CanonicalIsolationTree {
             .unwrap();
 
         let threshold;
-        if f64::abs(max_feature - min_feature) < f64::EPSILON {
+        if next_up(min_feature) > max_feature {
             threshold = min_feature;
         } else {
-            threshold = rng.gen_range(min_feature + f64::EPSILON..max_feature);
+            threshold = rng.gen_range(next_up(min_feature)..=max_feature);
         }
         (
             CanonicalIsolationSplit {

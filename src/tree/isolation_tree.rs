@@ -2,7 +2,7 @@ use super::{node::Node, tree::StandardSplit};
 use crate::{
     forest::{forest::OutlierTree, isolation_forest::IsolationForestConfig},
     tree::tree::Tree,
-    utils::structures::Sample,
+    utils::{float_handling::next_up, structures::Sample},
 };
 use rand::{thread_rng, Rng};
 
@@ -74,12 +74,12 @@ impl Tree for IsolationTree {
             .map(|f| f.data[feature])
             .fold(f64::NEG_INFINITY, f64::max);
 
-        let threshold;
-        if f64::abs(max_feature - min_feature) < f64::EPSILON {
-            threshold = min_feature;
-        } else {
-            threshold = rng.gen_range(min_feature + f64::EPSILON..max_feature);
-        }
+            let threshold;
+            if next_up(min_feature) > max_feature {
+                threshold = min_feature;
+            } else {
+                threshold = rng.gen_range(next_up(min_feature)..=max_feature);
+            }
 
         (
             StandardSplit {

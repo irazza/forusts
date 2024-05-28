@@ -1,5 +1,3 @@
-use std::cmp::max;
-use crate::utils::float_handling::next_up;
 use super::{node::Node, tree::SplitParameters};
 use crate::{
     feature_extraction::{catch22::compute_catch, statistics::EULER_MASCHERONI},
@@ -12,7 +10,6 @@ use lazy_static::lazy_static;
 use rand::{seq::SliceRandom, thread_rng, Rng};
 
 pub const MIN_INTERVAL_LEN: usize = 20;
-pub const MIN_INTERVAL_PERCENTAGE: f64 = 0.1;
 pub const TOT_ATTRIBUTES: usize = 25;
 
 lazy_static! {
@@ -111,13 +108,13 @@ impl Tree for CanonicalIsolationTree {
                 if config.ts_length < MIN_INTERVAL_LEN {
                     panic!("Time series length too short");
                 }
-                let min_interval = max(
-                    MIN_INTERVAL_LEN,
-                    (config.ts_length as f64 * MIN_INTERVAL_PERCENTAGE).ceil() as usize,
-                );
+                // let min_interval = max(
+                //     MIN_INTERVAL_LEN,
+                //     (config.ts_length as f64 * MIN_INTERVAL_PERCENTAGE).ceil() as usize,
+                // );
                 for j in 0..config.n_intervals {
-                    let start = rng.gen_range(0..config.ts_length - min_interval);
-                    let end = rng.gen_range(start + min_interval..config.ts_length);
+                    let start = rng.gen_range(0..config.ts_length - MIN_INTERVAL_LEN);
+                    let end = rng.gen_range(start + MIN_INTERVAL_LEN..config.ts_length);
                     intervals[j] = (start, end);
                 }
                 intervals
@@ -160,49 +157,36 @@ impl Tree for CanonicalIsolationTree {
         let (start, end) = self.intervals[interval_idx];
 
         let feature_idx = rng.gen_range(0..self.attributes.len());
-        let feature = self.attributes[feature_idx];
+        let attribute = self.attributes[feature_idx];
 
         // Compute the thresholds for all the samples, and store them in the cache
         let mut thresholds = vec![0.0; samples.len()];
         for (i, sample) in samples.iter().enumerate() {
             // Create the key for the cache
-            let key_cache = (sample.data.as_ptr() as usize, start, end, feature);
+            let key_cache = (sample.data.as_ptr() as usize, start, end, attribute);
 
             if let Some(value) = CISOF_CACHE.get(&key_cache) {
                 thresholds[i] = *value.value();
                 continue;
             }
 
-            let feature = compute_catch(feature)(&sample.data[start..end]);
-            // if CISOF_CACHE.len() > 1e8 as usize {
-            //     CISOF_CACHE.clear();
-            // }
+            let feature = compute_catch(attribute)(&sample.data[start..end]);
+            if CISOF_CACHE.len() > 1e8 as usize {
+                CISOF_CACHE.clear();
+            }
             CISOF_CACHE.insert(key_cache, feature);
             thresholds[i] = feature;
         }
+        thresholds.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
+        thresholds.dedup();
 
-        let min_feature = *thresholds
-            .iter()
-            .min_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap();
-        let max_feature = *thresholds
-            .iter()
-            .max_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap();
-
-        let threshold;
-        if next_up(min_feature) > max_feature {
-            threshold = min_feature;
-        } else {
-            threshold = rng.gen_range(next_up(min_feature)..=max_feature);
-        }
-        (
-            CanonicalIsolationSplit {
-                interval: (start, end),
-                feature,
-                threshold,
-            },
-            rng.gen_range(f64::EPSILON..1.0),
-        )
+        let threshold = thresholds[rng.gen_range(0..thresholds.len())];
+        // Generate the new split
+        (CanonicalIsolationSplit { 
+            interval: (start, end), 
+            feature: attribute, 
+            threshold: threshold
+        }, 
+        rng.gen_range(f64::EPSILON..1.0))
     }
 }

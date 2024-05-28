@@ -1,4 +1,3 @@
-use crate::feature_extraction::statistics::{mean, stddev};
 use crate::forest::canonical_isolation_forest::{
     CanonicalIsolationForest, CanonicalIsolationForestConfig,
 };
@@ -31,7 +30,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             max_samples: 1.0,
         },
     };
-    let n_repetitions = 30;
+    let n_repetitions = 10;
     let paths = fs::read_dir("../DATA/admep")?;
 
     let mut datasets = Vec::new();
@@ -46,7 +45,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     wtr.write_record(&["Dataset", "ROC-AUC"])?;
     wtr.flush()?;
     datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
-    let mut roc_mean = vec![0.0; n_repetitions];
+    // let mut roc_mean = vec![0.0; n_repetitions];
     for i in 0..n_repetitions {
         println!("Repetition {}", i + 1);
         //let mut predictions = Vec::new();
@@ -72,16 +71,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!("\t\tPrediction time: {:?}", start_time.elapsed());
             let roc = roc_auc_score(&prediction, &y_true);
             println!("\tROC AUC: {}", roc);
-            roc_mean[i] = roc;
+            // roc_mean[i] = roc;
             wtr.write_record(&[
                 path.file_name().to_string_lossy().to_string(),
                 roc.to_string(),
             ])?;
             wtr.flush()?;
             CISOF_CACHE.clear();
-            break;
         }
     }
-    println!("Mean: {} Std: {}", mean(&roc_mean), stddev(&roc_mean));
+    // println!("Mean: {} Std: {}", mean(&roc_mean), stddev(&roc_mean));
     Ok(())
 }

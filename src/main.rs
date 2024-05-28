@@ -22,7 +22,7 @@ mod utils;
 fn main() -> Result<(), Box<dyn Error>> {
     // Settings for the experiments
     let n_repetitions = 10;
-    let paths = fs::read_dir("/media/aazzari/UCRArchive_2018/")?;
+    let paths = fs::read_dir("/media/DATA/albertoazzari/UCRArchive_2018/")?;
 
     let mut datasets = Vec::new();
     for entry in paths {
@@ -115,7 +115,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             );
             vec_vec_to_csv(
                 format!(
-                    "/media/aazzari/ERCIF_DISTANCES/{}/{}_T{}I{}F{}breiman{}.csv",
+                    "/media/DATA/albertoazzari/ERCIF_DISTANCES/{}/{}_T{}I{}F{}breiman{}.csv",
                     path.file_name().to_string_lossy(),
                     path.file_name().to_string_lossy(),
                     config.classification_config.n_trees,
@@ -127,7 +127,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             vec_vec_to_csv(
                 format!(
-                    "/media/aazzari/ERCIF_DISTANCES/{}/{}_T{}I{}F{}zhu{}.csv",
+                    "/media/DATA/albertoazzari/ERCIF_DISTANCES/{}/{}_T{}I{}F{}zhu{}.csv",
                     path.file_name().to_string_lossy(),
                     path.file_name().to_string_lossy(),
                     config.classification_config.n_trees,
@@ -139,7 +139,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             vec_vec_to_csv(
                 format!(
-                    "/media/aazzari/ERCIF_DISTANCES/{}/{}_T{}I{}F{}ratiorf{}.csv",
+                    "/media/DATA/albertoazzari/ERCIF_DISTANCES/{}/{}_T{}I{}F{}ratiorf{}.csv",
                     path.file_name().to_string_lossy(),
                     path.file_name().to_string_lossy(),
                     config.classification_config.n_trees,

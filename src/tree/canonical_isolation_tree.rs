@@ -44,9 +44,9 @@ impl SplitParameters for CanonicalIsolationSplit {
         }
 
         let feature = compute_catch(self.feature)(&sample.data[self.interval.0..self.interval.1]);
-        // if CISOF_CACHE.len() > 1e8 as usize {
-        //     CISOF_CACHE.clear();
-        // }
+        if CISOF_CACHE.len() > 1e8 as usize {
+            CISOF_CACHE.clear();
+        }
         CISOF_CACHE.insert(key_cache, feature);
         return feature < self.threshold;
     }
@@ -89,7 +89,7 @@ impl OutlierTree for CanonicalIsolationTree {
     type TreeConfig = CanonicalIsolationForestConfig;
     fn from_outlier_config(config: &Self::TreeConfig, max_samples: usize) -> Self {
         Self::new(CanonicalIsolationTreeConfig {
-            max_depth: (max_samples as f64).max(2.0).log2().ceil() as usize + 1,
+            max_depth: (max_samples as f64).max(2.0).log2().ceil() as usize,
             min_samples_split: config.outlier_config.min_samples_split,
             n_intervals: config.n_intervals,
             n_attributes: config.n_attributes,
@@ -180,12 +180,11 @@ impl Tree for CanonicalIsolationTree {
             CISOF_CACHE.insert(key_cache, feature);
             thresholds[i] = feature;
         }
-        // Remove all minimum and maximum values from the thresholds
-        let min_value = thresholds.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
-        let max_value = thresholds.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let min_value = *thresholds.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let max_value = *thresholds.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
 
         let thresholds = thresholds
-            .iter()
+            .into_iter()
             .filter(|&v| v != min_value && v != max_value)
             .collect::<Vec<_>>();
         
@@ -197,7 +196,7 @@ impl Tree for CanonicalIsolationTree {
         (CanonicalIsolationSplit { 
             interval: (start, end), 
             feature: attribute, 
-            threshold: *threshold
+            threshold: threshold
         }, 
         rng.gen_range(f64::EPSILON..1.0))
     }

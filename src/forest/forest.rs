@@ -237,17 +237,17 @@ pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
         let trees: &Vec<T> = self.get_trees();
         trees.par_iter().for_each(|tree| {
             let mut union = Vec::new();
-            for (i, ds_test) in ds_test.iter().enumerate() {
-                let ds_test_splits = tree.get_splits(ds_test);
-                for (j, ds_train) in ds_train.iter().enumerate() {
+            for (i, sample_test) in ds_test.iter().enumerate() {
+                let ds_test_splits = tree.get_splits(sample_test);
+                for (j, sample_train) in ds_train.iter().enumerate() {
                     union.clear();
                     union.extend(ds_test_splits.iter().copied());
-                    union.extend(tree.get_splits(ds_train).into_iter());
+                    union.extend(tree.get_splits(sample_train).into_iter());
                     union.sort_unstable();
                     union.dedup();
                     let agree = union
                         .iter()
-                        .filter(|s| s.split(ds_test, false) == s.split(ds_train, false))
+                        .filter(|s| s.split(sample_test, false) == s.split(sample_train, false))
                         .count() as f64;
                     *distance_matrix[i][j].lock() += 1.0
                         - if union.len() == 0 {

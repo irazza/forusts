@@ -19,11 +19,11 @@ mod utils;
 fn main() -> Result<(), Box<dyn Error>> {
     // Settings for the experiments
     let config = CanonicalIsolationForestConfig {
-        n_intervals: 3000_f64.log10() as usize,
+        n_intervals: 3000_f64.sqrt() as usize,
         n_attributes: 8,
         ts_length: 3000,
         outlier_config: OutlierForestConfig {
-            n_trees: 100,
+            n_trees: 500,
             min_samples_split: 2,
             max_depth: None,
             enhanced_anomaly_score: false,
@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         },
     };
     let n_repetitions = 10;
-    let paths = fs::read_dir("/media/aazzari/admep")?;
+    let paths = fs::read_dir("/media/DATA/albertoazzari/admep")?;
     let mut datasets = Vec::new();
     for entry in paths {
         // Unwrap the entry or handle the error, if any.
@@ -44,10 +44,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     wtr.write_record(&["Dataset", "ROC-AUC"])?;
     wtr.flush()?;
     datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
-    // let mut roc_mean = vec![0.0; n_repetitions];
     for i in 0..n_repetitions {
         println!("Repetition {}", i + 1);
-        //let mut predictions = Vec::new();
         for path in &datasets {
             println!("\tProcessing {}", path.file_name().to_string_lossy());
             let train_path = path
@@ -70,7 +68,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!("\t\tPrediction time: {:?}", start_time.elapsed());
             let roc = roc_auc_score(&prediction, &y_true);
             println!("\tROC AUC: {}", roc);
-            // roc_mean[i] = roc;
             wtr.write_record(&[
                 path.file_name().to_string_lossy().to_string(),
                 roc.to_string(),
@@ -79,6 +76,5 @@ fn main() -> Result<(), Box<dyn Error>> {
             CISOF_CACHE.clear();
         }
     }
-    // println!("Mean: {} Std: {}", mean(&roc_mean), stddev(&roc_mean));
     Ok(())
 }

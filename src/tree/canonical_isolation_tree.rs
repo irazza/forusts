@@ -1,3 +1,5 @@
+use std::cmp::max;
+
 use super::{node::Node, tree::SplitParameters};
 use crate::{
     feature_extraction::{catch22::compute_catch, statistics::EULER_MASCHERONI},
@@ -11,6 +13,7 @@ use rand::{seq::SliceRandom, thread_rng, Rng};
 
 pub const MIN_INTERVAL_LEN: usize = 20;
 pub const TOT_ATTRIBUTES: usize = 25;
+pub const MIN_INTERVAL_PERCENTAGE: f64 = 0.1;
 
 lazy_static! {
     pub static ref CISOF_CACHE: DashMap<(usize, usize, usize, usize), f64> = DashMap::new();
@@ -108,13 +111,13 @@ impl Tree for CanonicalIsolationTree {
                 if config.ts_length < MIN_INTERVAL_LEN {
                     panic!("Time series length too short");
                 }
-                // let min_interval = max(
-                //     MIN_INTERVAL_LEN,
-                //     (config.ts_length as f64 * MIN_INTERVAL_PERCENTAGE).ceil() as usize,
-                // );
+                let min_interval = max(
+                    MIN_INTERVAL_LEN,
+                    (config.ts_length as f64 * MIN_INTERVAL_PERCENTAGE).ceil() as usize,
+                );
                 for j in 0..config.n_intervals {
-                    let start = rng.gen_range(0..config.ts_length - MIN_INTERVAL_LEN);
-                    let end = rng.gen_range(start + MIN_INTERVAL_LEN..config.ts_length);
+                    let start = rng.gen_range(0..config.ts_length - min_interval);
+                    let end = rng.gen_range(start + min_interval..config.ts_length);
                     intervals[j] = (start, end);
                 }
                 intervals
@@ -177,15 +180,24 @@ impl Tree for CanonicalIsolationTree {
             CISOF_CACHE.insert(key_cache, feature);
             thresholds[i] = feature;
         }
-        thresholds.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
-        thresholds.dedup();
+        // Remove all minimum and maximum values from the thresholds
+        let min_value = thresholds.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let max_value = thresholds.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
 
-        let threshold = thresholds[rng.gen_range(0..thresholds.len())];
+        let thresholds = thresholds
+            .iter()
+            .filter(|&v| v != min_value && v != max_value)
+            .collect::<Vec<_>>();
+        
+        let threshold = match thresholds.len() {
+            0 => min_value, 
+            _ => thresholds[rng.gen_range(0..thresholds.len())]
+        };
         // Generate the new split
         (CanonicalIsolationSplit { 
             interval: (start, end), 
             feature: attribute, 
-            threshold: threshold
+            threshold: *threshold
         }, 
         rng.gen_range(f64::EPSILON..1.0))
     }

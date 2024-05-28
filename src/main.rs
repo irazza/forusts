@@ -1,15 +1,12 @@
-use crate::forest::extremely_randomized_canonical_interval_forest::{
-    ExtremelyRandomizedCanonicalIntervalForest, ExtremelyRandomizedCanonicalIntervalForestConfig,
+use crate::forest::canonical_isolation_forest::{
+    CanonicalIsolationForest, CanonicalIsolationForestConfig,
 };
-use crate::forest::forest::{ClassificationForest, Forest};
-use crate::metrics::classification::accuracy_score;
-use crate::neighbors::nearest_neighbor::k_nearest_neighbor;
-use crate::tree::extremely_randomized_canonical_interval_tree::ERCIF_CACHE;
-use crate::utils::csv_io::{read_csv, vec_vec_to_csv};
-use forest::forest::ClassificationForestConfig;
+use crate::forest::forest::{Forest, OutlierForest, OutlierForestConfig};
+use crate::metrics::classification::roc_auc_score;
+use crate::tree::canonical_isolation_tree::CISOF_CACHE;
+use crate::utils::csv_io::read_csv;
 use std::error::Error;
 use std::fs::{self};
-use tree::tree::Criterion;
 
 mod distance;
 mod feature_extraction;
@@ -21,9 +18,20 @@ mod utils;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Settings for the experiments
+    let config = CanonicalIsolationForestConfig {
+        n_intervals: 3000_f64.log10() as usize,
+        n_attributes: 8,
+        ts_length: 3000,
+        outlier_config: OutlierForestConfig {
+            n_trees: 100,
+            min_samples_split: 2,
+            max_depth: None,
+            enhanced_anomaly_score: false,
+            max_samples: 1.0,
+        },
+    };
     let n_repetitions = 10;
-    let paths = fs::read_dir("/media/DATA/albertoazzari/UCRArchive_2018/")?;
-
+    let paths = fs::read_dir("/media/aazzari/admep")?;
     let mut datasets = Vec::new();
     for entry in paths {
         // Unwrap the entry or handle the error, if any.
@@ -32,20 +40,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             datasets.push(entry);
         }
     }
-    datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
-    let mut wtr = csv::Writer::from_path("ercif_light.csv")?;
-    wtr.write_record(&[
-        "Dataset",
-        "Breiman",
-        "Time Breiman",
-        "Zhu",
-        "Time Zhu",
-        "RatioRF",
-        "Time RatioRF",
-    ])?;
+    let mut wtr = csv::Writer::from_path(format!("{:?}.csv", config))?;
+    wtr.write_record(&["Dataset", "ROC-AUC"])?;
     wtr.flush()?;
+    datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
+    // let mut roc_mean = vec![0.0; n_repetitions];
     for i in 0..n_repetitions {
         println!("Repetition {}", i + 1);
+        //let mut predictions = Vec::new();
         for path in &datasets {
             println!("\tProcessing {}", path.file_name().to_string_lossy());
             let train_path = path
@@ -57,110 +59,26 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let mut ds_train = read_csv(train_path, b'\t', false)?;
             let ds_test = read_csv(test_path, b'\t', false)?;
-
             let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
 
-            let config = ExtremelyRandomizedCanonicalIntervalForestConfig {
-                n_intervals: (ds_train[0].data.len() as f64).log10() as usize,
-                n_attributes: 8,
-                ts_length: ds_train[0].data.len(),
-                classification_config: ClassificationForestConfig {
-                    n_trees: 100,
-                    max_depth: Some((ds_train[0].data.len() as f64).sqrt() as usize),
-                    min_samples_split: 2,
-                    max_features: tree::tree::MaxFeatures::Sqrt,
-                    criterion: Criterion::Random,
-                    bootstrap: true,
-                },
-            };
-
-            let mut model = ExtremelyRandomizedCanonicalIntervalForest::new(config);
-            let model_time = std::time::Instant::now();
+            let mut model = CanonicalIsolationForest::new(config);
+            let start_time = std::time::Instant::now();
             model.fit(&mut ds_train);
-            let model_time = model_time.elapsed().as_secs_f64();
-            println!("\tModel built in {}s", model_time);
-
-            let breiman_time = std::time::Instant::now();
-            let breiman_distance = model.pairwise_breiman(&ds_test, &ds_train);
-            let breiman_time = breiman_time.elapsed().as_secs_f64();
-            let prediction_breiman = k_nearest_neighbor(
-                1,
-                &ds_train.iter().map(|v| v.target).collect::<Vec<_>>(),
-                &breiman_distance,
-            );
-            let accuracy_breiman = accuracy_score(&prediction_breiman, &y_true);
-
-            let zhu_time = std::time::Instant::now();
-            let zhu_distance = model.pairwise_zhu(&ds_test, &ds_train);
-            let zhu_time = zhu_time.elapsed().as_secs_f64();
-            let prediction_zhu = k_nearest_neighbor(
-                1,
-                &ds_train.iter().map(|v| v.target).collect::<Vec<_>>(),
-                &zhu_distance,
-            );
-            let accuracy_zhu = accuracy_score(&prediction_zhu, &y_true);
-            let ratio_time = std::time::Instant::now();
-            let ratiorf_distance = model.pairwise_ratiorf(&ds_test, &ds_train);
-
-            let ratio_time = ratio_time.elapsed().as_secs_f64();
-            let prediction_ratiorf = k_nearest_neighbor(
-                1,
-                &ds_train.iter().map(|v| v.target).collect::<Vec<_>>(),
-                &ratiorf_distance,
-            );
-            let accuracy_ratiorf = accuracy_score(&prediction_ratiorf, &y_true);
-            println!(
-                "\t\tBreiman: {}\n\t\tZhu: {}\n\t\tRatioRF: {}",
-                accuracy_breiman, accuracy_zhu, accuracy_ratiorf
-            );
-            vec_vec_to_csv(
-                format!(
-                    "/media/DATA/albertoazzari/ERCIF_DISTANCES/{}/{}_T{}I{}F{}breiman{}.csv",
-                    path.file_name().to_string_lossy(),
-                    path.file_name().to_string_lossy(),
-                    config.classification_config.n_trees,
-                    config.n_intervals,
-                    config.n_attributes,
-                    i
-                ),
-                &breiman_distance,
-            )?;
-            vec_vec_to_csv(
-                format!(
-                    "/media/DATA/albertoazzari/ERCIF_DISTANCES/{}/{}_T{}I{}F{}zhu{}.csv",
-                    path.file_name().to_string_lossy(),
-                    path.file_name().to_string_lossy(),
-                    config.classification_config.n_trees,
-                    config.n_intervals,
-                    config.n_attributes,
-                    i
-                ),
-                &zhu_distance,
-            )?;
-            vec_vec_to_csv(
-                format!(
-                    "/media/DATA/albertoazzari/ERCIF_DISTANCES/{}/{}_T{}I{}F{}ratiorf{}.csv",
-                    path.file_name().to_string_lossy(),
-                    path.file_name().to_string_lossy(),
-                    config.classification_config.n_trees,
-                    config.n_intervals,
-                    config.n_attributes,
-                    i
-                ),
-                &ratiorf_distance,
-            )?;
+            println!("\t\tTraining time: {:?}", start_time.elapsed());
+            let start_time = std::time::Instant::now();
+            let prediction = model.score_samples(&ds_test);
+            println!("\t\tPrediction time: {:?}", start_time.elapsed());
+            let roc = roc_auc_score(&prediction, &y_true);
+            println!("\tROC AUC: {}", roc);
+            // roc_mean[i] = roc;
             wtr.write_record(&[
                 path.file_name().to_string_lossy().to_string(),
-                accuracy_breiman.to_string(),
-                breiman_time.to_string(),
-                accuracy_zhu.to_string(),
-                zhu_time.to_string(),
-                accuracy_ratiorf.to_string(),
-                ratio_time.to_string(),
+                roc.to_string(),
             ])?;
             wtr.flush()?;
-            ERCIF_CACHE.clear();
+            CISOF_CACHE.clear();
         }
     }
+    // println!("Mean: {} Std: {}", mean(&roc_mean), stddev(&roc_mean));
     Ok(())
 }

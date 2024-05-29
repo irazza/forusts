@@ -1,12 +1,13 @@
-use crate::forest::canonical_isolation_forest::{
-    CanonicalIsolationForest, CanonicalIsolationForestConfig,
+use crate::forest::extremely_randomized_canonical_interval_forest::{
+    ExtremelyRandomizedCanonicalIntervalForest, ExtremelyRandomizedCanonicalIntervalForestConfig,
 };
-use crate::forest::forest::{Forest, OutlierForest, OutlierForestConfig};
-use crate::metrics::classification::roc_auc_score;
-use crate::tree::canonical_isolation_tree::CISOF_CACHE;
-use crate::utils::csv_io::read_csv;
+use crate::forest::forest::{ClassificationForest, Forest};
+use crate::tree::extremely_randomized_canonical_interval_tree::ERCIF_CACHE;
+use crate::utils::csv_io::{read_csv, vec_vec_to_csv};
+use forest::forest::ClassificationForestConfig;
 use std::error::Error;
 use std::fs::{self};
+use tree::tree::Criterion;
 
 mod distance;
 mod feature_extraction;
@@ -18,20 +19,9 @@ mod utils;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Settings for the experiments
-    let config = CanonicalIsolationForestConfig {
-        n_intervals: 3000_f64.sqrt() as usize,
-        n_attributes: 8,
-        ts_length: 3000,
-        outlier_config: OutlierForestConfig {
-            n_trees: 500,
-            min_samples_split: 2,
-            max_depth: None,
-            enhanced_anomaly_score: false,
-            max_samples: 1.0,
-        },
-    };
     let n_repetitions = 10;
-    let paths = fs::read_dir("/media/DATA/albertoazzari/admep")?;
+    let paths = fs::read_dir("/media/DATA/albertoazzari/UCRArchive_2018/")?;
+
     let mut datasets = Vec::new();
     for entry in paths {
         // Unwrap the entry or handle the error, if any.
@@ -40,9 +30,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             datasets.push(entry);
         }
     }
-    let mut wtr = csv::Writer::from_path(format!("{:?}.csv", config))?;
-    wtr.write_record(&["Dataset", "ROC-AUC"])?;
-    wtr.flush()?;
     datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
     for i in 0..n_repetitions {
         println!("Repetition {}", i + 1);
@@ -55,25 +42,66 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .path()
                 .join(format!("{}_TEST.tsv", path.file_name().to_string_lossy()));
 
-            let mut ds_train = read_csv(train_path, b'\t', false)?;
+            let ds_train = read_csv(train_path, b'\t', false)?;
             let ds_test = read_csv(test_path, b'\t', false)?;
-            let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
 
-            let mut model = CanonicalIsolationForest::new(config);
-            let start_time = std::time::Instant::now();
-            model.fit(&mut ds_train);
-            println!("\t\tTraining time: {:?}", start_time.elapsed());
-            let start_time = std::time::Instant::now();
-            let prediction = model.score_samples(&ds_test);
-            println!("\t\tPrediction time: {:?}", start_time.elapsed());
-            let roc = roc_auc_score(&prediction, &y_true);
-            println!("\tROC AUC: {}", roc);
-            wtr.write_record(&[
-                path.file_name().to_string_lossy().to_string(),
-                roc.to_string(),
-            ])?;
-            wtr.flush()?;
-            CISOF_CACHE.clear();
+            let mut ds = ds_train.clone();
+            ds.extend(ds_test.clone());
+
+            let config = ExtremelyRandomizedCanonicalIntervalForestConfig {
+                n_intervals: (ds[0].data.len() as f64).log10() as usize,
+                n_attributes: 8,
+                ts_length: ds_train[0].data.len(),
+                classification_config: ClassificationForestConfig {
+                    n_trees: 100,
+                    max_depth: Some((ds_train[0].data.len() as f64).sqrt() as usize),
+                    min_samples_split: 2,
+                    max_features: tree::tree::MaxFeatures::Sqrt,
+                    criterion: Criterion::Random,
+                    bootstrap: true,
+                },
+            };
+
+            let mut model = ExtremelyRandomizedCanonicalIntervalForest::new(config);
+            let model_time = std::time::Instant::now();
+            model.fit(&mut ds);
+            let model_time = model_time.elapsed().as_secs_f64();
+            println!("\tModel built in {}s", model_time);
+
+            let breiman_distance = model.pairwise_breiman(&ds, &ds);
+            
+            let zhu_distance = model.pairwise_zhu(&ds, &ds);
+            
+            let ratiorf_distance = model.pairwise_ratiorf(&ds, &ds);
+            
+            vec_vec_to_csv(
+                format!(
+                    "/media/DATA/albertoazzari/ERCIF_DISTANCES/{}/{:?}_breiman{}.csv",
+                    path.file_name().to_string_lossy(),
+                    config,
+                    i
+                ),
+                &breiman_distance,
+            )?;
+            vec_vec_to_csv(
+                format!(
+                    "/media/DATA/albertoazzari/ERCIF_DISTANCES/{}/{:?}_zhu{}.csv",
+                    path.file_name().to_string_lossy(),
+                    config,
+                    i
+                ),
+                &zhu_distance,
+            )?;
+            vec_vec_to_csv(
+                format!(
+                    "/media/DATA/albertoazzari/ERCIF_DISTANCES/{}/{:?}_ratiorf{}.csv",
+                    path.file_name().to_string_lossy(),
+                    config,
+                    i
+                ),
+                &ratiorf_distance,
+            )?;
+            ERCIF_CACHE.clear();
         }
     }
     Ok(())

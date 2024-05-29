@@ -9,12 +9,14 @@ use crate::{
     utils::structures::Sample,
 };
 use core::panic;
+use std::cmp::max;
 use dashmap::DashMap;
 use lazy_static::lazy_static;
 use rand::{seq::SliceRandom, thread_rng, Rng};
 
 pub const MIN_INTERVAL_LEN: usize = 20;
 pub const TOT_ATTRIBUTES: usize = 25;
+pub const MIN_INTERVAL_PERCENTAGE: f64 = 0.1;
 
 lazy_static! {
     pub static ref ERCIF_CACHE: DashMap<(usize, usize, usize, usize), f64> = DashMap::new();
@@ -99,13 +101,13 @@ impl Tree for ExtremelyRandomizedCanonicalIntervalTree {
                 if config.ts_length < MIN_INTERVAL_LEN {
                     panic!("Time series length too short");
                 }
-                // let min_interval = max(
-                //     MIN_INTERVAL_LEN,
-                //     (config.ts_length as f64 * MIN_INTERVAL_PERCENTAGE).ceil() as usize,
-                // );
+                let min_interval = max(
+                    MIN_INTERVAL_LEN,
+                    (config.ts_length as f64 * MIN_INTERVAL_PERCENTAGE).ceil() as usize,
+                );
                 for j in 0..config.n_intervals {
-                    let start = rng.gen_range(0..config.ts_length - MIN_INTERVAL_LEN);
-                    let end = rng.gen_range(start + MIN_INTERVAL_LEN..config.ts_length);
+                    let start = rng.gen_range(0..config.ts_length - min_interval);
+                    let end = rng.gen_range(start + min_interval..config.ts_length);
                     intervals[j] = (start, end);
                 }
                 intervals

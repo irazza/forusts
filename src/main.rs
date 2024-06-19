@@ -20,7 +20,7 @@ mod utils;
 fn main() -> Result<(), Box<dyn Error>> {
     // Settings for the experiments
     let n_repetitions = 10;
-    let paths = fs::read_dir("/media/DATA/albertoazzari/UCRArchive_2018/")?;
+    let paths = fs::read_dir("/media/aazzari/UCRArchive_2018/")?;
 
     let mut datasets = Vec::new();
     for entry in paths {
@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     for i in 0..n_repetitions {
         println!("Repetition {}", i + 1);
         for path in &datasets {
-            println!("\tProcessing {}", path.file_name().to_string_lossy());
+            print!("\tProcessing {}", path.file_name().to_string_lossy());
             let train_path = path
                 .path()
                 .join(format!("{}_TRAIN.tsv", path.file_name().to_string_lossy()));
@@ -49,11 +49,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             ds.extend(ds_test.clone());
 
             let config = ExtremelyRandomizedCanonicalIntervalForestConfig {
-                n_intervals: (ds[0].data.len() as f64).log10() as usize,
+                n_intervals: (ds[0].data.len() as f64).sqrt() as usize,
                 n_attributes: 8,
                 ts_length: ds_train[0].data.len(),
                 classification_config: ClassificationForestConfig {
-                    n_trees: 100,
+                    n_trees: 500,
                     max_depth: Some((ds_train[0].data.len() as f64).sqrt() as usize),
                     min_samples_split: 2,
                     max_features: tree::tree::MaxFeatures::Sqrt,
@@ -66,17 +66,17 @@ fn main() -> Result<(), Box<dyn Error>> {
             let model_time = std::time::Instant::now();
             model.fit(&mut ds);
             let model_time = model_time.elapsed().as_secs_f64();
-            println!("\tModel built in {}s", model_time);
+            println!(": built in {}s", model_time);
 
             let breiman_distance = model.pairwise_breiman(&ds, &ds);
             
             let zhu_distance = model.pairwise_zhu(&ds, &ds);
             
             let ratiorf_distance = model.pairwise_ratiorf(&ds, &ds);
-            
+
             vec_vec_to_csv(
                 format!(
-                    "/media/DATA/albertoazzari/ERCIF_DISTANCES/{}/{:?}_breiman{}.csv",
+                    "/media/aazzari/ERCIF_DISTANCES/HEAVY/{}/{:?}_breiman{}.csv",
                     path.file_name().to_string_lossy(),
                     config,
                     i
@@ -85,7 +85,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             vec_vec_to_csv(
                 format!(
-                    "/media/DATA/albertoazzari/ERCIF_DISTANCES/{}/{:?}_zhu{}.csv",
+                    "/media/aazzari/ERCIF_DISTANCES/HEAVY/{}/{:?}_zhu{}.csv",
                     path.file_name().to_string_lossy(),
                     config,
                     i
@@ -94,7 +94,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?;
             vec_vec_to_csv(
                 format!(
-                    "/media/DATA/albertoazzari/ERCIF_DISTANCES/{}/{:?}_ratiorf{}.csv",
+                    "/media/aazzari/ERCIF_DISTANCES/{}/{:?}_ratiorf{}.csv",
                     path.file_name().to_string_lossy(),
                     config,
                     i

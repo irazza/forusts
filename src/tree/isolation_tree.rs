@@ -1,20 +1,25 @@
+use std::hash::RandomState;
+
 use super::{node::Node, tree::StandardSplit};
 use crate::{
     forest::{forest::OutlierTree, isolation_forest::IsolationForestConfig},
     tree::tree::Tree,
     utils::{float_handling::next_up, structures::Sample},
 };
-use rand::{thread_rng, Rng};
+use hashbrown::HashSet;
+use rand::{seq::SliceRandom, thread_rng, Rng};
+use rand_chacha::ChaCha8Rng;
 
 #[derive(Clone, Debug)]
 pub struct IsolationTreeConfig {
     pub max_depth: usize,
     pub min_samples_split: usize,
+    pub min_samples_leaf: usize,
 }
 
 #[derive(Clone, Debug)]
 pub struct IsolationTree {
-    root: Node<StandardSplit>,
+    nodes: Vec<Node<StandardSplit>>,
     config: IsolationTreeConfig,
 }
 
@@ -24,6 +29,7 @@ impl OutlierTree for IsolationTree {
         Self::new(IsolationTreeConfig {
             max_depth: (max_samples as f64).max(2.0).log2().ceil() as usize + 1,
             min_samples_split: config.min_samples_split,
+            min_samples_leaf: config.min_samples_leaf,
         })
     }
 }
@@ -33,60 +39,65 @@ impl Tree for IsolationTree {
     type SplitParameters = StandardSplit;
     fn new(config: Self::Config) -> Self {
         Self {
-            root: Node::new(),
+            nodes: Vec::new(),
             config,
         }
     }
+
+    fn get_split(&self, samples: &[Sample], non_constant_features: &mut Vec<usize>, random_state: ChaCha8Rng) -> Option<(Self::SplitParameters, f64)> {
+        let mut rng = random_state;
+        non_constant_features.shuffle(&mut rng);
+
+        while let Some(feature) = non_constant_features.pop() {
+
+            let min_feature = samples
+                .iter()
+                .map(|f| f.features[feature])
+                .fold(f64::INFINITY, f64::min);
+
+            let max_feature = samples
+                .iter()
+                .map(|f| f.features[feature])
+                .fold(f64::NEG_INFINITY, f64::max);
+
+            if min_feature >= max_feature {
+                // Remove constant features
+                continue;
+            } else {
+                let threshold = rng.gen_range(min_feature..max_feature);
+                non_constant_features.push(feature);
+                return Some((
+                    StandardSplit {
+                        feature,
+                        threshold,
+                    },
+                    f64::NAN,
+                ));
+            }
+        }
+        return None;
+    }
+
     fn get_max_depth(&self) -> usize {
         self.config.max_depth
     }
     fn get_root(&self) -> &Node<Self::SplitParameters> {
-        &self.root
+        &self.nodes[0]
     }
-    fn set_root(&mut self, root: Node<Self::SplitParameters>) {
-        self.root = root;
+
+    fn get_min_samples_split(&self) -> usize {
+        self.config.min_samples_split
     }
-    fn pre_split_conditions(&self, samples: &[Sample], current_depth: usize) -> bool {
-        // Base case: not enough samples or max depth reached
-        if samples.len() <= self.config.min_samples_split || current_depth == self.config.max_depth
-        {
-            return true;
-        }
-        // Base case: samples are the same object
-        let first_sample = &samples[0].data;
-        let is_all_same_data = samples.iter().all(|v| &v.data == first_sample);
-        if is_all_same_data {
-            return true;
-        }
-        return false;
+
+    fn get_min_samples_leaf(&self) -> usize {
+        self.config.min_samples_leaf
     }
-    fn get_split(&self, samples: &[Sample]) -> (Self::SplitParameters, f64) {
-        let mut rng = thread_rng();
 
-        let feature = rng.gen_range(0..samples[0].data.len());
+    fn set_nodes(&mut self, nodes: Vec<Node<Self::SplitParameters>>) {
+        self.nodes = nodes;
+    }
 
-        let min_feature = samples
-            .iter()
-            .map(|f| f.data[feature])
-            .fold(f64::INFINITY, f64::min);
-        let max_feature = samples
-            .iter()
-            .map(|f| f.data[feature])
-            .fold(f64::NEG_INFINITY, f64::max);
-
-            let threshold;
-            if next_up(min_feature) > max_feature {
-                threshold = min_feature;
-            } else {
-                threshold = rng.gen_range(next_up(min_feature)..=max_feature);
-            }
-
-        (
-            StandardSplit {
-                feature: feature,
-                threshold,
-            },
-            rng.gen_range(f64::EPSILON..1.0),
-        )
+    fn get_node_at(&self, id: usize) -> &Node<Self::SplitParameters> {
+        &self.nodes[id]
     }
 }

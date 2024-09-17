@@ -40,6 +40,7 @@ pub fn read_csv(
     delimiter: u8,
     header: bool,
 ) -> Result<Vec<Sample>, Box<dyn Error>> {
+
     let reader = BufReader::new(File::open(path)?);
     let mut reader = ReaderBuilder::new()
         .has_headers(header)
@@ -53,9 +54,9 @@ pub fn read_csv(
         // Replace NaNs with 0s
         let record = Sample {
             target: record.target,
-            data: Arc::new(
+            features: Arc::new(
                 record
-                    .data
+                    .features
                     .to_vec()
                     .iter()
                     .map(|v| if v.is_nan() { 0.0 } else { *v })

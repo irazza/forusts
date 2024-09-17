@@ -1,11 +1,3 @@
-pub mod canonical_interval_forest;
-pub mod canonical_isolation_forest;
-pub mod distance_isolation_forest;
-pub mod distance_set_forest;
-pub mod extremely_randomized_canonical_interval_forest;
+// pub mod extra_forest;
 pub mod forest;
 pub mod isolation_forest;
-pub mod random_forest;
-pub mod sc_isolation_forest;
-pub mod time_series_forest;
-pub mod time_series_isolation_forest;

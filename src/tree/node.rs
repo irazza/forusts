@@ -1,4 +1,7 @@
-use std::{fmt::Debug, sync::Arc};
+use std::{
+    fmt::Debug,
+    sync::{atomic::AtomicUsize, Arc},
+};
 
 use super::tree::SplitParameters;
 
@@ -13,86 +16,79 @@ pub enum LeafClassification {
 
 #[derive(Debug, Clone)]
 pub enum Node<S: SplitParameters> {
-    Leaf {
+    External {
+        id: usize,
         class: LeafClassification,
         depth: usize,
-        impurity: f64,
         n_samples: usize,
     },
-    Split {
+    Internal {
+        id: usize,
         split_params: S,
-        left: Box<Node<S>>,
-        right: Box<Node<S>>,
+        children: Vec<usize>,
+        n_children: usize,
         depth: usize,
         impurity: f64,
     },
 }
-
 impl<S: SplitParameters> Node<S> {
-    pub fn new() -> Self {
-        Node::Leaf {
-            class: LeafClassification::Simple(0),
-            depth: 0,
-            impurity: 0.0,
-            n_samples: 0,
+    pub fn get_id(&self) -> usize {
+        match self {
+            Node::External {
+                id,
+                ..
+            } => *id,
+            Node::Internal {
+                id,
+                ..
+            } => *id,
+        }
+    }
+    pub fn get_n_children(&self) -> usize {
+        match self {
+            Node::External {
+                ..
+            } => 0,
+            Node::Internal {
+                children,
+                ..
+            } => children.len(),
+        }
+    }
+    pub fn get_class(&self, sample: &[f64]) -> isize {
+        match self {
+            Node::External {
+                class,
+                ..
+            } => {
+                todo!()
+            }
+            Node::Internal {
+                ..
+            } => panic!("Cannot get class of a split node"),
+        }
+    }
+    pub fn get_n_samples(&self) -> usize {
+        match self {
+            Node::External {
+                n_samples,
+                ..
+            } => *n_samples,
+            Node::Internal {
+                ..
+            } => panic!("Cannot get n_samples of a split node"),
         }
     }
     pub fn get_depth(&self) -> usize {
         match self {
-            Node::Leaf {
-                class: _,
+            Node::External {
                 depth,
-                impurity: _,
-                n_samples: _,
-            } => return *depth,
-            Node::Split {
-                split_params: _,
-                left: _,
-                right: _,
+                ..
+            } => *depth,
+            Node::Internal {
                 depth,
-                impurity: _,
-            } => return *depth,
-        }
-    }
-
-    pub fn get_class(&self, sample: &[f64]) -> isize {
-        match self {
-            Node::Leaf {
-                class,
-                depth: _,
-                impurity: _,
-                n_samples: _,
-            } => {
-                return match class {
-                    LeafClassification::Simple(c) => *c,
-                    LeafClassification::Complex(c) => c.classify(sample),
-                }
-            }
-            Node::Split {
-                split_params: _,
-                left: _,
-                right: _,
-                depth: _,
-                impurity: _,
-            } => panic!("Cannot get class of a split node"),
-        }
-    }
-
-    pub fn get_samples(&self) -> usize {
-        match self {
-            Node::Leaf {
-                class: _,
-                depth: _,
-                impurity: _,
-                n_samples,
-            } => return *n_samples,
-            Node::Split {
-                split_params: _,
-                left: _,
-                right: _,
-                depth: _,
-                impurity: _,
-            } => panic!("Cannot get samples of a split node"),
+                ..
+            } => *depth,
         }
     }
 }

@@ -1,3 +1,5 @@
+use rand::{thread_rng, SeedableRng};
+use rand_chacha::ChaCha8Rng;
 use super::forest::OutlierForestConfig;
 use crate::{
     forest::forest::{Forest, OutlierForest},
@@ -15,17 +17,17 @@ pub struct IsolationForest {
 
 impl Forest<IsolationTree> for IsolationForest {
     type Config = IsolationForestConfig;
-    type TuningType = f64;
 
-    fn new(config: Self::Config) -> Self {
+    fn new(config: &Self::Config) -> Self {
         Self {
             trees: Vec::new(),
-            config,
+            config: config.clone(),
             max_samples: 0,
         }
     }
-    fn fit(&mut self, data: &mut [Sample]) {
-        self.fit_(data)
+    fn fit(&mut self, samples: &mut [Sample], random_state: Option<ChaCha8Rng>) {
+        let mut random_state = random_state.unwrap_or_else(|| ChaCha8Rng::from_rng(thread_rng()).unwrap());
+        self.fit_(&samples, &mut random_state)
     }
     fn predict(&self, data: &[Sample]) -> Vec<isize> {
         self.predict_(data)
@@ -35,9 +37,6 @@ impl Forest<IsolationTree> for IsolationForest {
     }
     fn get_trees_mut(&mut self) -> &mut Vec<IsolationTree> {
         &mut self.trees
-    }
-    fn tuning_predict(&self, _ds_train: &[Sample], ds_test: &[Sample]) -> Vec<Self::TuningType> {
-        self.score_samples(ds_test)
     }
 }
 impl OutlierForest<IsolationTree> for IsolationForest {

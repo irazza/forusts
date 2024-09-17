@@ -1,5 +1,20 @@
-#![allow(dead_code)]
-use crate::feature_extraction::statistics::unique;
+use hashbrown::HashSet;
+use std::hash::Hash;
+
+pub fn class_counts<T: Hash + Eq>(arr: &[T]) -> usize {
+    let mut count = HashSet::new();
+    for x in arr {
+        count.insert(x);
+    }
+    return count.len();
+}
+
+pub fn unique<T: PartialOrd + Clone>(x: &[T]) -> Vec<T> {
+    let mut unique = x.to_vec();
+    unique.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
+    unique.dedup();
+    unique
+}
 
 pub fn accuracy_score(y_pred: &[isize], y_true: &[isize]) -> f64 {
     (y_pred
@@ -67,7 +82,7 @@ pub fn confusion_matrix(y_pred: &[isize], y_true: &[isize]) -> Vec<Vec<usize>> {
 
 pub fn matthews_corrcoef(y_pred: &[isize], y_true: &[isize]) -> f64 {
     // Base case: only one class predicted
-    if unique(y_true).len() == 1 || unique(y_pred).len() == 1 {
+    if class_counts(y_true) == 1 || class_counts(y_pred) == 1 {
         return 0.0;
     }
 
@@ -155,7 +170,7 @@ pub fn true_positive_rate(y_pred: &[usize], y_true: &[isize]) -> f64 {
 
     // Ensure that is a binary problem
     assert_eq!(
-        unique(y_true).len(),
+        class_counts(y_true),
         2,
         "TPR is only defined for binary problems"
     );
@@ -192,7 +207,7 @@ pub fn false_positive_rate(y_pred: &[usize], y_true: &[isize]) -> f64 {
 
     // Ensure that is a binary problem
     assert_eq!(
-        unique(y_true).len(),
+        class_counts(y_true),
         2,
         "FPR is only defined for binary problems"
     );
@@ -230,7 +245,7 @@ fn roc_curve(y_pred: &[f64], y_true: &[isize]) -> (Vec<f64>, Vec<f64>, Vec<f64>)
 
     // Ensure that is a binary problem
     assert_eq!(
-        unique(y_true).len(),
+        class_counts(y_true),
         2,
         "ROC curve is only defined for binary problems"
     );
@@ -298,7 +313,7 @@ fn roc_curve_c(y_pred: &[f64], y_true: &[isize]) -> (Vec<f64>, Vec<f64>, Vec<f64
 
     // Ensure that is a binary problem
     assert_eq!(
-        unique(y_true).len(),
+        class_counts(y_true),
         2,
         "ROC curve is only defined for binary problems"
     );

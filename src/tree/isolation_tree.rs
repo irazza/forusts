@@ -24,7 +24,7 @@ impl OutlierTree for IsolationTree {
     type TreeConfig = IsolationForestConfig;
     fn from_outlier_config(config: &Self::TreeConfig, max_samples: usize) -> Self {
         Self::new(IsolationTreeConfig {
-            max_depth: (max_samples as f64).max(2.0).log2().ceil() as usize,
+            max_depth: (max_samples as f64).max(2.0).log2().ceil() as usize + 1,
             min_samples_split: config.min_samples_split,
             min_samples_leaf: config.min_samples_leaf,
         })
@@ -62,7 +62,7 @@ impl Tree for IsolationTree {
                 .map(|f| f.features[feature])
                 .fold(f64::NEG_INFINITY, f64::max);
 
-            if min_feature >= max_feature {
+            if max_feature - min_feature <= f64::EPSILON {
                 // Remove constant features
                 continue;
             } else {

@@ -30,7 +30,7 @@ impl SplitParameters for StandardSplit {
     }
     fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample) -> f64 {
         let leaf = tree.predict_leaf(x);
-        return leaf.get_depth() as f64 + T::average_path_length(leaf.get_n_samples());
+        return leaf.get_depth() as f64 + T::average_path_length(leaf.get_n_samples()) - 1.0;
     }
 }
 pub trait Tree: Sync + Send {
@@ -219,7 +219,6 @@ pub trait Tree: Sync + Send {
             let branch = split_params.split(x);
             node = self.get_node_at(children[branch]);
         }
-        // println!("{:?}", node.get_id());
         node
     }
     fn split<'a, 'b>(

@@ -7,6 +7,7 @@ use hashbrown::HashMap;
 use rand::{seq::SliceRandom, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use rayon::prelude::*;
+use core::panic;
 use std::cmp::min;
 
 pub const ANOMALY_SCORE: f64 = 2.0;
@@ -263,8 +264,7 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
     fn get_max_samples(&self) -> usize;
     fn fit_(&mut self, data: &[Sample], mut random_state: &mut ChaCha8Rng) {
         let mut trees = Vec::new();
-        let config_max_samples = self.get_forest_config().0.max_samples;
-        let max_samples = min(256, (data.len() as f64 * config_max_samples) as usize);
+        let max_samples = min(256, data.len() as usize);
         self.set_max_samples(max_samples);
         let (config, tree_config) = self.get_forest_config();
         let random_generators = (0..config.n_trees).map(|_| {
@@ -309,8 +309,9 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
             for tree in trees.iter() {
                 average_depth += Self::path_length(tree, sample);
             }
+            // panic!("SCORE: {:?}", average_depth / 100.0);
             let score = ANOMALY_SCORE
-                .powf(-average_depth / (average_path_length_max_samples * trees.len() as f64));
+                .powf(-average_depth / (2.0 * average_path_length_max_samples * trees.len() as f64));
             return score;
         }));
         scores

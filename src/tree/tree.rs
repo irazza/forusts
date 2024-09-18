@@ -2,9 +2,9 @@ use crate::{forest::forest::EGAMMA, utils::structures::Sample};
 use core::fmt::Debug;
 use hashbrown::HashMap;
 use rand_chacha::ChaCha8Rng;
-use std::ops::Range;
+use std::{collections::VecDeque, ops::Range};
 
-use super::node::{self, LeafClassification, Node};
+use super::node::{LeafClassification, Node};
 
 pub trait SplitParameters: Sync + Send + Debug + Ord + Eq {
     fn split(&self, sample: &Sample) -> usize;
@@ -42,20 +42,30 @@ pub trait Tree: Sync + Send {
     fn get_min_samples_leaf(&self) -> usize;
     fn get_root(&self) -> &Node<Self::SplitParameters>;
     fn set_nodes(&mut self, nodes: Vec<Node<Self::SplitParameters>>);
-    fn get_split(&self, samples: &[Sample], non_constant_features: &mut Vec<usize>, random_state: ChaCha8Rng) -> Option<(Self::SplitParameters, f64)>;
     fn get_node_at(&self, id: usize) -> &Node<Self::SplitParameters>;
+    fn get_split(
+        &self,
+        samples: &[Sample],
+        min_samples_leaf: usize,
+        non_constant_features: &mut Vec<usize>,
+        random_state: ChaCha8Rng,
+    ) -> Option<(Self::SplitParameters, f64)>;
     fn fit(&mut self, data: &[Sample], random_state: ChaCha8Rng) {
         let mut data = data.to_vec();
         let nodes = self.build_tree(&mut data, random_state);
         self.set_nodes(nodes);
     }
-    fn build_tree(&mut self, samples: &mut [Sample], random_state: ChaCha8Rng) -> Vec<Node<Self::SplitParameters>> {
+    fn build_tree(
+        &mut self,
+        samples: &mut [Sample],
+        random_state: ChaCha8Rng,
+    ) -> Vec<Node<Self::SplitParameters>> {
         let features = (0..samples[0].features.len()).collect::<Vec<_>>();
-        let mut stack = vec![(0..samples.len(), 0, None, features)];
+        let mut queue = VecDeque::from(vec![(0..samples.len(), 0, None, features)]);
         let mut nodes = Vec::new();
-
-        while let Some((range, depth, parent, mut non_constant_features)) = stack.pop() {
+        while let Some((range, depth, parent, mut non_constant_features)) = queue.pop_front() {
             let id = nodes.len();
+
             let is_leaf = depth >= self.get_max_depth()
                 || range.len() < self.get_min_samples_split()
                 || range.len() < 2 * self.get_min_samples_leaf()
@@ -63,13 +73,11 @@ pub trait Tree: Sync + Send {
 
             let node_samples = &mut samples[range.clone()];
 
-            let get_leaf = || {
-                Node::External {
-                    id,
-                    class: Self::get_leaf_class(node_samples, None),
-                    depth,
-                    n_samples: node_samples.len(),
-                }
+            let get_leaf = || Node::External {
+                id,
+                class: Self::get_leaf_class(node_samples, None),
+                depth,
+                n_samples: node_samples.len(),
             };
 
             let add_children = |nodes: &mut Vec<Node<Self::SplitParameters>>| {
@@ -87,17 +95,20 @@ pub trait Tree: Sync + Send {
                 continue;
             }
 
-            let Some((split_parameters, impurity)) = self.get_split(node_samples, &mut non_constant_features, random_state.clone()) else {
+            let Some((split_parameters, impurity)) = self.get_split(
+                node_samples,
+                self.get_min_samples_leaf(),
+                &mut non_constant_features,
+                random_state.clone(),
+            ) else {
                 nodes.push(get_leaf());
                 add_children(&mut nodes);
                 continue;
             };
 
-                // || impurity <= f64::EPSILON;
-
             let splitted_data = Self::split(node_samples, &split_parameters);
 
-            assert_eq!(splitted_data.len(), 2);
+            assert!(splitted_data.len()>=2);
 
             nodes.push(Node::Internal {
                 id,
@@ -106,18 +117,23 @@ pub trait Tree: Sync + Send {
                 n_children: splitted_data.len(),
                 depth: depth,
                 impurity,
+                n_samples: node_samples.len(),
             });
 
             for child_range in splitted_data {
                 let child_depth = depth + 1;
                 let child_range =
                     (range.start + child_range.start)..(range.start + child_range.end);
-                stack.push((child_range, child_depth, Some(id), non_constant_features.clone()));
+                queue.push_back((
+                    child_range,
+                    child_depth,
+                    Some(id),
+                    non_constant_features.clone(),
+                ));
             }
 
             add_children(&mut nodes);
-            
-        }        
+        }
         nodes
     }
 
@@ -130,7 +146,8 @@ pub trait Tree: Sync + Send {
         if n_samples == 1 {
             0.0
         } else {
-            2.0 * (Self::harmonic_number(n_samples-1)) - (2.0 * (n_samples as f64 - 1.0) / n_samples as f64)
+            2.0 * (Self::harmonic_number(n_samples - 1))
+                - (2.0 * (n_samples as f64 - 1.0) / n_samples as f64)
         }
     }
     #[inline]
@@ -202,6 +219,7 @@ pub trait Tree: Sync + Send {
             let branch = split_params.split(x);
             node = self.get_node_at(children[branch]);
         }
+        // println!("{:?}", node.get_id());
         node
     }
     fn split<'a, 'b>(

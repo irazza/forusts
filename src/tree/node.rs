@@ -29,66 +29,40 @@ pub enum Node<S: SplitParameters> {
         n_children: usize,
         depth: usize,
         impurity: f64,
+        n_samples: usize,
     },
 }
 impl<S: SplitParameters> Node<S> {
     pub fn get_id(&self) -> usize {
         match self {
-            Node::External {
-                id,
-                ..
-            } => *id,
-            Node::Internal {
-                id,
-                ..
-            } => *id,
+            Node::External { id, .. } => *id,
+            Node::Internal { id, .. } => *id,
         }
     }
     pub fn get_n_children(&self) -> usize {
         match self {
-            Node::External {
-                ..
-            } => 0,
-            Node::Internal {
-                children,
-                ..
-            } => children.len(),
+            Node::External { .. } => 0,
+            Node::Internal { children, .. } => children.len(),
         }
     }
     pub fn get_class(&self, sample: &[f64]) -> isize {
         match self {
-            Node::External {
-                class,
-                ..
-            } => {
+            Node::External { class, .. } => {
                 todo!()
             }
-            Node::Internal {
-                ..
-            } => panic!("Cannot get class of a split node"),
+            Node::Internal { .. } => panic!("Cannot get class of a split node"),
         }
     }
     pub fn get_n_samples(&self) -> usize {
         match self {
-            Node::External {
-                n_samples,
-                ..
-            } => *n_samples,
-            Node::Internal {
-                ..
-            } => panic!("Cannot get n_samples of a split node"),
+            Node::External { n_samples, .. } => *n_samples,
+            Node::Internal { n_samples, .. } => *n_samples,
         }
     }
     pub fn get_depth(&self) -> usize {
         match self {
-            Node::External {
-                depth,
-                ..
-            } => *depth,
-            Node::Internal {
-                depth,
-                ..
-            } => *depth,
+            Node::External { depth, .. } => *depth,
+            Node::Internal { depth, .. } => *depth,
         }
     }
 }

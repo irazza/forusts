@@ -4,16 +4,10 @@ use crate::{
     utils::structures::Sample,
 };
 use hashbrown::HashMap;
-use parking_lot::Mutex;
-use rand::{seq::SliceRandom, Rng, SeedableRng};
+use rand::{seq::SliceRandom, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use rayon::prelude::*;
-use core::panic;
 use std::cmp::min;
-use std::{
-    cmp::max,
-    sync::atomic::{AtomicUsize, Ordering},
-};
 
 pub const ANOMALY_SCORE: f64 = 2.0;
 
@@ -276,19 +270,25 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
         let random_generators = (0..config.n_trees).map(|_| {
             ChaCha8Rng::from_rng(&mut random_state).expect("Error creating random generator")
         });
-        trees.par_extend((0..config.n_trees).into_iter().zip(random_generators).par_bridge().map(|(_i, mut random_state)| {
-            let mut n_samples: Vec<usize> = (0..data.len()).collect();
-            n_samples.shuffle(&mut random_state);
-            let mut tree = T::from_outlier_config(&tree_config, max_samples);
-            tree.fit(
-                &mut (0..max_samples)
-                    .into_iter()
-                    .map(|i| data[n_samples[i]].clone())
-                    .collect::<Vec<Sample>>(),
-                random_state.clone(),
-            );
-            tree
-        }));
+        trees.par_extend(
+            (0..config.n_trees)
+                .into_iter()
+                .zip(random_generators)
+                .par_bridge()
+                .map(|(_i, mut random_state)| {
+                    let mut n_samples: Vec<usize> = (0..data.len()).collect();
+                    n_samples.shuffle(&mut random_state);
+                    let mut tree = T::from_outlier_config(&tree_config, max_samples);
+                    tree.fit(
+                        &mut (0..max_samples)
+                            .into_iter()
+                            .map(|i| data[n_samples[i]].clone())
+                            .collect::<Vec<Sample>>(),
+                        random_state.clone(),
+                    );
+                    tree
+                }),
+        );
         *self.get_trees_mut() = trees;
     }
     fn predict_(&self, data: &[Sample]) -> Vec<isize> {

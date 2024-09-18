@@ -53,25 +53,3 @@ impl std::cmp::Ord for FloatEq {
         self.0.partial_cmp(&other.0).unwrap()
     }
 }
-
-pub fn next_up(value: f64) -> f64 {
-    // We must use strictly integer arithmetic to prevent denormals from
-    // flushing to zero after an arithmetic operation on some platforms.
-    const TINY_BITS: u64 = 0x1; // Smallest positive f64.
-    const CLEAR_SIGN_MASK: u64 = 0x7fff_ffff_ffff_ffff;
-
-    let bits = value.to_bits();
-    if value.is_nan() || bits == f64::INFINITY.to_bits() {
-        return value;
-    }
-
-    let abs = bits & CLEAR_SIGN_MASK;
-    let next_bits = if abs == 0 {
-        TINY_BITS
-    } else if bits == abs {
-        bits + 1
-    } else {
-        bits - 1
-    };
-    f64::from_bits(next_bits)
-}

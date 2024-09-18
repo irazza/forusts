@@ -41,26 +41,27 @@ fn main() -> Result<(), Box<dyn Error>> {
     datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
     let mut predictions = vec![0.0; datasets.len()];
     for i in 0..n_repetitions {
-        println!("Repetition {}", i + 1);
+        // println!("Repetition {}", i + 1);
         for (j, path) in datasets.iter().enumerate() {
-            println!("\tProcessing {}", path.file_name().to_string_lossy());
+            // print!("\tProcessing {} - ", path.file_name().to_string_lossy());
 
             let mut ds_train = read_csv(path.path(), b',', false)?;
-            let ds_test = read_csv(path.path(), b',', false)?;
-            let y_true = ds_train.iter().map(|s| s.target).collect::<Vec<_>>();
+            let ds_test = ds_train.clone(); // read_csv(path.path(), b',', false)?;
+            let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
 
             let mut model = IsolationForest::new(&config);
-            let start_time = std::time::Instant::now();
-            model.fit(&mut ds_train, None);//Some(rand_chacha::ChaCha8Rng::seed_from_u64(0)));
-            println!("\t\tTraining time: {:?}", start_time.elapsed());
-            let start_time = std::time::Instant::now();
-            let prediction = model.score_samples(&ds_train);
-            println!("\t\tPrediction time: {:?}", start_time.elapsed());
+            model.fit(
+                &mut ds_train,
+                None, // Some(rand_chacha::ChaCha8Rng::seed_from_u64(0)),
+            );
+            assert_eq!(ds_test, ds_test);
+            let prediction = model.score_samples(&ds_test);
             predictions[j] += roc_auc_score(&prediction, &y_true);
-            println!("\tROC AUC: {}", predictions[j]);
-            panic!();
+            // println!("ROC AUC: {:.4}", predictions[j]);
+            break;
         }
     }
+    println!("Results: {}", predictions[0]/n_repetitions as f64);
     // for (path, mean) in datasets.iter().zip(predictions.iter()) {
     //     wtr.write_record(&[
     //         path.file_name().to_string_lossy().to_string(),

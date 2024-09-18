@@ -1,6 +1,9 @@
-use std::{cmp::{max, min}, mem::swap};
-use rand::{seq::SliceRandom, SeedableRng};
 use super::structures::Sample;
+use rand::{seq::SliceRandom, SeedableRng};
+use std::{
+    cmp::{max, min},
+    mem::swap,
+};
 
 pub fn train_test_split(
     data: &[Sample],

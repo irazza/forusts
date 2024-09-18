@@ -40,7 +40,6 @@ pub fn read_csv(
     delimiter: u8,
     header: bool,
 ) -> Result<Vec<Sample>, Box<dyn Error>> {
-
     let reader = BufReader::new(File::open(path)?);
     let mut reader = ReaderBuilder::new()
         .has_headers(header)

@@ -3,9 +3,9 @@ use crate::{
     forest::{forest::OutlierTree, isolation_forest::IsolationForestConfig},
     tree::tree::Tree,
     utils::structures::Sample,
+    RandomGenerator,
 };
 use rand::{seq::SliceRandom, Rng};
-use rand_chacha::ChaCha8Rng;
 
 #[derive(Clone, Debug)]
 pub struct IsolationTreeConfig {
@@ -46,10 +46,9 @@ impl Tree for IsolationTree {
         samples: &[Sample],
         min_samples_leaf: usize,
         non_constant_features: &mut Vec<usize>,
-        random_state: ChaCha8Rng,
+        random_state: &mut RandomGenerator,
     ) -> Option<(Self::SplitParameters, f64)> {
-        let mut rng = random_state;
-        non_constant_features.shuffle(&mut rng);
+        non_constant_features.shuffle(random_state);
 
         while let Some(feature) = non_constant_features.pop() {
             let min_feature = samples
@@ -66,8 +65,11 @@ impl Tree for IsolationTree {
                 // Remove constant features
                 continue;
             } else {
-                let threshold = rng.gen_range(min_feature..max_feature);
-                let left_count = samples.iter().filter(|s| s.features[feature] < threshold).count();
+                let threshold = random_state.gen_range(min_feature..max_feature);
+                let left_count = samples
+                    .iter()
+                    .filter(|s| s.features[feature] < threshold)
+                    .count();
                 let right_count = samples.len() - left_count;
 
                 if left_count < min_samples_leaf || right_count < min_samples_leaf {

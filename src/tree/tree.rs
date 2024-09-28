@@ -1,7 +1,6 @@
-use crate::{forest::forest::EGAMMA, utils::structures::Sample};
+use crate::{forest::forest::EGAMMA, utils::structures::Sample, RandomGenerator};
 use core::fmt::Debug;
 use hashbrown::HashMap;
-use rand_chacha::ChaCha8Rng;
 use std::{collections::VecDeque, ops::Range};
 
 use super::node::{LeafClassification, Node};
@@ -48,9 +47,9 @@ pub trait Tree: Sync + Send {
         samples: &[Sample],
         min_samples_leaf: usize,
         non_constant_features: &mut Vec<usize>,
-        random_state: ChaCha8Rng,
+        random_state: &mut RandomGenerator,
     ) -> Option<(Self::SplitParameters, f64)>;
-    fn fit(&mut self, data: &[Sample], random_state: ChaCha8Rng) {
+    fn fit(&mut self, data: &[Sample], random_state: &mut RandomGenerator) {
         let mut data = data.to_vec();
         let nodes = self.build_tree(&mut data, random_state);
         self.set_nodes(nodes);
@@ -58,7 +57,7 @@ pub trait Tree: Sync + Send {
     fn build_tree(
         &mut self,
         samples: &mut [Sample],
-        random_state: ChaCha8Rng,
+        random_state: &mut RandomGenerator,
     ) -> Vec<Node<Self::SplitParameters>> {
         let features = (0..samples[0].features.len()).collect::<Vec<_>>();
         let mut queue = VecDeque::from(vec![(0..samples.len(), 0, None, features)]);
@@ -99,7 +98,7 @@ pub trait Tree: Sync + Send {
                 node_samples,
                 self.get_min_samples_leaf(),
                 &mut non_constant_features,
-                random_state.clone(),
+                random_state,
             ) else {
                 nodes.push(get_leaf());
                 add_children(&mut nodes);
@@ -108,7 +107,7 @@ pub trait Tree: Sync + Send {
 
             let splitted_data = Self::split(node_samples, &split_parameters);
 
-            assert!(splitted_data.len()>=2);
+            assert!(splitted_data.len() >= 2);
 
             nodes.push(Node::Internal {
                 id,

@@ -3,7 +3,7 @@ use crate::forest::isolation_forest::IsolationForest;
 use crate::metrics::classification::roc_auc_score;
 use crate::utils::csv_io::read_csv;
 use forest::isolation_forest::IsolationForestConfig;
-use rand::SeedableRng;
+use rand::{RngCore, SeedableRng};
 use std::error::Error;
 use std::fs::{self};
 
@@ -12,6 +12,8 @@ mod metrics;
 mod neighbors;
 mod tree;
 mod utils;
+
+type RandomGenerator = rand_chacha::ChaCha8Rng;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Settings for the experiments
@@ -61,7 +63,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             break;
         }
     }
-    println!("Results: {}", predictions[0]/n_repetitions as f64);
+    println!("Results: {}", predictions[0] / n_repetitions as f64);
     // for (path, mean) in datasets.iter().zip(predictions.iter()) {
     //     wtr.write_record(&[
     //         path.file_name().to_string_lossy().to_string(),

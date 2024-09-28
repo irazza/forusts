@@ -2,12 +2,12 @@
 use crate::{
     tree::tree::{SplitParameters, Tree},
     utils::structures::Sample,
+    RandomGenerator,
 };
+use core::panic;
 use hashbrown::HashMap;
 use rand::{seq::SliceRandom, SeedableRng};
-use rand_chacha::ChaCha8Rng;
 use rayon::prelude::*;
-use core::panic;
 use std::cmp::min;
 
 pub const ANOMALY_SCORE: f64 = 2.0;
@@ -17,7 +17,7 @@ pub trait Forest<T: Tree>: Sync + Send {
     fn get_trees(&self) -> &Vec<T>;
     fn get_trees_mut(&mut self) -> &mut Vec<T>;
     fn new(config: &Self::Config) -> Self;
-    fn fit(&mut self, data: &mut [Sample], random_state: Option<ChaCha8Rng>);
+    fn fit(&mut self, data: &mut [Sample], random_state: Option<RandomGenerator>);
     fn predict(&self, data: &[Sample]) -> Vec<isize>;
 }
 
@@ -262,13 +262,13 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
     fn get_forest_config(&self) -> (&OutlierForestConfig, &T::TreeConfig);
     fn set_max_samples(&mut self, max_samples: usize);
     fn get_max_samples(&self) -> usize;
-    fn fit_(&mut self, data: &[Sample], mut random_state: &mut ChaCha8Rng) {
+    fn fit_(&mut self, data: &[Sample], mut random_state: &mut RandomGenerator) {
         let mut trees = Vec::new();
         let max_samples = min(256, data.len() as usize);
         self.set_max_samples(max_samples);
         let (config, tree_config) = self.get_forest_config();
         let random_generators = (0..config.n_trees).map(|_| {
-            ChaCha8Rng::from_rng(&mut random_state).expect("Error creating random generator")
+            RandomGenerator::from_rng(&mut random_state).expect("Error creating random generator")
         });
         trees.par_extend(
             (0..config.n_trees)
@@ -284,7 +284,7 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
                             .into_iter()
                             .map(|i| data[n_samples[i]].clone())
                             .collect::<Vec<Sample>>(),
-                        random_state.clone(),
+                        &mut random_state,
                     );
                     tree
                 }),
@@ -302,16 +302,16 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
     fn score_samples(&self, data: &[Sample]) -> Vec<f64> {
         let mut scores = Vec::new();
         let average_path_length_max_samples = T::average_path_length(self.get_max_samples());
-        scores.par_extend(data.par_windows(1).map(|sample| {
+        scores.par_extend(data.par_iter().map(|sample| {
             let mut average_depth = 0.0;
-            let sample = &sample[0];
             let trees: &Vec<T> = self.get_trees();
             for tree in trees.iter() {
                 average_depth += Self::path_length(tree, sample);
             }
             // panic!("SCORE: {:?}", average_depth / 100.0);
-            let score = ANOMALY_SCORE
-                .powf(-average_depth / (2.0 * average_path_length_max_samples * trees.len() as f64));
+            let score = ANOMALY_SCORE.powf(
+                -average_depth / (2.0 * average_path_length_max_samples * trees.len() as f64),
+            );
             return score;
         }));
         scores

@@ -3,9 +3,9 @@ use crate::{
     forest::forest::{Forest, OutlierForest},
     tree::isolation_tree::IsolationTree,
     utils::structures::Sample,
+    RandomGenerator,
 };
 use rand::{thread_rng, SeedableRng};
-use rand_chacha::ChaCha8Rng;
 
 pub type IsolationForestConfig = OutlierForestConfig;
 
@@ -25,9 +25,9 @@ impl Forest<IsolationTree> for IsolationForest {
             max_samples: 0,
         }
     }
-    fn fit(&mut self, samples: &mut [Sample], random_state: Option<ChaCha8Rng>) {
+    fn fit(&mut self, samples: &mut [Sample], random_state: Option<RandomGenerator>) {
         let mut random_state =
-            random_state.unwrap_or_else(|| ChaCha8Rng::from_rng(thread_rng()).unwrap());
+            random_state.unwrap_or_else(|| RandomGenerator::from_rng(thread_rng()).unwrap());
         self.fit_(&samples, &mut random_state)
     }
     fn predict(&self, data: &[Sample]) -> Vec<isize> {

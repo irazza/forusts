@@ -4,13 +4,15 @@ use crate::{
     utils::structures::Sample,
     RandomGenerator,
 };
-use core::panic;
 use hashbrown::HashMap;
-use rand::{seq::SliceRandom, SeedableRng};
+use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rayon::prelude::*;
 use std::cmp::min;
+use atomic_float::AtomicF64;
 
-pub const ANOMALY_SCORE: f64 = 2.0;
+const SUBSAMPLE_SIZE: usize = 256;
+const ANOMALY_SCORE: f64 = 2.0;
+pub const EGAMMA: f64 = 0.577215664901532860606512090082402431_f64;
 
 pub trait Forest<T: Tree>: Sync + Send {
     type Config;
@@ -19,6 +21,24 @@ pub trait Forest<T: Tree>: Sync + Send {
     fn new(config: &Self::Config) -> Self;
     fn fit(&mut self, data: &mut [Sample], random_state: Option<RandomGenerator>);
     fn predict(&self, data: &[Sample]) -> Vec<isize>;
+    fn generate_indeces(
+        n_samples: usize,
+        n_population: usize,
+        with_replacement: bool,
+        random_state: &mut RandomGenerator,
+    ) -> Vec<usize> {
+        let mut indeces = Vec::with_capacity(n_samples);
+        if with_replacement {
+            for _ in 0..n_samples {
+                indeces.push(random_state.gen_range(0..n_population));
+            }
+        } else {
+            let mut population = (0..n_population).collect::<Vec<usize>>();
+            population.shuffle(random_state);
+            indeces.extend(population.iter().take(n_samples).copied());
+        }
+        indeces
+    }
 }
 
 // pub struct ClassificationForestConfig {
@@ -241,8 +261,6 @@ pub trait Forest<T: Tree>: Sync + Send {
 //     }
 // }
 
-pub const EGAMMA: f64 = 0.577215664901532860606512090082402431_f64;
-
 #[derive(Clone)]
 pub struct OutlierForestConfig {
     pub n_trees: usize,
@@ -256,7 +274,11 @@ pub struct OutlierForestConfig {
 
 pub trait OutlierTree: Tree {
     type TreeConfig: Sync + Send;
-    fn from_outlier_config(config: &Self::TreeConfig, max_samples: usize) -> Self;
+    fn from_outlier_config(
+        config: &Self::TreeConfig,
+        max_samples: usize,
+        random_state: &mut RandomGenerator,
+    ) -> Self;
 }
 pub trait OutlierForest<T: OutlierTree>: Forest<T> {
     fn get_forest_config(&self) -> (&OutlierForestConfig, &T::TreeConfig);
@@ -264,7 +286,7 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
     fn get_max_samples(&self) -> usize;
     fn fit_(&mut self, data: &[Sample], mut random_state: &mut RandomGenerator) {
         let mut trees = Vec::new();
-        let max_samples = min(256, data.len() as usize);
+        let max_samples = min(SUBSAMPLE_SIZE, data.len());
         self.set_max_samples(max_samples);
         let (config, tree_config) = self.get_forest_config();
         let random_generators = (0..config.n_trees).map(|_| {
@@ -276,16 +298,15 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
                 .zip(random_generators)
                 .par_bridge()
                 .map(|(_i, mut random_state)| {
-                    let mut n_samples: Vec<usize> = (0..data.len()).collect();
-                    n_samples.shuffle(&mut random_state);
-                    let mut tree = T::from_outlier_config(&tree_config, max_samples);
-                    tree.fit(
-                        &mut (0..max_samples)
-                            .into_iter()
-                            .map(|i| data[n_samples[i]].clone())
-                            .collect::<Vec<Sample>>(),
-                        &mut random_state,
-                    );
+                    let indeces =
+                        Self::generate_indeces(max_samples, data.len(), false, &mut random_state);
+                    let samples = indeces
+                        .iter()
+                        .map(|idx| data[*idx].clone())
+                        .collect::<Vec<Sample>>();
+                    let mut tree =
+                        T::from_outlier_config(&tree_config, max_samples, &mut random_state);
+                    tree.fit(&samples, &mut random_state);
                     tree
                 }),
         );
@@ -300,20 +321,31 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
         predictions
     }
     fn score_samples(&self, data: &[Sample]) -> Vec<f64> {
-        let mut scores = Vec::new();
         let average_path_length_max_samples = T::average_path_length(self.get_max_samples());
-        scores.par_extend(data.par_iter().map(|sample| {
-            let mut average_depth = 0.0;
-            let trees: &Vec<T> = self.get_trees();
-            for tree in trees.iter() {
-                average_depth += Self::path_length(tree, sample);
+        let trees: &Vec<T> = self.get_trees();
+        let mut scores = (0..data.len()).map(|_| AtomicF64::new(0.0)).collect::<Vec<_>>();
+        trees.par_iter().for_each(|tree| {
+            let data = tree.transform(data);
+            for (i, sample) in data.iter().enumerate() {
+                scores[i].fetch_add(Self::path_length(tree, sample), std::sync::atomic::Ordering::Relaxed);
             }
-            // panic!("SCORE: {:?}", average_depth / 100.0);
-            let score = ANOMALY_SCORE.powf(
-                -average_depth / (2.0 * average_path_length_max_samples * trees.len() as f64),
-            );
-            return score;
-        }));
+            
+        });
+        let scores = scores.into_iter().map(|x| ANOMALY_SCORE.powf(
+            -x.into_inner() / (2.0 * average_path_length_max_samples * data.len() as f64),
+        )).collect::<Vec<_>>();
+        // scores.par_extend(data.par_iter().map(|sample| {
+        //     let mut average_depth = 0.0;
+        //     let trees: &Vec<T> = self.get_trees();
+        //     for tree in trees.iter() {
+        //         let sample = tree.transform(&[sample.clone()]);
+        //         average_depth += Self::path_length(tree, &sample[0]);
+        //     }
+        //     let score = ANOMALY_SCORE.powf(
+        //         -average_depth / (2.0 * average_path_length_max_samples * trees.len() as f64),
+        //     );
+        //     return score;
+        // }));
         scores
     }
     fn path_length(tree: &T, x: &Sample) -> f64 {

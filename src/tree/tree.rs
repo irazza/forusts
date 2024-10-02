@@ -35,7 +35,8 @@ impl SplitParameters for StandardSplit {
 pub trait Tree: Sync + Send {
     type Config;
     type SplitParameters: SplitParameters;
-    fn new(init: Self::Config) -> Self;
+    fn new(init: Self::Config, random_state: &mut RandomGenerator) -> Self;
+    fn transform(&self, data: &[Sample]) -> Vec<Sample>;
     fn get_max_depth(&self) -> usize;
     fn get_min_samples_split(&self) -> usize;
     fn get_min_samples_leaf(&self) -> usize;
@@ -50,7 +51,7 @@ pub trait Tree: Sync + Send {
         random_state: &mut RandomGenerator,
     ) -> Option<(Self::SplitParameters, f64)>;
     fn fit(&mut self, data: &[Sample], random_state: &mut RandomGenerator) {
-        let mut data = data.to_vec();
+        let mut data = self.transform(data);
         let nodes = self.build_tree(&mut data, random_state);
         self.set_nodes(nodes);
     }
@@ -87,7 +88,6 @@ pub trait Tree: Sync + Send {
                 }
             };
 
-            // If all samples are equals, then the node is a leaf
             if is_leaf {
                 nodes.push(get_leaf());
                 add_children(&mut nodes);

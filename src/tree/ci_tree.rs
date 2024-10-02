@@ -1,52 +1,78 @@
+use std::sync::Arc;
+
 use super::{node::Node, tree::StandardSplit};
 use crate::{
-    forest::{forest::OutlierTree, isolation_forest::IsolationForestConfig},
+    forest::{ci_forest::CIForestConfig, forest::OutlierTree},
     tree::tree::Tree,
     utils::structures::Sample,
     RandomGenerator,
 };
+use catch22::{compute, N_CATCH22};
 use rand::{seq::SliceRandom, Rng};
+const MIN_INTERVAL_PERC: f64 = 0.1;
 
 #[derive(Clone, Debug)]
-pub struct IsolationTreeConfig {
+pub struct CITreeConfig {
     pub max_depth: usize,
     pub min_samples_split: usize,
     pub min_samples_leaf: usize,
+    pub n_intervals: usize,
+    pub n_attributes: usize,
 }
 
 #[derive(Clone, Debug)]
-pub struct IsolationTree {
+pub struct CITree {
     nodes: Vec<Node<StandardSplit>>,
-    config: IsolationTreeConfig,
+    config: CITreeConfig,
+    pub intervals: Vec<(f64, f64)>,
+    pub attributes: Vec<usize>,
 }
 
-impl OutlierTree for IsolationTree {
-    type TreeConfig = IsolationForestConfig;
+impl OutlierTree for CITree {
+    type TreeConfig = CIForestConfig;
     fn from_outlier_config(
         config: &Self::TreeConfig,
         max_samples: usize,
         random_state: &mut RandomGenerator,
     ) -> Self {
         Self::new(
-            IsolationTreeConfig {
+            CITreeConfig {
                 max_depth: (max_samples as f64).max(2.0).log2().ceil() as usize + 1,
-                min_samples_split: config.min_samples_split,
-                min_samples_leaf: config.min_samples_leaf,
+                min_samples_split: config.outlier_config.min_samples_split,
+                min_samples_leaf: config.outlier_config.min_samples_leaf,
+                n_intervals: config.n_intervals,
+                n_attributes: config.n_attributes,
             },
             random_state,
         )
     }
 }
 
-impl Tree for IsolationTree {
-    type Config = IsolationTreeConfig;
+impl Tree for CITree {
+    type Config = CITreeConfig;
     type SplitParameters = StandardSplit;
-    fn new(config: Self::Config, _random_state: &mut RandomGenerator) -> Self {
+    fn new(config: Self::Config, mut random_state: &mut RandomGenerator) -> Self {
         Self {
             nodes: Vec::new(),
-            config,
+            config: config.clone(),
+            intervals: {
+                let mut intervals = Vec::with_capacity(config.n_intervals);
+                for _ in 0..config.n_intervals {
+                    let start = random_state.gen_range(0.0..=1.0 - MIN_INTERVAL_PERC);
+                    let end = start + MIN_INTERVAL_PERC;
+                    intervals.push((start, end));
+                }
+                intervals
+            },
+            attributes: {
+                let mut attributes = (0..N_CATCH22).collect::<Vec<usize>>();
+                attributes.shuffle(&mut random_state);
+                attributes.truncate(config.n_attributes);
+                attributes
+            },
         }
     }
+
     fn get_split(
         &self,
         samples: &[Sample],
@@ -114,6 +140,21 @@ impl Tree for IsolationTree {
     }
 
     fn transform(&self, data: &[Sample]) -> Vec<Sample> {
-        data.to_vec()
+        let mut transformed = Vec::with_capacity(data.len());
+        for sample in data {
+            for (start, end) in &self.intervals {
+                let start = (start * sample.features.len() as f64) as usize;
+                let end = (end * sample.features.len() as f64) as usize;
+                let mut features = Vec::with_capacity(self.attributes.len());
+                for attribute in &self.attributes {
+                    features.push(compute(&sample.features[start..end], *attribute));
+                }
+                transformed.push(Sample {
+                    features: Arc::new(features),
+                    target: sample.target,
+                });
+            }
+        }
+        transformed
     }
 }

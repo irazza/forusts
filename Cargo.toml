@@ -20,6 +20,8 @@ dtw_rs = "0.9.5"
 dashmap = "5.5.3"
 lazy_static = "1.4.0"
 rand_distr = "0.4.3"
+catch22 = { git = "https://github.com/albertoazzari/catch22_rs.git", version = "0.1.0" }
+atomic_float = "1.1.0"
 
 [profile.dev]
 debug = 1

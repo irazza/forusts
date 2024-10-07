@@ -306,6 +306,7 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
                         .collect::<Vec<Sample>>();
                     let mut tree =
                         T::from_outlier_config(&tree_config, max_samples, &mut random_state);
+                    let samples = tree.transform(&samples);
                     tree.fit(&samples, &mut random_state);
                     tree
                 }),
@@ -323,29 +324,16 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
     fn score_samples(&self, data: &[Sample]) -> Vec<f64> {
         let average_path_length_max_samples = T::average_path_length(self.get_max_samples());
         let trees: &Vec<T> = self.get_trees();
-        let mut scores = (0..data.len()).map(|_| AtomicF64::new(0.0)).collect::<Vec<_>>();
+        let scores = (0..data.len()).map(|_| AtomicF64::new(0.0)).collect::<Vec<_>>();
         trees.par_iter().for_each(|tree| {
-            let data = tree.transform(data);
-            for (i, sample) in data.iter().enumerate() {
+            let samples = tree.transform(data);
+            for (i, sample) in samples.iter().enumerate() {
                 scores[i].fetch_add(Self::path_length(tree, sample), std::sync::atomic::Ordering::Relaxed);
             }
-            
         });
         let scores = scores.into_iter().map(|x| ANOMALY_SCORE.powf(
-            -x.into_inner() / (2.0 * average_path_length_max_samples * data.len() as f64),
+            -x.into_inner() / (average_path_length_max_samples * data.len() as f64),
         )).collect::<Vec<_>>();
-        // scores.par_extend(data.par_iter().map(|sample| {
-        //     let mut average_depth = 0.0;
-        //     let trees: &Vec<T> = self.get_trees();
-        //     for tree in trees.iter() {
-        //         let sample = tree.transform(&[sample.clone()]);
-        //         average_depth += Self::path_length(tree, &sample[0]);
-        //     }
-        //     let score = ANOMALY_SCORE.powf(
-        //         -average_depth / (2.0 * average_path_length_max_samples * trees.len() as f64),
-        //     );
-        //     return score;
-        // }));
         scores
     }
     fn path_length(tree: &T, x: &Sample) -> f64 {

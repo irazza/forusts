@@ -29,7 +29,7 @@ impl SplitParameters for StandardSplit {
     }
     fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample) -> f64 {
         let leaf = tree.predict_leaf(x);
-        return leaf.get_depth() as f64 + T::average_path_length(leaf.get_n_samples()) - 1.0;
+        return leaf.get_depth() as f64 + T::average_path_length(leaf.get_n_samples());
     }
 }
 pub trait Tree: Sync + Send {
@@ -51,7 +51,7 @@ pub trait Tree: Sync + Send {
         random_state: &mut RandomGenerator,
     ) -> Option<(Self::SplitParameters, f64)>;
     fn fit(&mut self, data: &[Sample], random_state: &mut RandomGenerator) {
-        let mut data = self.transform(data);
+        let mut data = data.to_vec();
         let nodes = self.build_tree(&mut data, random_state);
         self.set_nodes(nodes);
     }
@@ -135,7 +135,6 @@ pub trait Tree: Sync + Send {
         }
         nodes
     }
-
     fn predict(&self, x: &[Sample]) -> Vec<isize> {
         x.iter()
             .map(|sample| self.predict_leaf(sample).get_class(&sample.features))

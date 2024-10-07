@@ -59,7 +59,7 @@ impl Tree for CITree {
                 let mut intervals = Vec::with_capacity(config.n_intervals);
                 for _ in 0..config.n_intervals {
                     let start = random_state.gen_range(0.0..=1.0 - MIN_INTERVAL_PERC);
-                    let end = start + MIN_INTERVAL_PERC;
+                    let end = random_state.gen_range(start + MIN_INTERVAL_PERC..=1.0);
                     intervals.push((start, end));
                 }
                 intervals
@@ -142,18 +142,18 @@ impl Tree for CITree {
     fn transform(&self, data: &[Sample]) -> Vec<Sample> {
         let mut transformed = Vec::with_capacity(data.len());
         for sample in data {
+            let mut features = Vec::with_capacity(self.intervals.len()*self.attributes.len());
             for (start, end) in &self.intervals {
-                let start = (start * sample.features.len() as f64) as usize;
-                let end = (end * sample.features.len() as f64) as usize;
-                let mut features = Vec::with_capacity(self.attributes.len());
+                let start = (start * sample.features.len() as f64).round() as usize;
+                let end = (end * sample.features.len() as f64).round() as usize;
                 for attribute in &self.attributes {
                     features.push(compute(&sample.features[start..end], *attribute));
                 }
-                transformed.push(Sample {
-                    features: Arc::new(features),
-                    target: sample.target,
-                });
             }
+            transformed.push(Sample {
+                features: Arc::new(features),
+                target: sample.target,
+            });
         }
         transformed
     }

@@ -1,10 +1,8 @@
 use crate::forest::forest::{Forest, OutlierForest};
-use crate::forest::isolation_forest::IsolationForest;
 use crate::metrics::classification::roc_auc_score;
 use crate::utils::csv_io::read_csv;
 use forest::ci_forest::{CIForest, CIForestConfig};
 use forest::forest::OutlierForestConfig;
-use forest::isolation_forest::IsolationForestConfig;
 use rand::SeedableRng;
 use std::error::Error;
 use std::fs::{self};
@@ -14,6 +12,7 @@ mod metrics;
 mod neighbors;
 mod tree;
 mod utils;
+mod tests;
 
 type RandomGenerator = rand_chacha::ChaCha8Rng;
 
@@ -23,21 +22,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         n_intervals: 3,
         n_attributes: 8,
         outlier_config: OutlierForestConfig{
-            n_trees: 100,
+            n_trees: 500,
             max_depth: None,
             min_samples_split: 2,
             min_samples_leaf: 1,
             max_samples: 1.0,
             max_features: |x| x,
-            criterion: |a, b| 1.0,
+            criterion: |_a, _b| 1.0,
         },
     };
-    let n_repetitions = 1;
-    let paths = fs::read_dir("/media/DATA/albertoazzari/ADMEP/")?;
+    let n_repetitions = 10;
+    let paths = fs::read_dir("/media/DATA/albertoazzari/admep_old/")?;
 
     let mut datasets = Vec::new();
     for entry in paths {
-        // Unwrap the entry or handle the error, if any.
         let entry = entry?;
         if entry.file_type()?.is_dir() {
             datasets.push(entry);
@@ -48,11 +46,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     wtr.flush()?;
     datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
     let mut predictions = vec![0.0; datasets.len()];
-    for i in 0..n_repetitions {
-        // println!("Repetition {}", i + 1);
+    for _i in 0..n_repetitions {
         for (j, path) in datasets.iter().enumerate() {
-            let mut ds_train = read_csv(path.path().join(format!("{}_0.csv", path.file_name().to_string_lossy())), b',', false)?;
-            let ds_test = ds_train.clone(); // read_csv(path.path(), b',', false)?;
+            let mut ds_train = read_csv(path.path().join(format!("{}_TRAIN.tsv", path.file_name().to_string_lossy())), b'\t', false)?;
+            let ds_test = read_csv(path.path().join(format!("{}_TEST.tsv", path.file_name().to_string_lossy())), b'\t', false)?;
             let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
 
             let mut model = CIForest::new(&config);
@@ -62,14 +59,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             );
             let prediction = model.score_samples(&ds_test);
             predictions[j] += roc_auc_score(&prediction, &y_true);
-            // println!("ROC AUC: {:.4}", predictions[j]);
+            println!("{}: {:.2}", path.file_name().to_string_lossy(), roc_auc_score(&prediction, &y_true));
         }
     }
     let predictions = predictions
         .iter()
         .map(|x| x / n_repetitions as f64)
         .collect::<Vec<_>>();
-    println!("Results: {:?}", predictions);
+    println!("Mean ROC-AUC: {:.2}", predictions.iter().sum::<f64>() / predictions.len() as f64);
     for (path, mean) in datasets.iter().zip(predictions.iter()) {
         wtr.write_record(&[
             path.file_name().to_string_lossy().to_string(),

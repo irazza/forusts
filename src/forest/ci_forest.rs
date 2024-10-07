@@ -18,8 +18,6 @@ pub struct CIForest {
     trees: Vec<CITree>,
     config: CIForestConfig,
     max_samples: usize,
-    n_intervals: usize,
-    n_attributes: usize,
 }
 
 impl Forest<CITree> for CIForest {
@@ -30,8 +28,6 @@ impl Forest<CITree> for CIForest {
             trees: Vec::new(),
             config: config.clone(),
             max_samples: 0,
-            n_intervals: config.n_intervals,
-            n_attributes: config.n_attributes,
         }
     }
     fn fit(&mut self, samples: &mut [Sample], random_state: Option<RandomGenerator>) {

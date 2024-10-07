@@ -99,7 +99,7 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 [[package]]
 name = "catch22"
 version = "0.1.0"
-source = "git+https://github.com/albertoazzari/catch22_rs.git#c77b456f04fb490b0a3ad9f94b7a12b18617bf29"
+source = "git+https://github.com/albertoazzari/catch22_rs.git#4db7cc7af112938cbfd8c1e18fc0cef4274b7d57"
 dependencies = [
  "bindgen 0.70.1",
  "cc",

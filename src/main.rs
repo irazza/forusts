@@ -4,12 +4,12 @@ use crate::utils::csv_io::read_csv;
 use forest::ci_forest::{CIForest, CIForestConfig};
 use forest::forest::OutlierForestConfig;
 use rand::SeedableRng;
-use utils::structures::IntervalType;
 use std::error::Error;
 use std::fs::{self};
+use utils::structures::IntervalType;
 
-mod forest;
 mod cluster;
+mod forest;
 mod metrics;
 mod neighbors;
 mod tests;

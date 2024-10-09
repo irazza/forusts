@@ -273,6 +273,7 @@ dependencies = [
  "dtw_rs",
  "find_peaks",
  "hashbrown",
+ "kodama",
  "lazy_static",
  "parking_lot",
  "rand",
@@ -356,6 +357,12 @@ name = "itoa"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49f1f14873335454500d59611f1cf4a4b0f786f9ac11f4312a78e4cf2566695b"
+
+[[package]]
+name = "kodama"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f868feceed4703c842925c14232667c5f29c8059d0354154b2d06ec3bf9daf82"
 
 [[package]]
 name = "lazy_static"

@@ -1,4 +1,3 @@
-
 use super::{ci_forest::CIForestConfig, forest::OutlierForestConfig};
 use crate::{
     forest::forest::{Forest, OutlierForest},

@@ -21,7 +21,7 @@ pub enum IntervalType {
     LOG2,
     LOG10,
     LN,
-    SQRT
+    SQRT,
 }
 impl IntervalType {
     pub fn get_interval(&self, n: usize) -> usize {

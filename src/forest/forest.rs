@@ -394,8 +394,12 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
                         .iter()
                         .map(|idx| data[*idx].clone())
                         .collect::<Vec<Sample>>();
-                    let mut tree =
-                        T::from_outlier_config(&tree_config, max_samples, samples[0].features.len(), &mut random_state);
+                    let mut tree = T::from_outlier_config(
+                        &tree_config,
+                        max_samples,
+                        samples[0].features.len(),
+                        &mut random_state,
+                    );
                     let samples = tree.transform(&samples);
                     tree.fit(&samples, &mut random_state);
                     tree

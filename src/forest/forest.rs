@@ -1,16 +1,19 @@
 #![allow(dead_code)]
 use crate::{
-    tree::tree::{SplitParameters, Tree},
+    tree::{
+        node::Node,
+        tree::{SplitParameters, Tree},
+    },
     utils::structures::Sample,
     RandomGenerator,
 };
+use atomic_float::AtomicF64;
 use hashbrown::HashMap;
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rayon::prelude::*;
-use std::cmp::min;
-use atomic_float::AtomicF64;
+use std::{cmp::max, sync::atomic::AtomicUsize};
 
-const SUBSAMPLE_SIZE: usize = 256;
+pub const SUBSAMPLE_SIZE: usize = 256;
 const ANOMALY_SCORE: f64 = 2.0;
 pub const EGAMMA: f64 = 0.577215664901532860606512090082402431_f64;
 
@@ -38,6 +41,117 @@ pub trait Forest<T: Tree>: Sync + Send {
             indeces.extend(population.iter().take(n_samples).copied());
         }
         indeces
+    }
+    fn pairwise_breiman(&self, ds_test: &[Sample], ds_train: &[Sample]) -> Vec<Vec<f64>> {
+        let distance_matrix: Vec<Vec<_>> = (0..ds_test.len())
+            .map(|_| (0..ds_train.len()).map(|_| AtomicUsize::new(0)).collect())
+            .collect();
+        let trees: &Vec<T> = self.get_trees();
+        trees.par_iter().for_each(|tree| {
+            let ds_train = tree.transform(ds_train);
+            let ds_test = tree.transform(ds_test);
+            let ds_test_leaves = ds_test
+                .iter()
+                .map(|x| tree.predict_leaf(x))
+                .collect::<Vec<_>>();
+            let ds_train_leaves = ds_train
+                .iter()
+                .map(|x| tree.predict_leaf(x))
+                .collect::<Vec<_>>();
+
+            for (i, &ds_test_node) in ds_test_leaves.iter().enumerate() {
+                for (j, &ds_train_node) in ds_train_leaves.iter().enumerate() {
+                    distance_matrix[i][j].fetch_add(
+                        ((ds_test_node as *const Node<_>) != (ds_train_node as *const Node<_>))
+                            as usize,
+                        std::sync::atomic::Ordering::Relaxed,
+                    );
+                }
+            }
+        });
+        distance_matrix
+            .into_iter()
+            .map(|d| {
+                d.into_iter()
+                    .map(|d| d.into_inner() as f64 / trees.len() as f64)
+                    .collect()
+            })
+            .collect()
+    }
+    fn pairwise_zhu(&self, ds_test: &[Sample], ds_train: &[Sample]) -> Vec<Vec<f64>> {
+        let distance_matrix: Vec<Vec<_>> = (0..ds_test.len())
+            .map(|_| (0..ds_train.len()).map(|_| AtomicF64::new(0.0)).collect())
+            .collect();
+        let trees: &Vec<T> = self.get_trees();
+        trees.par_iter().for_each(|tree| {
+            let ds_test_nodes = ds_test
+                .iter()
+                .map(|x| tree.predict_leaf(x))
+                .collect::<Vec<_>>();
+            let ds_train_nodes = ds_train
+                .iter()
+                .map(|x| tree.predict_leaf(x))
+                .collect::<Vec<_>>();
+
+            for (i, &ds_test_node) in ds_test_nodes.iter().enumerate() {
+                let distances = tree.compute_ancestor(ds_test_node);
+
+                for (j, &ds_train_node) in ds_train_nodes.iter().enumerate() {
+                    let value = distances[&(ds_train_node as *const Node<_>)].get_depth() as f64
+                        / max(ds_test_node.get_depth(), ds_train_node.get_depth()) as f64;
+                    distance_matrix[i][j].fetch_add(value, std::sync::atomic::Ordering::Relaxed);
+                }
+            }
+        });
+
+        distance_matrix
+            .into_iter()
+            .map(|d| {
+                d.into_iter()
+                    .map(|d| 1.0 - (d.into_inner() as f64 / trees.len() as f64))
+                    .collect()
+            })
+            .collect()
+    }
+
+    fn pairwise_ratiorf(&self, ds_test: &[Sample], ds_train: &[Sample]) -> Vec<Vec<f64>> {
+        let distance_matrix: Vec<Vec<_>> = (0..ds_test.len())
+            .map(|_| (0..ds_train.len()).map(|_| AtomicF64::new(0.0)).collect())
+            .collect();
+
+        let trees: &Vec<T> = self.get_trees();
+        trees.par_iter().for_each(|tree| {
+            let mut union = Vec::new();
+            for (i, sample_test) in ds_test.iter().enumerate() {
+                let ds_test_splits = tree.get_splits(sample_test);
+                for (j, sample_train) in ds_train.iter().enumerate() {
+                    union.clear();
+                    union.extend(ds_test_splits.iter().copied());
+                    union.extend(tree.get_splits(sample_train).into_iter());
+                    union.sort_unstable();
+                    union.dedup();
+                    let agree = union
+                        .iter()
+                        .filter(|s| s.split(sample_test) == s.split(sample_train))
+                        .count() as f64;
+                    let value = 1.0
+                        - if union.len() == 0 {
+                            1.0
+                        } else {
+                            agree / union.len() as f64
+                        };
+                    distance_matrix[i][j].fetch_add(value, std::sync::atomic::Ordering::Relaxed);
+                }
+            }
+        });
+        distance_matrix
+            .into_iter()
+            .map(|d| {
+                d.into_iter()
+                    .map(|d| d.into_inner() as f64 / trees.len() as f64)
+                    .collect()
+            })
+            .collect()
     }
 }
 
@@ -112,40 +226,6 @@ pub trait Forest<T: Tree>: Sync + Send {
 //         }
 
 //         final_predictions
-//     }
-//     fn pairwise_breiman(&self, ds_test: &[Sample], ds_train: &[Sample]) -> Vec<Vec<f64>> {
-//         let distance_matrix: Vec<Vec<_>> = (0..ds_test.len())
-//             .map(|_| (0..ds_train.len()).map(|_| AtomicUsize::new(0)).collect())
-//             .collect();
-//         let trees: &Vec<T> = self.get_trees();
-//         trees.par_iter().for_each(|tree| {
-//             let ds_test_leaves = ds_test
-//                 .iter()
-//                 .map(|x| tree.predict_leaf(x))
-//                 .collect::<Vec<_>>();
-//             let ds_train_leaves = ds_train
-//                 .iter()
-//                 .map(|x| tree.predict_leaf(x))
-//                 .collect::<Vec<_>>();
-
-//             for (i, &ds_test_node) in ds_test_leaves.iter().enumerate() {
-//                 for (j, &ds_train_node) in ds_train_leaves.iter().enumerate() {
-//                     distance_matrix[i][j].fetch_add(
-//                         ((ds_test_node as *const Node<_>) != (ds_train_node as *const Node<_>))
-//                             as usize,
-//                         Ordering::Relaxed,
-//                     );
-//                 }
-//             }
-//         });
-//         distance_matrix
-//             .into_iter()
-//             .map(|d| {
-//                 d.into_iter()
-//                     .map(|d| d.into_inner() as f64 / self.get_forest_config().0.n_trees as f64)
-//                     .collect()
-//             })
-//             .collect()
 //     }
 //     fn pairwise_ancestor(&self, ds_test: &[Sample], ds_train: &[Sample]) -> Vec<Vec<f64>> {
 //         let distance_matrix: Vec<Vec<_>> = (0..ds_test.len())
@@ -277,6 +357,7 @@ pub trait OutlierTree: Tree {
     fn from_outlier_config(
         config: &Self::TreeConfig,
         max_samples: usize,
+        n_features: usize,
         random_state: &mut RandomGenerator,
     ) -> Self;
 }
@@ -284,9 +365,14 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
     fn get_forest_config(&self) -> (&OutlierForestConfig, &T::TreeConfig);
     fn set_max_samples(&mut self, max_samples: usize);
     fn get_max_samples(&self) -> usize;
-    fn fit_(&mut self, data: &[Sample], mut random_state: &mut RandomGenerator) {
+    fn fit_(
+        &mut self,
+        data: &[Sample],
+        max_samples: usize,
+        with_replacement: bool,
+        mut random_state: &mut RandomGenerator,
+    ) {
         let mut trees = Vec::new();
-        let max_samples = min(SUBSAMPLE_SIZE, data.len());
         self.set_max_samples(max_samples);
         let (config, tree_config) = self.get_forest_config();
         let random_generators = (0..config.n_trees).map(|_| {
@@ -298,14 +384,18 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
                 .zip(random_generators)
                 .par_bridge()
                 .map(|(_i, mut random_state)| {
-                    let indeces =
-                        Self::generate_indeces(max_samples, data.len(), false, &mut random_state);
+                    let indeces = Self::generate_indeces(
+                        max_samples,
+                        data.len(),
+                        with_replacement,
+                        &mut random_state,
+                    );
                     let samples = indeces
                         .iter()
                         .map(|idx| data[*idx].clone())
                         .collect::<Vec<Sample>>();
                     let mut tree =
-                        T::from_outlier_config(&tree_config, max_samples, &mut random_state);
+                        T::from_outlier_config(&tree_config, max_samples, samples[0].features.len(), &mut random_state);
                     let samples = tree.transform(&samples);
                     tree.fit(&samples, &mut random_state);
                     tree
@@ -324,16 +414,25 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
     fn score_samples(&self, data: &[Sample]) -> Vec<f64> {
         let average_path_length_max_samples = T::average_path_length(self.get_max_samples());
         let trees: &Vec<T> = self.get_trees();
-        let scores = (0..data.len()).map(|_| AtomicF64::new(0.0)).collect::<Vec<_>>();
+        let scores = (0..data.len())
+            .map(|_| AtomicF64::new(0.0))
+            .collect::<Vec<_>>();
         trees.par_iter().for_each(|tree| {
             let samples = tree.transform(data);
             for (i, sample) in samples.iter().enumerate() {
-                scores[i].fetch_add(Self::path_length(tree, sample), std::sync::atomic::Ordering::Relaxed);
+                scores[i].fetch_add(
+                    Self::path_length(tree, sample),
+                    std::sync::atomic::Ordering::Relaxed,
+                );
             }
         });
-        let scores = scores.into_iter().map(|x| ANOMALY_SCORE.powf(
-            -x.into_inner() / (average_path_length_max_samples * data.len() as f64),
-        )).collect::<Vec<_>>();
+        let scores = scores
+            .into_iter()
+            .map(|x| {
+                ANOMALY_SCORE
+                    .powf(-x.into_inner() / (average_path_length_max_samples * data.len() as f64))
+            })
+            .collect::<Vec<_>>();
         scores
     }
     fn path_length(tree: &T, x: &Sample) -> f64 {

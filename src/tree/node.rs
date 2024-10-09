@@ -1,7 +1,4 @@
-use std::{
-    fmt::Debug,
-    sync::{atomic::AtomicUsize, Arc},
-};
+use std::{fmt::Debug, sync::Arc};
 
 use super::tree::SplitParameters;
 

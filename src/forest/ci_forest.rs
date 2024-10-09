@@ -1,15 +1,17 @@
-use super::forest::OutlierForestConfig;
+use std::cmp::min;
+
+use super::forest::{OutlierForestConfig, SUBSAMPLE_SIZE};
 use crate::{
     forest::forest::{Forest, OutlierForest},
     tree::ci_tree::CITree,
-    utils::structures::Sample,
+    utils::structures::{IntervalType, Sample},
     RandomGenerator,
 };
 use rand::{thread_rng, SeedableRng};
 
 #[derive(Clone)]
 pub struct CIForestConfig {
-    pub n_intervals: usize,
+    pub n_intervals: IntervalType,
     pub n_attributes: usize,
     pub outlier_config: OutlierForestConfig,
 }
@@ -33,7 +35,8 @@ impl Forest<CITree> for CIForest {
     fn fit(&mut self, samples: &mut [Sample], random_state: Option<RandomGenerator>) {
         let mut random_state =
             random_state.unwrap_or_else(|| RandomGenerator::from_rng(thread_rng()).unwrap());
-        self.fit_(&samples, &mut random_state)
+        let max_samples = min(SUBSAMPLE_SIZE, samples.len());
+        self.fit_(&samples, max_samples, false, &mut random_state)
     }
     fn predict(&self, data: &[Sample]) -> Vec<isize> {
         self.predict_(data)

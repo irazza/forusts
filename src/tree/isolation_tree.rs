@@ -25,6 +25,7 @@ impl OutlierTree for IsolationTree {
     fn from_outlier_config(
         config: &Self::TreeConfig,
         max_samples: usize,
+        _n_features: usize,
         random_state: &mut RandomGenerator,
     ) -> Self {
         Self::new(

@@ -4,24 +4,26 @@ use crate::utils::csv_io::read_csv;
 use forest::ci_forest::{CIForest, CIForestConfig};
 use forest::forest::OutlierForestConfig;
 use rand::SeedableRng;
+use utils::structures::IntervalType;
 use std::error::Error;
 use std::fs::{self};
 
 mod forest;
+mod cluster;
 mod metrics;
 mod neighbors;
+mod tests;
 mod tree;
 mod utils;
-mod tests;
 
 type RandomGenerator = rand_chacha::ChaCha8Rng;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Settings for the experiments
     let config = CIForestConfig {
-        n_intervals: 3,
+        n_intervals: IntervalType::LOG10,
         n_attributes: 8,
-        outlier_config: OutlierForestConfig{
+        outlier_config: OutlierForestConfig {
             n_trees: 500,
             max_depth: None,
             min_samples_split: 2,
@@ -48,8 +50,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut predictions = vec![0.0; datasets.len()];
     for _i in 0..n_repetitions {
         for (j, path) in datasets.iter().enumerate() {
-            let mut ds_train = read_csv(path.path().join(format!("{}_TRAIN.tsv", path.file_name().to_string_lossy())), b'\t', false)?;
-            let ds_test = read_csv(path.path().join(format!("{}_TEST.tsv", path.file_name().to_string_lossy())), b'\t', false)?;
+            let mut ds_train = read_csv(
+                path.path()
+                    .join(format!("{}_TRAIN.tsv", path.file_name().to_string_lossy())),
+                b'\t',
+                false,
+            )?;
+            let ds_test = read_csv(
+                path.path()
+                    .join(format!("{}_TEST.tsv", path.file_name().to_string_lossy())),
+                b'\t',
+                false,
+            )?;
             let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
 
             let mut model = CIForest::new(&config);
@@ -59,14 +71,21 @@ fn main() -> Result<(), Box<dyn Error>> {
             );
             let prediction = model.score_samples(&ds_test);
             predictions[j] += roc_auc_score(&prediction, &y_true);
-            println!("{}: {:.2}", path.file_name().to_string_lossy(), roc_auc_score(&prediction, &y_true));
+            println!(
+                "{}: {:.2}",
+                path.file_name().to_string_lossy(),
+                roc_auc_score(&prediction, &y_true)
+            );
         }
     }
     let predictions = predictions
         .iter()
         .map(|x| x / n_repetitions as f64)
         .collect::<Vec<_>>();
-    println!("Mean ROC-AUC: {:.2}", predictions.iter().sum::<f64>() / predictions.len() as f64);
+    println!(
+        "Mean ROC-AUC: {:.2}",
+        predictions.iter().sum::<f64>() / predictions.len() as f64
+    );
     for (path, mean) in datasets.iter().zip(predictions.iter()) {
         wtr.write_record(&[
             path.file_name().to_string_lossy().to_string(),

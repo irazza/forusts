@@ -1,0 +1,216 @@
+#[cfg(test)]
+mod tests {
+
+    use std::fs;
+
+    use rand::SeedableRng;
+
+    use crate::{
+        forest::{
+            ci_forest::{CIForest, CIForestConfig}, erci_forest::ERCIForest, forest::{Forest, OutlierForest, OutlierForestConfig}, isolation_forest::{IsolationForest, IsolationForestConfig}
+        }, metrics::classification::{accuracy_score, roc_auc_score}, neighbors::nearest_neighbor::k_nearest_neighbor, utils::{csv_io::read_csv, structures::IntervalType}
+    };
+
+    #[test]
+    fn test_if() {
+        let config = IsolationForestConfig {
+            n_trees: 100,
+            max_depth: None,
+            min_samples_split: 2,
+            min_samples_leaf: 1,
+            max_samples: 1.0,
+            max_features: |x| x,
+            criterion: |_a, _b| 1.0,
+        };
+        let n_repetitions = 10;
+        let paths = fs::read_dir("/media/DATA/albertoazzari/IFDatasets").unwrap();
+
+        let mut datasets = Vec::new();
+        for entry in paths {
+            let entry = entry.unwrap();
+            if entry.file_type().unwrap().is_file() {
+                datasets.push(entry);
+            }
+        }
+        datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
+        let mut predictions = vec![0.0; datasets.len()];
+        for i in 0..n_repetitions {
+            for (j, path) in datasets.iter().enumerate() {
+                let mut ds_train = read_csv(path.path(), b',', false).unwrap();
+                let ds_test = ds_train.clone(); // read_csv(path.path(), b',', false).unwrap();
+                let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
+
+                let mut model = IsolationForest::new(&config);
+                model.fit(
+                    &mut ds_train,
+                    Some(rand_chacha::ChaCha8Rng::seed_from_u64(i as u64)),
+                );
+                assert_eq!(ds_test, ds_test);
+                let prediction = model.score_samples(&ds_test);
+                predictions[j] += roc_auc_score(&prediction, &y_true);
+            }
+        }
+
+        for (i, path) in datasets.iter().enumerate() {
+            println!(
+                "{}: {:.2?}",
+                path.file_name().to_string_lossy(),
+                predictions[i] / n_repetitions as f64
+            );
+        }
+    }
+
+    #[test]
+    fn test_cif() {
+        // Settings for the experiments
+        let config = CIForestConfig {
+            n_intervals: IntervalType::LOG10,
+            n_attributes: 4,
+            outlier_config: OutlierForestConfig {
+                n_trees: 100,
+                max_depth: None,
+                min_samples_split: 2,
+                min_samples_leaf: 1,
+                max_samples: 1.0,
+                max_features: |x| x,
+                criterion: |_a, _b| 1.0,
+            },
+        };
+        let n_repetitions = 1;
+        let paths = fs::read_dir("/media/DATA/admep/").unwrap();
+
+        let mut datasets = Vec::new();
+        for entry in paths {
+            let entry = entry.unwrap();
+            if entry.file_type().unwrap().is_dir() {
+                datasets.push(entry);
+            }
+        }
+        datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
+        let mut predictions = vec![0.0; datasets.len()];
+        for i in 0..n_repetitions {
+            for (j, path) in datasets.iter().enumerate() {
+                let mut ds_train = read_csv(
+                    path.path()
+                        .join(format!("{}_TRAIN.tsv", path.file_name().to_string_lossy())),
+                    b'\t',
+                    false,
+                )
+                .unwrap();
+                let ds_test = read_csv(
+                    path.path()
+                        .join(format!("{}_TEST.tsv", path.file_name().to_string_lossy())),
+                    b'\t',
+                    false,
+                )
+                .unwrap();
+                let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
+
+                let mut model = CIForest::new(&config);
+                model.fit(
+                    &mut ds_train,
+                    Some(rand_chacha::ChaCha8Rng::seed_from_u64((i*j) as u64)),
+                );
+                let prediction = model.score_samples(&ds_test);
+                predictions[j] += roc_auc_score(&prediction, &y_true);
+                // println!(
+                //     "{}: {:.2}",
+                //     path.file_name().to_string_lossy(),
+                //     roc_auc_score(&prediction, &y_true)
+                // );
+            }
+        }
+        let predictions = predictions
+            .iter()
+            .map(|x| x / n_repetitions as f64)
+            .collect::<Vec<_>>();
+        for (i, path) in datasets.iter().enumerate() {
+            println!(
+                "{}: {:.2}",
+                path.file_name().to_string_lossy(),
+                predictions[i]
+            );
+        }
+        println!(
+            "Mean ROC-AUC: {:.2}",
+            predictions.iter().sum::<f64>() / predictions.len() as f64
+        );
+    }
+
+    #[test]
+    fn test_dmkd() {
+        // Settings for the experiments
+        let config = CIForestConfig {
+            n_intervals: IntervalType::LOG2,
+            n_attributes: 8,
+            outlier_config: OutlierForestConfig {
+                n_trees: 500,
+                max_depth: None,
+                min_samples_split: 2,
+                min_samples_leaf: 1,
+                max_samples: 1.0,
+                max_features: |x| x,
+                criterion: |_a, _b| 1.0,
+            },
+        };
+        let n_repetitions = 10;
+        let paths = fs::read_dir("/media/DATA/UCRArchive_2018/").unwrap();
+
+        let mut datasets = Vec::new();
+        for entry in paths {
+            let entry = entry.unwrap();
+            if entry.file_type().unwrap().is_dir() {
+                datasets.push(entry);
+            }
+        }
+        datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
+        let datasets = datasets.iter().take(5).collect::<Vec<_>>();
+        let datasets = datasets[1..2].to_vec();
+        let mut predictions = vec![0.0; datasets.len()];
+        for i in 0..n_repetitions {
+            for (j, path) in datasets.iter().enumerate() {
+                let mut ds_train = read_csv(
+                    path.path()
+                        .join(format!("{}_TRAIN.tsv", path.file_name().to_string_lossy())),
+                    b'\t',
+                    false,
+                )
+                .unwrap();
+                let y_train = ds_train.iter().map(|s| s.target).collect::<Vec<_>>();
+                let ds_test = read_csv(
+                    path.path()
+                        .join(format!("{}_TEST.tsv", path.file_name().to_string_lossy())),
+                    b'\t',
+                    false,
+                )
+                .unwrap();
+                let y_test = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
+
+                let mut model = ERCIForest::new(&config);
+                model.fit(
+                    &mut ds_train,
+                    Some(rand_chacha::ChaCha8Rng::seed_from_u64((i*j) as u64)),
+                );
+                let distance_matrix = model.pairwise_breiman(&ds_test, &ds_train);
+                let prediction = k_nearest_neighbor(1, &y_train, &distance_matrix);
+                predictions[j] += accuracy_score(&prediction, &y_test);
+                // println!(
+                //     "{}: {:.2}",
+                //     path.file_name().to_string_lossy(),
+                //     roc_auc_score(&prediction, &y_true)
+                // );
+            }
+        }
+        let predictions = predictions
+            .iter()
+            .map(|x| x / n_repetitions as f64)
+            .collect::<Vec<_>>();
+        for (i, path) in datasets.iter().enumerate() {
+            println!(
+                "{}: {:.2}",
+                path.file_name().to_string_lossy(),
+                predictions[i]
+            );
+        }
+    }
+}

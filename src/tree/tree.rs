@@ -185,26 +185,20 @@ pub trait Tree: Sync + Send {
     //         }
     //     }
     // }
-    // fn get_splits(&self, x: &Sample) -> Vec<&Self::SplitParameters> {
-    //     let mut path = Vec::new();
-    //     let mut node = self.get_root();
-    //     while let Node::Internal {
-    //         split_params,
-    //         left,
-    //         right,
-    //         depth: _,
-    //         impurity: _,
-    //     } = node
-    //     {
-    //         path.push(split_params);
-    //         if split_params.split(x, false) {
-    //             node = left;
-    //         } else {
-    //             node = right;
-    //         }
-    //     }
-    //     path
-    // }
+    fn get_splits(&self, x: &Sample) -> Vec<&Self::SplitParameters> {
+        let mut path = Vec::new();
+        let mut node = self.get_root();
+        while let Node::Internal {
+            split_params,
+            children,
+            ..
+        } = node
+        {
+            path.push(split_params);
+            node = self.get_node_at(children[split_params.split(x)]);
+        }
+        path
+    }
     fn predict_leaf(&self, x: &Sample) -> &Node<Self::SplitParameters> {
         let mut node = self.get_root();
 
@@ -308,67 +302,68 @@ pub trait Tree: Sync + Send {
 
     //     max_depth
     // }
-    // fn compute_ancestor<'a>(
-    //     &'a self,
-    //     node: &'a Node<Self::SplitParameters>,
-    // ) -> HashMap<*const Node<Self::SplitParameters>, &'a Node<Self::SplitParameters>> {
-    //     let mut ancestors = HashMap::new();
-    //     Self::compute_ancestor_rec(&self.get_root(), node, None, &mut ancestors);
-    //     ancestors.insert(node as *const Node<Self::SplitParameters>, node);
-    //     ancestors
-    // }
-    // fn compute_ancestor_rec<'a>(
-    //     current: &'a Node<Self::SplitParameters>,
-    //     target: &'a Node<Self::SplitParameters>,
-    //     found_lca: Option<&'a Node<Self::SplitParameters>>,
-    //     ancestors: &mut HashMap<
-    //         *const Node<Self::SplitParameters>,
-    //         &'a Node<Self::SplitParameters>,
-    //     >,
-    // ) -> bool {
-    //     if (current as *const Node<Self::SplitParameters>)
-    //         == (target as *const Node<Self::SplitParameters>)
-    //     {
-    //         return true;
-    //     }
+    fn compute_ancestor<'a>(
+        &'a self,
+        node: &'a Node<Self::SplitParameters>,
+    ) -> HashMap<*const Node<Self::SplitParameters>, &'a Node<Self::SplitParameters>> {
+        let mut ancestors = HashMap::new();
+        Self::compute_ancestor_rec(&self.get_root(), node, None, &mut ancestors);
+        ancestors.insert(node as *const Node<Self::SplitParameters>, node);
+        ancestors
+    }
+    fn compute_ancestor_rec<'a>(
+        current: &'a Node<Self::SplitParameters>,
+        target: &'a Node<Self::SplitParameters>,
+        found_lca: Option<&'a Node<Self::SplitParameters>>,
+        ancestors: &mut HashMap<
+            *const Node<Self::SplitParameters>,
+            &'a Node<Self::SplitParameters>,
+        >,
+    ) -> bool {
+        if (current as *const Node<Self::SplitParameters>)
+            == (target as *const Node<Self::SplitParameters>)
+        {
+            return true;
+        }
 
-    //     match current {
-    //         Node::External { .. } => {
-    //             if let Some(found_lca) = found_lca {
-    //                 ancestors.insert(current as *const Node<Self::SplitParameters>, found_lca);
-    //             }
-    //             false
-    //         }
-    //         Node::Internal { left, right, .. } => {
-    //             if let Some(found_lca) = found_lca {
-    //                 Self::compute_ancestor_rec(left.deref(), target, Some(found_lca), ancestors);
-    //                 Self::compute_ancestor_rec(right.deref(), target, Some(found_lca), ancestors);
-    //                 false
-    //             } else {
-    //                 let left_found =
-    //                     Self::compute_ancestor_rec(left.deref(), target, None, ancestors);
-    //                 if left_found {
-    //                     Self::compute_ancestor_rec(right.deref(), target, Some(current), ancestors);
-    //                     true
-    //                 } else {
-    //                     let right_found =
-    //                         Self::compute_ancestor_rec(right, target, None, ancestors);
-    //                     if right_found {
-    //                         Self::compute_ancestor_rec(
-    //                             left.deref(),
-    //                             target,
-    //                             Some(current),
-    //                             ancestors,
-    //                         );
-    //                         true
-    //                     } else {
-    //                         false
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
+        match current {
+            Node::External { .. } => {
+                if let Some(found_lca) = found_lca {
+                    ancestors.insert(current as *const Node<Self::SplitParameters>, found_lca);
+                }
+                false
+            }
+            Node::Internal { children, .. } => {
+                todo!("Implement this");
+                // if let Some(found_lca) = found_lca {
+                //     Self::compute_ancestor_rec(left.deref(), target, Some(found_lca), ancestors);
+                //     Self::compute_ancestor_rec(right.deref(), target, Some(found_lca), ancestors);
+                //     false
+                // } else {
+                //     let left_found =
+                //         Self::compute_ancestor_rec(left.deref(), target, None, ancestors);
+                //     if left_found {
+                //         Self::compute_ancestor_rec(right.deref(), target, Some(current), ancestors);
+                //         true
+                //     } else {
+                //         let right_found =
+                //             Self::compute_ancestor_rec(right, target, None, ancestors);
+                //         if right_found {
+                //             Self::compute_ancestor_rec(
+                //                 left.deref(),
+                //                 target,
+                //                 Some(current),
+                //                 ancestors,
+                //             );
+                //             true
+                //         } else {
+                //             false
+                //         }
+                //     }
+                // }
+            }
+        }
+    }
     // fn entropy_impurity(class_counts: &HashMap<isize, usize>) -> f64 {
     //     let mut impurity = 0.0;
     //     let total_samples = class_counts.values().sum::<usize>() as f64;

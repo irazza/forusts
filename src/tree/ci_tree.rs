@@ -1,8 +1,11 @@
-use std::sync::Arc;
+use std::{sync::Arc, usize};
 
 use super::{node::Node, tree::StandardSplit};
 use crate::{
-    forest::{ci_forest::CIForestConfig, forest::OutlierTree},
+    forest::{
+        ci_forest::CIForestConfig,
+        forest::OutlierTree,
+    },
     tree::tree::Tree,
     utils::structures::Sample,
     RandomGenerator,
@@ -24,8 +27,9 @@ pub struct CITreeConfig {
 pub struct CITree {
     nodes: Vec<Node<StandardSplit>>,
     config: CITreeConfig,
-    pub intervals: Vec<(f64, f64)>,
-    pub attributes: Vec<usize>,
+    intervals: Vec<(f64, f64)>,
+    attributes: Vec<usize>,
+    // cache: Arc<DashMap<(Sample, usize, usize, usize), f64>>,
 }
 
 impl OutlierTree for CITree {
@@ -33,6 +37,7 @@ impl OutlierTree for CITree {
     fn from_outlier_config(
         config: &Self::TreeConfig,
         max_samples: usize,
+        n_features: usize,
         random_state: &mut RandomGenerator,
     ) -> Self {
         Self::new(
@@ -40,7 +45,7 @@ impl OutlierTree for CITree {
                 max_depth: (max_samples as f64).max(2.0).log2().ceil() as usize + 1,
                 min_samples_split: config.outlier_config.min_samples_split,
                 min_samples_leaf: config.outlier_config.min_samples_leaf,
-                n_intervals: config.n_intervals,
+                n_intervals: config.n_intervals.get_interval(n_features),
                 n_attributes: config.n_attributes,
             },
             random_state,
@@ -56,7 +61,8 @@ impl Tree for CITree {
             nodes: Vec::new(),
             config: config.clone(),
             intervals: {
-                let mut intervals = Vec::with_capacity(config.n_intervals);
+                let mut intervals = Vec::with_capacity(config.n_intervals + 1);
+                intervals.push((0.0, 1.0));
                 for _ in 0..config.n_intervals {
                     let start = random_state.gen_range(0.0..=1.0 - MIN_INTERVAL_PERC);
                     let end = random_state.gen_range(start + MIN_INTERVAL_PERC..=1.0);
@@ -142,12 +148,24 @@ impl Tree for CITree {
     fn transform(&self, data: &[Sample]) -> Vec<Sample> {
         let mut transformed = Vec::with_capacity(data.len());
         for sample in data {
-            let mut features = Vec::with_capacity(self.intervals.len()*self.attributes.len());
+            let mut features = Vec::with_capacity(self.intervals.len() * self.attributes.len());
             for (start, end) in &self.intervals {
                 let start = (start * sample.features.len() as f64).round() as usize;
                 let end = (end * sample.features.len() as f64).round() as usize;
                 for attribute in &self.attributes {
-                    features.push(compute(&sample.features[start..end], *attribute));
+                    let value = compute(&sample.features[start..end], *attribute);
+                    features.push(value);
+                    // if CIFOREST_CACHE.contains_key(&(sample.clone(), start, end, *attribute)) {
+                    //     features.push(
+                    //         *CIFOREST_CACHE
+                    //             .get(&(sample.clone(), start, end, *attribute))
+                    //             .unwrap(),
+                    //     );
+                    // } else {
+                    //     let value = compute(&sample.features[start..end], *attribute);
+                    //     CIFOREST_CACHE.insert((sample.clone(), start, end, *attribute), value);
+                    //     features.push(value);
+                    // }
                 }
             }
             transformed.push(Sample {

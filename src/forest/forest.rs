@@ -50,6 +50,7 @@ pub trait Forest<T: Tree>: Sync + Send {
         trees.par_iter().for_each(|tree| {
             let ds_train = tree.transform(ds_train);
             let ds_test = tree.transform(ds_test);
+
             let ds_test_leaves = ds_test
                 .iter()
                 .map(|x| tree.predict_leaf(x))
@@ -78,6 +79,7 @@ pub trait Forest<T: Tree>: Sync + Send {
             })
             .collect()
     }
+
     fn pairwise_zhu(&self, ds_test: &[Sample], ds_train: &[Sample]) -> Vec<Vec<f64>> {
         let distance_matrix: Vec<Vec<_>> = (0..ds_test.len())
             .map(|_| (0..ds_train.len()).map(|_| AtomicF64::new(0.0)).collect())

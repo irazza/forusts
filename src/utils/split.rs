@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use super::structures::Sample;
 use rand::{seq::SliceRandom, SeedableRng};
 use std::{

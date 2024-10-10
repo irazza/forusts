@@ -154,7 +154,7 @@ mod tests {
             n_attributes: 8,
             outlier_config: OutlierForestConfig {
                 n_trees: 200,
-                max_depth: None,
+                max_depth: Some(usize::MAX),
                 min_samples_split: 2,
                 min_samples_leaf: 1,
                 max_samples: 1.0,
@@ -178,6 +178,7 @@ mod tests {
         let mut predictions = vec![0.0; datasets.len()];
         for i in 0..n_repetitions {
             for (j, path) in datasets.iter().enumerate() {
+                println!("{:?} ", path.file_name().to_string_lossy());
                 let ds_train = read_csv(
                     path.path()
                         .join(format!("{}_TRAIN.tsv", path.file_name().to_string_lossy())),
@@ -206,7 +207,9 @@ mod tests {
                     &mut ds,
                     Some(rand_chacha::ChaCha8Rng::seed_from_u64((i * j) as u64)),
                 );
+
                 let distance_matrix = model.pairwise_breiman(&ds, &ds);
+
                 let prediction = agglomerative_clustering(
                     classes.len(),
                     kodama::Method::Average,

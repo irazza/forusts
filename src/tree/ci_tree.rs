@@ -39,7 +39,10 @@ impl OutlierTree for CITree {
     ) -> Self {
         Self::new(
             CITreeConfig {
-                max_depth: (max_samples as f64).max(2.0).log2().ceil() as usize + 1,
+                max_depth: config
+                    .outlier_config
+                    .max_depth
+                    .unwrap_or((max_samples as f64).max(2.0).log2().ceil() as usize + 1),
                 min_samples_split: config.outlier_config.min_samples_split,
                 min_samples_leaf: config.outlier_config.min_samples_leaf,
                 n_intervals: config.n_intervals.get_interval(n_features),
@@ -58,8 +61,7 @@ impl Tree for CITree {
             nodes: Vec::new(),
             config: config.clone(),
             intervals: {
-                let mut intervals = Vec::with_capacity(config.n_intervals + 1);
-                intervals.push((0.0, 1.0));
+                let mut intervals = Vec::with_capacity(config.n_intervals);
                 for _ in 0..config.n_intervals {
                     let start = random_state.gen_range(0.0..=1.0 - MIN_INTERVAL_PERC);
                     let end = random_state.gen_range(start + MIN_INTERVAL_PERC..=1.0);

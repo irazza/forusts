@@ -307,11 +307,12 @@ pub trait Tree: Sync + Send {
         node: &'a Node<Self::SplitParameters>,
     ) -> HashMap<*const Node<Self::SplitParameters>, &'a Node<Self::SplitParameters>> {
         let mut ancestors = HashMap::new();
-        Self::compute_ancestor_rec(&self.get_root(), node, None, &mut ancestors);
+        self.compute_ancestor_rec(&self.get_root(), node, None, &mut ancestors);
         ancestors.insert(node as *const Node<Self::SplitParameters>, node);
         ancestors
     }
     fn compute_ancestor_rec<'a>(
+        &'a self,
         current: &'a Node<Self::SplitParameters>,
         target: &'a Node<Self::SplitParameters>,
         found_lca: Option<&'a Node<Self::SplitParameters>>,
@@ -334,33 +335,38 @@ pub trait Tree: Sync + Send {
                 false
             }
             Node::Internal { children, .. } => {
-                todo!("Implement this");
-                // if let Some(found_lca) = found_lca {
-                //     Self::compute_ancestor_rec(left.deref(), target, Some(found_lca), ancestors);
-                //     Self::compute_ancestor_rec(right.deref(), target, Some(found_lca), ancestors);
-                //     false
-                // } else {
-                //     let left_found =
-                //         Self::compute_ancestor_rec(left.deref(), target, None, ancestors);
-                //     if left_found {
-                //         Self::compute_ancestor_rec(right.deref(), target, Some(current), ancestors);
-                //         true
-                //     } else {
-                //         let right_found =
-                //             Self::compute_ancestor_rec(right, target, None, ancestors);
-                //         if right_found {
-                //             Self::compute_ancestor_rec(
-                //                 left.deref(),
-                //                 target,
-                //                 Some(current),
-                //                 ancestors,
-                //             );
-                //             true
-                //         } else {
-                //             false
-                //         }
-                //     }
-                // }
+                if let Some(found_lca) = found_lca {
+                    for child in children {
+                        let child_node = self.get_node_at(*child);
+                        self.compute_ancestor_rec(child_node, target, Some(found_lca), ancestors);
+                    }
+                    false
+                } else {
+                    let mut lca_child = None;
+                    for child in children {
+                        let child_node = self.get_node_at(*child);
+                        let found = self.compute_ancestor_rec(child_node, target, None, ancestors);
+                        if found {
+                            lca_child = Some(*child);
+                            break;
+                        }
+                    }
+                    if let Some(lca_child) = lca_child {
+                        for child in children {
+                            if *child != lca_child {
+                                self.compute_ancestor_rec(
+                                    self.get_node_at(*child),
+                                    target,
+                                    Some(current),
+                                    ancestors,
+                                );
+                            }
+                        }
+                        true
+                    } else {
+                        false
+                    }
+                }
             }
         }
     }

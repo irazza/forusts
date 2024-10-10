@@ -1,21 +1,31 @@
-from sklearn.ensemble import IsolationForest
-from sklearn.metrics import roc_auc_score
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.metrics import roc_auc_score, adjusted_rand_score
 import numpy as np
 import pathlib
 
 if __name__ == "__main__":
-    datasets = sorted([x for x in pathlib.Path("/media/DATA/albertoazzari/ADMEP/").iterdir()])
-    # first figit is int all the others 3000 are doubles
-    fmt = "%d" + ",%f" * 3000
-    for d in datasets:
-        data0 = np.loadtxt(d/(d.name+"_0.csv"), delimiter=",")
-        X0, y0 = data0[:, 1:], data0[:, 0].reshape(-1, 1)
-        data0 = np.hstack([y0, X0])
-        np.savetxt(d/(d.name+"_0.csv"), data0, delimiter=",", fmt=fmt)
-        data1 = np.loadtxt(d/(d.name+"_1.csv"), delimiter=",")
-        X1, y1 = data1[:, 1:], data1[:, 0].reshape(-1, 1)
-        data1 = np.hstack([y1, X1])
-        np.savetxt(d/(d.name+"_1.csv"), data1, delimiter=",", fmt=fmt)
+    true = np.loadtxt("true.csv", delimiter=",")
+    n_classes = len(np.unique(true))
+    dist_matrix = np.loadtxt("dist.csv", delimiter=",")
+    model = AgglomerativeClustering(n_clusters=n_classes, metric="precomputed", linkage="average")
+    model.fit(dist_matrix)
+    prediction = model.labels_
+
+    # prediction = np.loadtxt("prediction.csv", delimiter=",")
+
+    print(adjusted_rand_score(true, prediction))
+    # datasets = sorted([x for x in pathlib.Path("/media/DATA/albertoazzari/ADMEP/").iterdir()])
+    # # first figit is int all the others 3000 are doubles
+    # fmt = "%d" + ",%f" * 3000
+    # for d in datasets:
+    #     data0 = np.loadtxt(d/(d.name+"_0.csv"), delimiter=",")
+    #     X0, y0 = data0[:, 1:], data0[:, 0].reshape(-1, 1)
+    #     data0 = np.hstack([y0, X0])
+    #     np.savetxt(d/(d.name+"_0.csv"), data0, delimiter=",", fmt=fmt)
+    #     data1 = np.loadtxt(d/(d.name+"_1.csv"), delimiter=",")
+    #     X1, y1 = data1[:, 1:], data1[:, 0].reshape(-1, 1)
+    #     data1 = np.hstack([y1, X1])
+    #     np.savetxt(d/(d.name+"_1.csv"), data1, delimiter=",", fmt=fmt)
     # datasets = sorted([x for x in pathlib.Path("/media/DATA/albertoazzari/IFDatasets/").glob("*.csv")])
     # for p in datasets:
     #     avg_score = 0

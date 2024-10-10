@@ -86,6 +86,9 @@ pub trait Forest<T: Tree>: Sync + Send {
             .collect();
         let trees: &Vec<T> = self.get_trees();
         trees.par_iter().for_each(|tree| {
+            let ds_train = tree.transform(ds_train);
+            let ds_test = tree.transform(ds_test);
+
             let ds_test_nodes = ds_test
                 .iter()
                 .map(|x| tree.predict_leaf(x))
@@ -123,6 +126,9 @@ pub trait Forest<T: Tree>: Sync + Send {
 
         let trees: &Vec<T> = self.get_trees();
         trees.par_iter().for_each(|tree| {
+            let ds_train = tree.transform(ds_train);
+            let ds_test = tree.transform(ds_test);
+
             let mut union = Vec::new();
             for (i, sample_test) in ds_test.iter().enumerate() {
                 let ds_test_splits = tree.get_splits(sample_test);

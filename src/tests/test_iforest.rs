@@ -122,23 +122,20 @@ mod tests {
         }
         datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
         let mut predictions = vec![0.0; datasets.len()];
-        for i in 0..n_repetitions {
-            for (j, path) in datasets.iter().enumerate() {
-                let mut ds_train = read_csv(path.path(), b',', false).unwrap();
-                let ds_test = ds_train.clone(); // read_csv(path.path(), b',', false).unwrap();
-                let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
 
+        for (i, path) in datasets.iter().enumerate() {
+            let mut ds_train = read_csv(path.path(), b',', false).unwrap();
+            let ds_test = ds_train.clone(); // read_csv(path.path(), b',', false).unwrap();
+            let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
+            for j in 0..n_repetitions {
                 let mut model = IsolationForest::new(&config);
                 model.fit(
                     &mut ds_train,
-                    Some(rand_chacha::ChaCha8Rng::seed_from_u64(i as u64)),
+                    Some(rand_chacha::ChaCha8Rng::seed_from_u64(((i+2) * (j+2)) as u64)),
                 );
                 let prediction = model.score_samples(&ds_test);
-                predictions[j] += roc_auc_score(&prediction, &y_true);
+                predictions[i] += roc_auc_score(&prediction, &y_true);
             }
-        }
-
-        for (i, path) in datasets.iter().enumerate() {
             println!(
                 "{}: {:.2?}",
                 path.file_name().to_string_lossy(),

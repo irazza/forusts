@@ -1,6 +1,7 @@
 use super::{node::Node, tree::StandardSplit};
 use crate::{
-    forest::isolation_forest::IsolationForestConfig, tree::tree::Tree, utils::structures::Sample, RandomGenerator
+    forest::isolation_forest::IsolationForestConfig, tree::tree::Tree, utils::structures::Sample,
+    RandomGenerator,
 };
 use rand::{seq::SliceRandom, Rng};
 

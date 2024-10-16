@@ -184,7 +184,6 @@ pub struct ClassificationForestConfig {
     pub max_depth: Option<usize>,
     pub max_features: fn(usize) -> usize,
     pub criterion: fn(&HashMap<isize, usize>, Vec<&HashMap<isize, usize>>) -> f64,
-    pub bootstrap: bool,
 }
 
 // pub trait ClassificationForest<T: Tree>: Forest<T> {

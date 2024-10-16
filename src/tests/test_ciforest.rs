@@ -10,13 +10,11 @@ mod tests {
             ci_forest::{CIForest, CIForestConfig},
             erci_forest::ERCIForest,
             forest::{Forest, OutlierForest, OutlierForestConfig},
-            isolation_forest::{IsolationForest, IsolationForestConfig},
         },
         metrics::{
-            classification::{accuracy_score, roc_auc_score},
+            classification::roc_auc_score,
             clustering::adjusted_rand_score,
         },
-        neighbors::nearest_neighbor::k_nearest_neighbor,
         utils::{csv_io::read_csv, structures::IntervalType},
     };
 
@@ -49,31 +47,31 @@ mod tests {
         }
         datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
         let mut predictions = vec![0.0; datasets.len()];
-        for i in 0..n_repetitions {
-            for (j, path) in datasets.iter().enumerate() {
-                let mut ds_train = read_csv(
-                    path.path()
-                        .join(format!("{}_TRAIN.tsv", path.file_name().to_string_lossy())),
-                    b'\t',
-                    false,
-                )
-                .unwrap();
-                let ds_test = read_csv(
-                    path.path()
-                        .join(format!("{}_TEST.tsv", path.file_name().to_string_lossy())),
-                    b'\t',
-                    false,
-                )
-                .unwrap();
-                let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
 
+        for (i, path) in datasets.iter().enumerate() {
+            let mut ds_train = read_csv(
+                path.path()
+                    .join(format!("{}_TRAIN.tsv", path.file_name().to_string_lossy())),
+                b'\t',
+                false,
+            )
+            .unwrap();
+            let ds_test = read_csv(
+                path.path()
+                    .join(format!("{}_TEST.tsv", path.file_name().to_string_lossy())),
+                b'\t',
+                false,
+            )
+            .unwrap();
+            let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
+            for j in 0..n_repetitions {
                 let mut model = CIForest::new(&config);
                 model.fit(
                     &mut ds_train,
                     Some(rand_chacha::ChaCha8Rng::seed_from_u64((i * j) as u64)),
                 );
                 let prediction = model.score_samples(&ds_test);
-                predictions[j] += roc_auc_score(&prediction, &y_true);
+                predictions[i] += roc_auc_score(&prediction, &y_true);
             }
         }
         let predictions = predictions
@@ -122,32 +120,31 @@ mod tests {
         }
         datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
         let mut predictions = vec![0.0; datasets.len()];
-        for i in 0..n_repetitions {
-            for (j, path) in datasets.iter().enumerate() {
-                println!("{:?} ", path.file_name().to_string_lossy());
-                let ds_train = read_csv(
-                    path.path()
-                        .join(format!("{}_TRAIN.tsv", path.file_name().to_string_lossy())),
-                    b'\t',
-                    false,
-                )
-                .unwrap();
-                let ds_test = read_csv(
-                    path.path()
-                        .join(format!("{}_TEST.tsv", path.file_name().to_string_lossy())),
-                    b'\t',
-                    false,
-                )
-                .unwrap();
 
-                let mut ds = ds_train.clone();
-                ds.extend(ds_test.clone());
-                let y_true = ds.iter().map(|s| s.target).collect::<Vec<_>>();
+        for (i, path) in datasets.iter().enumerate() {
+            let ds_train = read_csv(
+                path.path()
+                    .join(format!("{}_TRAIN.tsv", path.file_name().to_string_lossy())),
+                b'\t',
+                false,
+            )
+            .unwrap();
+            let ds_test = read_csv(
+                path.path()
+                    .join(format!("{}_TEST.tsv", path.file_name().to_string_lossy())),
+                b'\t',
+                false,
+            )
+            .unwrap();
 
-                let mut classes = y_true.clone();
-                classes.sort();
-                classes.dedup();
+            let mut ds = ds_train.clone();
+            ds.extend(ds_test.clone());
+            let y_true = ds.iter().map(|s| s.target).collect::<Vec<_>>();
 
+            let mut classes = y_true.clone();
+            classes.sort();
+            classes.dedup();
+            for j in 0..n_repetitions {
                 let mut model = ERCIForest::new(&config);
                 model.fit(
                     &mut ds,
@@ -163,8 +160,13 @@ mod tests {
                     distance_matrix,
                 );
 
-                predictions[j] += adjusted_rand_score(&prediction, &y_true);
+                predictions[i] += adjusted_rand_score(&prediction, &y_true);
             }
+            println!(
+                "{}: {:.2}",
+                path.file_name().to_string_lossy(),
+                predictions[i] / n_repetitions as f64
+            );
         }
     }
 }

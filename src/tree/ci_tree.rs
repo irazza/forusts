@@ -2,10 +2,7 @@ use std::{sync::Arc, usize};
 
 use super::{node::Node, tree::StandardSplit};
 use crate::{
-    forest::{
-        ci_forest::CIForestConfig,
-        forest::CACHE,
-    },
+    forest::{ci_forest::CIForestConfig, forest::CACHE},
     tree::tree::Tree,
     utils::structures::Sample,
     RandomGenerator,

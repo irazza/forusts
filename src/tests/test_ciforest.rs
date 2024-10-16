@@ -21,55 +21,6 @@ mod tests {
     };
 
     #[test]
-    fn test_if() {
-        let config = IsolationForestConfig {
-            n_trees: 100,
-            max_depth: None,
-            min_samples_split: 2,
-            min_samples_leaf: 1,
-            max_samples: 1.0,
-            max_features: |x| x,
-            criterion: |_a, _b| 1.0,
-        };
-        let n_repetitions = 10;
-        let paths = fs::read_dir("/media/DATA/albertoazzari/IFDatasets").unwrap();
-
-        let mut datasets = Vec::new();
-        for entry in paths {
-            let entry = entry.unwrap();
-            if entry.file_type().unwrap().is_file() {
-                datasets.push(entry);
-            }
-        }
-        datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
-        let mut predictions = vec![0.0; datasets.len()];
-        for i in 0..n_repetitions {
-            for (j, path) in datasets.iter().enumerate() {
-                let mut ds_train = read_csv(path.path(), b',', false).unwrap();
-                let ds_test = ds_train.clone(); // read_csv(path.path(), b',', false).unwrap();
-                let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
-
-                let mut model = IsolationForest::new(&config);
-                model.fit(
-                    &mut ds_train,
-                    Some(rand_chacha::ChaCha8Rng::seed_from_u64(i as u64)),
-                );
-                assert_eq!(ds_test, ds_test);
-                let prediction = model.score_samples(&ds_test);
-                predictions[j] += roc_auc_score(&prediction, &y_true);
-            }
-        }
-
-        for (i, path) in datasets.iter().enumerate() {
-            println!(
-                "{}: {:.2?}",
-                path.file_name().to_string_lossy(),
-                predictions[i] / n_repetitions as f64
-            );
-        }
-    }
-
-    #[test]
     fn test_cif() {
         // Settings for the experiments
         let config = CIForestConfig {
@@ -83,6 +34,7 @@ mod tests {
                 max_samples: 1.0,
                 max_features: |x| x,
                 criterion: |_a, _b| 1.0,
+                aggregation: None,
             },
         };
         let n_repetitions = 1;
@@ -122,11 +74,6 @@ mod tests {
                 );
                 let prediction = model.score_samples(&ds_test);
                 predictions[j] += roc_auc_score(&prediction, &y_true);
-                // println!(
-                //     "{}: {:.2}",
-                //     path.file_name().to_string_lossy(),
-                //     roc_auc_score(&prediction, &y_true)
-                // );
             }
         }
         let predictions = predictions
@@ -160,6 +107,7 @@ mod tests {
                 max_samples: 1.0,
                 max_features: |x| x,
                 criterion: |_a, _b| 1.0,
+                aggregation: None,
             },
         };
         let n_repetitions = 10;
@@ -173,8 +121,6 @@ mod tests {
             }
         }
         datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
-        let datasets = datasets.iter().take(5).collect::<Vec<_>>();
-        let datasets = datasets[1..2].to_vec();
         let mut predictions = vec![0.0; datasets.len()];
         for i in 0..n_repetitions {
             for (j, path) in datasets.iter().enumerate() {
@@ -205,9 +151,10 @@ mod tests {
                 let mut model = ERCIForest::new(&config);
                 model.fit(
                     &mut ds,
-                    Some(rand_chacha::ChaCha8Rng::seed_from_u64((i * j) as u64)),
+                    Some(rand_chacha::ChaCha8Rng::seed_from_u64(
+                        ((i + 2) * (j + 2)) as u64,
+                    )),
                 );
-
                 let distance_matrix = model.pairwise_breiman(&ds, &ds);
 
                 let prediction = agglomerative_clustering(
@@ -217,24 +164,7 @@ mod tests {
                 );
 
                 predictions[j] += adjusted_rand_score(&prediction, &y_true);
-                panic!("{:?}", adjusted_rand_score(&prediction, &y_true));
-                // println!(
-                //     "{}: {:.2}",
-                //     path.file_name().to_string_lossy(),
-                //     roc_auc_score(&prediction, &y_true)
-                // );
             }
-        }
-        let predictions = predictions
-            .iter()
-            .map(|x| x / n_repetitions as f64)
-            .collect::<Vec<_>>();
-        for (i, path) in datasets.iter().enumerate() {
-            println!(
-                "{}: {:.2}",
-                path.file_name().to_string_lossy(),
-                predictions[i]
-            );
         }
     }
 }

@@ -1,48 +1,33 @@
 use super::{node::Node, tree::StandardSplit};
 use crate::{
-    forest::isolation_forest::IsolationForestConfig, tree::tree::Tree, utils::structures::Sample, RandomGenerator
+    forest::{forest::ClassificationTree, random_forest::RandomForestConfig},
+    tree::tree::Tree,
+    utils::structures::Sample,
+    RandomGenerator,
 };
 use rand::{seq::SliceRandom, Rng};
 
 #[derive(Clone, Debug)]
-pub struct IsolationTreeConfig {
+pub struct DecisionTreeConfig {
     pub max_depth: usize,
     pub min_samples_split: usize,
     pub min_samples_leaf: usize,
 }
 
 #[derive(Clone, Debug)]
-pub struct IsolationTree {
+pub struct DecisionTree {
     nodes: Vec<Node<StandardSplit>>,
-    config: IsolationTreeConfig,
+    config: DecisionTreeConfig,
 }
-
-impl Tree for IsolationTree {
-    type Config = IsolationTreeConfig;
-    type ForestConfig = IsolationForestConfig;
+impl Tree for DecisionTree {
+    type Config = DecisionTreeConfig;
+    type ForestConfig = RandomForestConfig;
     type SplitParameters = StandardSplit;
     fn new(config: Self::Config, _random_state: &mut RandomGenerator) -> Self {
         Self {
             nodes: Vec::new(),
             config,
         }
-    }
-    fn from_config(
-        config: &Self::ForestConfig,
-        max_samples: usize,
-        _n_features: usize,
-        random_state: &mut RandomGenerator,
-    ) -> Self {
-        Self::new(
-            IsolationTreeConfig {
-                max_depth: config
-                    .max_depth
-                    .unwrap_or((max_samples as f64).max(2.0).log2().ceil() as usize + 1),
-                min_samples_split: config.min_samples_split,
-                min_samples_leaf: config.min_samples_leaf,
-            },
-            random_state,
-        )
     }
     fn get_split(
         &self,
@@ -85,6 +70,24 @@ impl Tree for IsolationTree {
             }
         }
         return None;
+    }
+    
+    fn from_config(
+        config: &Self::ForestConfig,
+        max_samples: usize,
+        n_features: usize,
+        random_state: &mut RandomGenerator,
+    ) -> Self {
+        Self::new(
+            DecisionTreeConfig {
+                max_depth: config
+                    .max_depth
+                    .unwrap_or(usize::MAX),
+                min_samples_split: config.min_samples_split,
+                min_samples_leaf: config.min_samples_leaf,
+            },
+            random_state,
+        )
     }
 
     fn get_max_depth(&self) -> usize {

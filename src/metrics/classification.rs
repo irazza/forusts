@@ -125,6 +125,37 @@ pub fn matthews_corrcoef(y_pred: &[isize], y_true: &[isize]) -> f64 {
     }
 }
 
+pub fn precision_at_k(y_pred: &[f64], y_true: &[isize], k: usize) -> f64 {
+    let n_samples = y_pred.len();
+    assert!(
+        k <= n_samples && k > 0,
+        "k must be a positive integer less than the number of samples"
+    );
+    assert_eq!(
+        n_samples,
+        y_true.len(),
+        "Input vectors must have the same length"
+    );
+
+    // Sort the predictions in descending order
+    let mut indices: Vec<usize> = (0..n_samples).collect();
+    indices.sort_unstable_by(|a, b| y_pred[*b].partial_cmp(&y_pred[*a]).unwrap());
+
+    // Initialize variables to store the number of true positives and the precision at k
+    let mut n_true_positives = 0;
+
+    // Iterate through the top k predictions
+    for i in 0..k {
+        if y_true[indices[i]] == 1 {
+            // Increment the number of true positives when the prediction is correct
+            n_true_positives += 1;
+        }
+    }
+
+    // Calculate the precision at k
+    n_true_positives as f64 / k as f64
+}
+
 pub fn roc_auc_score(y_pred: &[f64], y_true: &[isize]) -> f64 {
     // Calculate ROC curve
     let (fprs, tprs, _) = roc_curve(y_pred, y_true);

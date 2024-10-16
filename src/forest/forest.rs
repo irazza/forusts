@@ -4,14 +4,24 @@ use crate::{
         node::Node,
         tree::{SplitParameters, Tree},
     },
-    utils::structures::Sample,
+    utils::{
+        aggregation::{Aggregation, Combiner},
+        statistics::transpose,
+        structures::Sample,
+    },
     RandomGenerator,
 };
 use atomic_float::AtomicF64;
+use dashmap::DashMap;
 use hashbrown::HashMap;
+use lazy_static::lazy_static;
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rayon::prelude::*;
 use std::{cmp::max, sync::atomic::AtomicUsize};
+
+lazy_static! {
+    pub static ref CACHE: DashMap<(Sample, usize, usize, usize), f64> = DashMap::new();
+}
 
 pub const SUBSAMPLE_SIZE: usize = 256;
 const ANOMALY_SCORE: f64 = 2.0;
@@ -80,6 +90,8 @@ pub trait Forest<T: Tree>: Sync + Send {
             .collect()
     }
 
+    // https://openaccess.thecvf.com/content_cvpr_2014/papers/Zhu_Constructing_Robust_Affinity_2014_CVPR_paper.pdf
+    // VARIANT II
     fn pairwise_zhu(&self, ds_test: &[Sample], ds_train: &[Sample]) -> Vec<Vec<f64>> {
         let distance_matrix: Vec<Vec<_>> = (0..ds_test.len())
             .map(|_| (0..ds_train.len()).map(|_| AtomicF64::new(0.0)).collect())
@@ -113,12 +125,13 @@ pub trait Forest<T: Tree>: Sync + Send {
             .into_iter()
             .map(|d| {
                 d.into_iter()
-                    .map(|d| 1.0 - (d.into_inner() as f64 / trees.len() as f64))
+                    .map(|d| (1.0 - (d.into_inner() as f64 / trees.len() as f64)).sqrt())
                     .collect()
             })
             .collect()
     }
 
+    // http://profs.sci.univr.it/~bicego/papers/2021_TKDE.pdf
     fn pairwise_ratiorf(&self, ds_test: &[Sample], ds_train: &[Sample]) -> Vec<Vec<f64>> {
         let distance_matrix: Vec<Vec<_>> = (0..ds_test.len())
             .map(|_| (0..ds_train.len()).map(|_| AtomicF64::new(0.0)).collect())
@@ -148,7 +161,8 @@ pub trait Forest<T: Tree>: Sync + Send {
                         } else {
                             agree / union.len() as f64
                         };
-                    distance_matrix[i][j].fetch_add(value, std::sync::atomic::Ordering::Relaxed);
+                    distance_matrix[i][j]
+                        .fetch_add(value.sqrt(), std::sync::atomic::Ordering::Relaxed);
                 }
             }
         });
@@ -163,44 +177,58 @@ pub trait Forest<T: Tree>: Sync + Send {
     }
 }
 
-// pub struct ClassificationForestConfig {
-//     pub n_trees: usize,
-//     pub min_samples_split: usize,
-//     pub max_depth: Option<usize>,
-//     pub max_features: fn(usize) -> usize,
-//     pub criterion: fn(&HashMap<isize, usize>, Vec<&HashMap<isize, usize>>) -> f64,
-//     pub bootstrap: bool,
-// }
+pub struct ClassificationForestConfig {
+    pub n_trees: usize,
+    pub min_samples_split: usize,
+    pub min_samples_leaf: usize,
+    pub max_depth: Option<usize>,
+    pub max_features: fn(usize) -> usize,
+    pub criterion: fn(&HashMap<isize, usize>, Vec<&HashMap<isize, usize>>) -> f64,
+    pub bootstrap: bool,
+}
 
-// pub trait ClassificationTree: Tree {
-//     type TreeConfig: Sync + Send;
-//     fn from_classification_config(config: &Self::TreeConfig) -> Self;
-// }
-
-// pub trait ClassificationForest<T: ClassificationTree>: Forest<T> {
-//     fn get_forest_config(&self) -> (&ClassificationForestConfig, &T::TreeConfig);
-//     fn fit_(&mut self, data: &mut [Sample]) {
+// pub trait ClassificationForest<T: Tree>: Forest<T> {
+//     fn get_forest_config(&self) -> (&ClassificationForestConfig, &T::Config);
+//     fn fit_(
+//         &mut self,
+//         data: &[Sample],
+//         max_samples: usize,
+//         with_replacement: bool,
+//         mut random_state: &mut RandomGenerator,
+//     ) {
 //         let mut trees = Vec::new();
+//         self.set_max_samples(max_samples);
 //         let (config, tree_config) = self.get_forest_config();
-//         trees.par_extend((0..config.n_trees).into_par_iter().map(|_i| {
-//             let mut tree = T::from_classification_config(&tree_config);
-//             if config.bootstrap {
-//                 let bootstrap_indices = (0..data.len())
-//                     .collect::<Vec<_>>()
-//                     .iter()
-//                     .map(|_| thread_rng().gen_range(0..data.len()))
-//                     .collect::<Vec<_>>();
-//                 tree.fit(
-//                     &mut bootstrap_indices
+//         let random_generators = (0..config.n_trees).map(|_| {
+//             RandomGenerator::from_rng(&mut random_state).expect("Error creating random generator")
+//         });
+//         trees.par_extend(
+//             (0..config.n_trees)
+//                 .into_iter()
+//                 .zip(random_generators)
+//                 .par_bridge()
+//                 .map(|(_i, mut random_state)| {
+//                     let indeces = Self::generate_indeces(
+//                         max_samples,
+//                         data.len(),
+//                         with_replacement,
+//                         &mut random_state,
+//                     );
+//                     let samples = indeces
 //                         .iter()
-//                         .map(|idx| data[*idx].to_ref())
-//                         .collect::<Vec<Sample>>(),
-//                 );
-//             } else {
-//                 tree.fit(&mut data.iter().map(|x| x.to_ref()).collect::<Vec<Sample>>());
-//             }
-//             tree
-//         }));
+//                         .map(|idx| data[*idx].clone())
+//                         .collect::<Vec<Sample>>();
+//                     let mut tree = T::from_config(
+//                         &tree_config,
+//                         max_samples,
+//                         samples[0].features.len(),
+//                         &mut random_state,
+//                     );
+//                     let samples = tree.transform(&samples);
+//                     tree.fit(&samples, &mut random_state);
+//                     tree
+//                 }),
+//         );
 //         *self.get_trees_mut() = trees;
 //     }
 //     fn predict_(&self, data: &[Sample]) -> Vec<isize> {
@@ -235,120 +263,7 @@ pub trait Forest<T: Tree>: Sync + Send {
 
 //         final_predictions
 //     }
-//     fn pairwise_ancestor(&self, ds_test: &[Sample], ds_train: &[Sample]) -> Vec<Vec<f64>> {
-//         let distance_matrix: Vec<Vec<_>> = (0..ds_test.len())
-//             .map(|_| (0..ds_train.len()).map(|_| Mutex::new(0.0)).collect())
-//             .collect();
-//         let trees: &Vec<T> = self.get_trees();
-//         trees.par_iter().for_each(|tree| {
-//             let ds_test_nodes = ds_test
-//                 .iter()
-//                 .map(|x| tree.predict_leaf(x))
-//                 .collect::<Vec<_>>();
-//             let ds_train_nodes = ds_train
-//                 .iter()
-//                 .map(|x| tree.predict_leaf(x))
-//                 .collect::<Vec<_>>();
-
-//             for (i, &ds_test_node) in ds_test_nodes.iter().enumerate() {
-//                 let distances = tree.compute_ancestor(ds_test_node);
-
-//                 for (j, &ds_train_node) in ds_train_nodes.iter().enumerate() {
-//                     *distance_matrix[i][j].lock() += (ds_test_node.get_depth()
-//                         + ds_train_node.get_depth()
-//                         - 2 * distances[&(ds_train_node as *const Node<_>)].get_depth())
-//                         as f64
-//                         / max(ds_test_node.get_depth(), ds_train_node.get_depth()) as f64;
-//                 }
-//             }
-//         });
-//         distance_matrix
-//             .into_iter()
-//             .map(|d| {
-//                 d.into_iter()
-//                     .map(|d| d.into_inner() as f64 / self.get_forest_config().0.n_trees as f64)
-//                     .collect::<Vec<_>>()
-//             })
-//             .collect::<Vec<Vec<_>>>()
-//     }
-//     fn pairwise_zhu(&self, ds_test: &[Sample], ds_train: &[Sample]) -> Vec<Vec<f64>> {
-//         let distance_matrix: Vec<Vec<_>> = (0..ds_test.len())
-//             .map(|_| (0..ds_train.len()).map(|_| Mutex::new(0.0)).collect())
-//             .collect();
-//         let trees: &Vec<T> = self.get_trees();
-//         trees.par_iter().for_each(|tree| {
-//             let ds_test_nodes = ds_test
-//                 .iter()
-//                 .map(|x| tree.predict_leaf(x))
-//                 .collect::<Vec<_>>();
-//             let ds_train_nodes = ds_train
-//                 .iter()
-//                 .map(|x| tree.predict_leaf(x))
-//                 .collect::<Vec<_>>();
-
-//             for (i, &ds_test_node) in ds_test_nodes.iter().enumerate() {
-//                 let distances = tree.compute_ancestor(ds_test_node);
-
-//                 for (j, &ds_train_node) in ds_train_nodes.iter().enumerate() {
-//                     *distance_matrix[i][j].lock() += distances[&(ds_train_node as *const Node<_>)]
-//                         .get_depth() as f64
-//                         / max(ds_test_node.get_depth(), ds_train_node.get_depth()) as f64;
-//                 }
-//             }
-//         });
-
-//         distance_matrix
-//             .into_iter()
-//             .map(|d| {
-//                 d.into_iter()
-//                     .map(|d| {
-//                         1.0 - (d.into_inner() as f64 / self.get_forest_config().0.n_trees as f64)
-//                     })
-//                     .collect()
-//             })
-//             .collect()
-//     }
-
-//     fn pairwise_ratiorf(&self, ds_test: &[Sample], ds_train: &[Sample]) -> Vec<Vec<f64>> {
-//         let distance_matrix: Vec<Vec<_>> = (0..ds_test.len())
-//             .map(|_| (0..ds_train.len()).map(|_| Mutex::new(0.0)).collect())
-//             .collect();
-
-//         let trees: &Vec<T> = self.get_trees();
-//         trees.par_iter().for_each(|tree| {
-//             let mut union = Vec::new();
-//             for (i, sample_test) in ds_test.iter().enumerate() {
-//                 let ds_test_splits = tree.get_splits(sample_test);
-//                 for (j, sample_train) in ds_train.iter().enumerate() {
-//                     union.clear();
-//                     union.extend(ds_test_splits.iter().copied());
-//                     union.extend(tree.get_splits(sample_train).into_iter());
-//                     union.sort_unstable();
-//                     union.dedup();
-//                     let agree = union
-//                         .iter()
-//                         .filter(|s| s.split(sample_test, false) == s.split(sample_train, false))
-//                         .count() as f64;
-//                     *distance_matrix[i][j].lock() += 1.0
-//                         - if union.len() == 0 {
-//                             1.0
-//                         } else {
-//                             agree / union.len() as f64
-//                         };
-//                 }
-//             }
-//         });
-//         distance_matrix
-//             .into_iter()
-//             .map(|d| {
-//                 d.into_iter()
-//                     .map(|d| d.into_inner() as f64 / self.get_forest_config().0.n_trees as f64)
-//                     .collect()
-//             })
-//             .collect()
-//     }
 // }
-
 #[derive(Clone)]
 pub struct OutlierForestConfig {
     pub n_trees: usize,
@@ -358,19 +273,11 @@ pub struct OutlierForestConfig {
     pub max_samples: f64,
     pub max_features: fn(usize) -> usize,
     pub criterion: fn(&HashMap<isize, usize>, Vec<&HashMap<isize, usize>>) -> f64,
+    pub aggregation: Option<Combiner>,
 }
 
-pub trait OutlierTree: Tree {
-    type TreeConfig: Sync + Send;
-    fn from_outlier_config(
-        config: &Self::TreeConfig,
-        max_samples: usize,
-        n_features: usize,
-        random_state: &mut RandomGenerator,
-    ) -> Self;
-}
-pub trait OutlierForest<T: OutlierTree>: Forest<T> {
-    fn get_forest_config(&self) -> (&OutlierForestConfig, &T::TreeConfig);
+pub trait OutlierForest<T: Tree>: Forest<T> {
+    fn get_forest_config(&self) -> (&OutlierForestConfig, &T::ForestConfig);
     fn set_max_samples(&mut self, max_samples: usize);
     fn get_max_samples(&self) -> usize;
     fn fit_(
@@ -402,7 +309,7 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
                         .iter()
                         .map(|idx| data[*idx].clone())
                         .collect::<Vec<Sample>>();
-                    let mut tree = T::from_outlier_config(
+                    let mut tree = T::from_config(
                         &tree_config,
                         max_samples,
                         samples[0].features.len(),
@@ -424,27 +331,27 @@ pub trait OutlierForest<T: OutlierTree>: Forest<T> {
         predictions
     }
     fn score_samples(&self, data: &[Sample]) -> Vec<f64> {
+        let (config, _) = self.get_forest_config();
         let average_path_length_max_samples = T::average_path_length(self.get_max_samples());
         let trees: &Vec<T> = self.get_trees();
-        let scores = (0..data.len())
-            .map(|_| AtomicF64::new(0.0))
+        let mut depths = (0..trees.len())
+            .map(|_| (0..data.len()).map(|_| 0.0).collect::<Vec<_>>())
             .collect::<Vec<_>>();
-        trees.par_iter().for_each(|tree| {
-            let samples = tree.transform(data);
-            for (i, sample) in samples.iter().enumerate() {
-                scores[i].fetch_add(
-                    Self::path_length(tree, sample),
-                    std::sync::atomic::Ordering::Relaxed,
-                );
-            }
-        });
-        let scores = scores
-            .into_iter()
-            .map(|x| {
-                ANOMALY_SCORE
-                    .powf(-x.into_inner() / (average_path_length_max_samples * data.len() as f64))
-            })
-            .collect::<Vec<_>>();
+        trees
+            .par_iter()
+            .zip(depths.par_iter_mut())
+            .for_each(|(tree, depth)| {
+                let samples = tree.transform(data);
+                for (j, sample) in samples.iter().enumerate() {
+                    depth[j] = Self::path_length(tree, sample);
+                }
+            });
+        let depths = transpose(depths);
+        let mut scores = vec![0.0; data.len()];
+        let combiner = config.aggregation.clone().unwrap_or(Combiner::PROD);
+        for (i, depth) in depths.iter().enumerate() {
+            scores[i] = combiner.combine(depth, average_path_length_max_samples);
+        }
         scores
     }
     fn path_length(tree: &T, x: &Sample) -> f64 {

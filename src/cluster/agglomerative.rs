@@ -43,7 +43,6 @@ pub fn agglomerative_clustering(
     }
     assert_eq!(n_clusters, clusters.len());
     let mut labels = vec![-1; n];
-    // let mut mapping = HashMap::new();
     for (i, cluster) in clusters.iter() {
         for &j in cluster {
             labels[j] = *i as isize;

@@ -30,18 +30,18 @@ pub enum Node<S: SplitParameters> {
     },
 }
 impl<S: SplitParameters> Node<S> {
-    pub fn get_id(&self) -> usize {
-        match self {
-            Node::External { id, .. } => *id,
-            Node::Internal { id, .. } => *id,
-        }
-    }
-    pub fn get_n_children(&self) -> usize {
-        match self {
-            Node::External { .. } => 0,
-            Node::Internal { children, .. } => children.len(),
-        }
-    }
+    // pub fn get_id(&self) -> usize {
+    //     match self {
+    //         Node::External { id, .. } => *id,
+    //         Node::Internal { id, .. } => *id,
+    //     }
+    // }
+    // pub fn get_n_children(&self) -> usize {
+    //     match self {
+    //         Node::External { .. } => 0,
+    //         Node::Internal { children, .. } => children.len(),
+    //     }
+    // }
     pub fn get_class(&self, sample: &[f64]) -> isize {
         match self {
             Node::External { class, .. } => {

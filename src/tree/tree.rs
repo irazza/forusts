@@ -34,6 +34,7 @@ impl SplitParameters for StandardSplit {
 }
 pub trait Tree: Sync + Send {
     type Config;
+    type ForestConfig: Sync + Send;
     type SplitParameters: SplitParameters;
     fn new(init: Self::Config, random_state: &mut RandomGenerator) -> Self;
     fn transform(&self, data: &[Sample]) -> Vec<Sample>;
@@ -152,6 +153,12 @@ pub trait Tree: Sync + Send {
     fn harmonic_number(n: usize) -> f64 {
         (n as f64).ln() + EGAMMA
     }
+    fn from_config(
+        config: &Self::ForestConfig,
+        max_samples: usize,
+        n_features: usize,
+        random_state: &mut RandomGenerator,
+    ) -> Self;
 
     // fn get_leaves(&self) -> Vec<&Node<Self::SplitParameters>> {
     //     let mut leaves = Vec::new();

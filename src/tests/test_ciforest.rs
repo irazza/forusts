@@ -9,12 +9,9 @@ mod tests {
         forest::{
             ci_forest::{CIForest, CIForestConfig},
             erci_forest::ERCIForest,
-            forest::{Forest, OutlierForest, OutlierForestConfig},
+            forest::{Forest, ForestConfig, OutlierForest},
         },
-        metrics::{
-            classification::roc_auc_score,
-            clustering::adjusted_rand_score,
-        },
+        metrics::{classification::roc_auc_score, clustering::adjusted_rand_score},
         utils::{csv_io::read_csv, structures::IntervalType},
     };
 
@@ -24,7 +21,7 @@ mod tests {
         let config = CIForestConfig {
             n_intervals: IntervalType::LOG10,
             n_attributes: 4,
-            outlier_config: OutlierForestConfig {
+            outlier_config: ForestConfig {
                 n_trees: 100,
                 max_depth: None,
                 min_samples_split: 2,
@@ -97,7 +94,7 @@ mod tests {
         let config = CIForestConfig {
             n_intervals: IntervalType::LOG2,
             n_attributes: 8,
-            outlier_config: OutlierForestConfig {
+            outlier_config: ForestConfig {
                 n_trees: 200,
                 max_depth: Some(usize::MAX),
                 min_samples_split: 2,

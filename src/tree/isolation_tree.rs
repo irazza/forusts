@@ -20,7 +20,7 @@ pub struct IsolationTree {
 
 impl Tree for IsolationTree {
     type Config = IsolationTreeConfig;
-    type ForestConfig = IsolationForestConfig;
+    type ForestTreeConfig = IsolationForestConfig;
     type SplitParameters = StandardSplit;
     fn new(config: Self::Config, _random_state: &mut RandomGenerator) -> Self {
         Self {
@@ -29,7 +29,7 @@ impl Tree for IsolationTree {
         }
     }
     fn from_config(
-        config: &Self::ForestConfig,
+        config: &Self::ForestTreeConfig,
         max_samples: usize,
         _n_features: usize,
         random_state: &mut RandomGenerator,
@@ -55,34 +55,30 @@ impl Tree for IsolationTree {
         non_constant_features.shuffle(random_state);
 
         while let Some(feature) = non_constant_features.pop() {
-            let min_feature = samples
+            let thresholds = samples
                 .iter()
                 .map(|f| f.features[feature])
-                .fold(f64::INFINITY, f64::min);
+                .collect::<Vec<_>>();
 
-            let max_feature = samples
-                .iter()
-                .map(|f| f.features[feature])
-                .fold(f64::NEG_INFINITY, f64::max);
+            let min_feature = *thresholds.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+
+            let max_feature = *thresholds.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
 
             if max_feature - min_feature <= f64::EPSILON {
                 // Remove constant features
                 continue;
             } else {
                 let threshold = random_state.gen_range(min_feature..max_feature);
-                let left_count = samples
-                    .iter()
-                    .filter(|s| s.features[feature] < threshold)
-                    .count();
-                let right_count = samples.len() - left_count;
-
-                if left_count < min_samples_leaf || right_count < min_samples_leaf {
+                let split = StandardSplit { feature, threshold };
+                let (min_samples_leaf_split, _) =
+                    Self::min_samples_leaf_split(samples, min_samples_leaf, &split);
+                if min_samples_leaf_split {
                     continue;
                 }
 
                 non_constant_features.push(feature);
 
-                return Some((StandardSplit { feature, threshold }, f64::NAN));
+                return Some((split, f64::NAN));
             }
         }
         return None;

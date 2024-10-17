@@ -1,15 +1,12 @@
-use std::cmp::min;
-
-use super::forest::{ClassificationForestConfig};
 use crate::{
-    forest::forest::{Forest, ClassificationForest},
+    forest::forest::{ClassificationForest, Forest, ForestConfig},
     tree::decision_tree::DecisionTree,
     utils::structures::Sample,
     RandomGenerator,
 };
 use rand::{thread_rng, SeedableRng};
 
-pub type RandomForestConfig = ClassificationForestConfig;
+pub type RandomForestConfig = ForestConfig;
 
 pub struct RandomForest {
     trees: Vec<DecisionTree>,
@@ -31,7 +28,7 @@ impl Forest<DecisionTree> for RandomForest {
         let mut random_state =
             random_state.unwrap_or_else(|| RandomGenerator::from_rng(thread_rng()).unwrap());
         let max_samples = samples.len();
-        self.fit_(&samples, max_samples, false, &mut random_state)
+        self.fit_(&samples, max_samples, true, &mut random_state)
     }
     fn predict(&self, data: &[Sample]) -> Vec<isize> {
         self.predict_(data)
@@ -42,9 +39,7 @@ impl Forest<DecisionTree> for RandomForest {
     fn get_trees_mut(&mut self) -> &mut Vec<DecisionTree> {
         &mut self.trees
     }
-}
-impl ClassificationForest<DecisionTree> for RandomForest {
-    fn get_forest_config(&self) -> (&ClassificationForestConfig, &ClassificationForestConfig) {
+    fn get_forest_config(&self) -> (&ForestConfig, &ForestConfig) {
         (&self.config, &self.config)
     }
     fn set_max_samples(&mut self, max_samples: usize) {
@@ -54,3 +49,4 @@ impl ClassificationForest<DecisionTree> for RandomForest {
         self.max_samples
     }
 }
+impl ClassificationForest<DecisionTree> for RandomForest {}

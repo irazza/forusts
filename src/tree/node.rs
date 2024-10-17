@@ -44,9 +44,10 @@ impl<S: SplitParameters> Node<S> {
     // }
     pub fn get_class(&self, sample: &[f64]) -> isize {
         match self {
-            Node::External { class, .. } => {
-                todo!()
-            }
+            Node::External { class, .. } => match class {
+                LeafClassification::Simple(c) => *c,
+                LeafClassification::Complex(c) => c.classify(sample),
+            },
             Node::Internal { .. } => panic!("Cannot get class of a split node"),
         }
     }

@@ -1,4 +1,4 @@
-use super::{ci_forest::CIForestConfig, forest::OutlierForestConfig};
+use super::{ci_forest::CIForestConfig, forest::ForestConfig};
 use crate::{
     forest::forest::{Forest, OutlierForest},
     tree::ci_tree::CITree,
@@ -38,9 +38,7 @@ impl Forest<CITree> for ERCIForest {
     fn get_trees_mut(&mut self) -> &mut Vec<CITree> {
         &mut self.trees
     }
-}
-impl OutlierForest<CITree> for ERCIForest {
-    fn get_forest_config(&self) -> (&OutlierForestConfig, &CIForestConfig) {
+    fn get_forest_config(&self) -> (&ForestConfig, &CIForestConfig) {
         (&self.config.outlier_config, &self.config)
     }
     fn set_max_samples(&mut self, max_samples: usize) {
@@ -50,3 +48,5 @@ impl OutlierForest<CITree> for ERCIForest {
         self.max_samples
     }
 }
+
+impl OutlierForest<CITree> for ERCIForest {}

@@ -27,31 +27,70 @@ pub const SUBSAMPLE_SIZE: usize = 256;
 const ANOMALY_SCORE: f64 = 2.0;
 pub const EGAMMA: f64 = 0.577215664901532860606512090082402431_f64;
 
+#[derive(Clone)]
+pub struct ForestConfig {
+    pub n_trees: usize,
+    pub max_depth: Option<usize>,
+    pub min_samples_split: usize,
+    pub min_samples_leaf: usize,
+    pub max_samples: f64,
+    pub max_features: fn(usize) -> usize,
+    pub criterion: fn(&HashMap<isize, usize>, Vec<&HashMap<isize, usize>>) -> f64,
+    pub aggregation: Option<Combiner>,
+}
+
 pub trait Forest<T: Tree>: Sync + Send {
     type Config;
+    fn get_forest_config(&self) -> (&ForestConfig, &T::ForestTreeConfig);
+    fn get_max_samples(&self) -> usize;
     fn get_trees(&self) -> &Vec<T>;
     fn get_trees_mut(&mut self) -> &mut Vec<T>;
+    fn set_max_samples(&mut self, max_samples: usize);
     fn new(config: &Self::Config) -> Self;
     fn fit(&mut self, data: &mut [Sample], random_state: Option<RandomGenerator>);
-    fn predict(&self, data: &[Sample]) -> Vec<isize>;
-    fn generate_indeces(
-        n_samples: usize,
-        n_population: usize,
+    fn fit_(
+        &mut self,
+        data: &[Sample],
+        max_samples: usize,
         with_replacement: bool,
-        random_state: &mut RandomGenerator,
-    ) -> Vec<usize> {
-        let mut indeces = Vec::with_capacity(n_samples);
-        if with_replacement {
-            for _ in 0..n_samples {
-                indeces.push(random_state.gen_range(0..n_population));
-            }
-        } else {
-            let mut population = (0..n_population).collect::<Vec<usize>>();
-            population.shuffle(random_state);
-            indeces.extend(population.iter().take(n_samples).copied());
-        }
-        indeces
+        mut random_state: &mut RandomGenerator,
+    ) {
+        let mut trees = Vec::new();
+        self.set_max_samples(max_samples);
+        let (config, tree_config) = self.get_forest_config();
+        let random_generators = (0..config.n_trees).map(|_| {
+            RandomGenerator::from_rng(&mut random_state).expect("Error creating random generator")
+        });
+        trees.par_extend(
+            (0..config.n_trees)
+                .into_iter()
+                .zip(random_generators)
+                .par_bridge()
+                .map(|(_i, mut random_state)| {
+                    let indeces = generate_indeces(
+                        max_samples,
+                        data.len(),
+                        with_replacement,
+                        &mut random_state,
+                    );
+                    let samples = indeces
+                        .iter()
+                        .map(|idx| data[*idx].clone())
+                        .collect::<Vec<Sample>>();
+                    let mut tree = T::from_config(
+                        &tree_config,
+                        max_samples,
+                        samples[0].features.len(),
+                        &mut random_state,
+                    );
+                    let samples = tree.transform(&samples);
+                    tree.fit(&samples, &mut random_state);
+                    tree
+                }),
+        );
+        *self.get_trees_mut() = trees;
     }
+    fn predict(&self, data: &[Sample]) -> Vec<isize>;
     fn pairwise_breiman(&self, ds_test: &[Sample], ds_train: &[Sample]) -> Vec<Vec<f64>> {
         let distance_matrix: Vec<Vec<_>> = (0..ds_test.len())
             .map(|_| (0..ds_train.len()).map(|_| AtomicUsize::new(0)).collect())
@@ -177,150 +216,42 @@ pub trait Forest<T: Tree>: Sync + Send {
     }
 }
 
-pub struct ClassificationForestConfig {
-    pub n_trees: usize,
-    pub min_samples_split: usize,
-    pub min_samples_leaf: usize,
-    pub max_depth: Option<usize>,
-    pub max_features: fn(usize) -> usize,
-    pub criterion: fn(&HashMap<isize, usize>, Vec<&HashMap<isize, usize>>) -> f64,
-}
+pub trait ClassificationForest<T: Tree>: Forest<T> {
+    fn predict_(&self, data: &[Sample]) -> Vec<isize> {
+        let n_samples = data.len();
+        let mut predictions = Vec::new();
+        // Make predictions for each sample using each tree in the forest
+        let trees: &Vec<T> = self.get_trees();
+        predictions.par_extend(trees.par_iter().map(|tree| tree.predict(data)));
 
-// pub trait ClassificationForest<T: Tree>: Forest<T> {
-//     fn get_forest_config(&self) -> (&ClassificationForestConfig, &T::Config);
-//     fn fit_(
-//         &mut self,
-//         data: &[Sample],
-//         max_samples: usize,
-//         with_replacement: bool,
-//         mut random_state: &mut RandomGenerator,
-//     ) {
-//         let mut trees = Vec::new();
-//         self.set_max_samples(max_samples);
-//         let (config, tree_config) = self.get_forest_config();
-//         let random_generators = (0..config.n_trees).map(|_| {
-//             RandomGenerator::from_rng(&mut random_state).expect("Error creating random generator")
-//         });
-//         trees.par_extend(
-//             (0..config.n_trees)
-//                 .into_iter()
-//                 .zip(random_generators)
-//                 .par_bridge()
-//                 .map(|(_i, mut random_state)| {
-//                     let indeces = Self::generate_indeces(
-//                         max_samples,
-//                         data.len(),
-//                         with_replacement,
-//                         &mut random_state,
-//                     );
-//                     let samples = indeces
-//                         .iter()
-//                         .map(|idx| data[*idx].clone())
-//                         .collect::<Vec<Sample>>();
-//                     let mut tree = T::from_config(
-//                         &tree_config,
-//                         max_samples,
-//                         samples[0].features.len(),
-//                         &mut random_state,
-//                     );
-//                     let samples = tree.transform(&samples);
-//                     tree.fit(&samples, &mut random_state);
-//                     tree
-//                 }),
-//         );
-//         *self.get_trees_mut() = trees;
-//     }
-//     fn predict_(&self, data: &[Sample]) -> Vec<isize> {
-//         let n_samples = data.len();
-//         let mut predictions = Vec::new();
-//         // Make predictions for each sample using each tree in the forest
-//         let trees: &Vec<T> = self.get_trees();
-//         predictions.par_extend(trees.par_iter().map(|tree| tree.predict(data)));
+        // Combine predictions using a majority vote
+        let mut final_predictions = vec![0; n_samples];
 
-//         // Combine predictions using a majority vote
-//         let mut final_predictions = vec![0; n_samples];
+        for i in 0..n_samples {
+            let mut class_counts = HashMap::new();
+            for j in 0..self.get_forest_config().0.n_trees {
+                let class = predictions[j][i];
+                *class_counts.entry(class).or_insert(0) += 1;
+            }
 
-//         for i in 0..n_samples {
-//             let mut class_counts = HashMap::new();
-//             for j in 0..self.get_forest_config().0.n_trees {
-//                 let class = predictions[j][i];
-//                 *class_counts.entry(class).or_insert(0) += 1;
-//             }
+            // Find the class with the maximum count
+            let mut max_count = 0;
+            let mut majority_class = 0;
+            for (class, count) in &class_counts {
+                if *count > max_count {
+                    max_count = *count;
+                    majority_class = *class;
+                }
+            }
 
-//             // Find the class with the maximum count
-//             let mut max_count = 0;
-//             let mut majority_class = 0;
-//             for (class, count) in &class_counts {
-//                 if *count > max_count {
-//                     max_count = *count;
-//                     majority_class = *class;
-//                 }
-//             }
+            final_predictions[i] = majority_class;
+        }
 
-//             final_predictions[i] = majority_class;
-//         }
-
-//         final_predictions
-//     }
-// }
-#[derive(Clone)]
-pub struct OutlierForestConfig {
-    pub n_trees: usize,
-    pub max_depth: Option<usize>,
-    pub min_samples_split: usize,
-    pub min_samples_leaf: usize,
-    pub max_samples: f64,
-    pub max_features: fn(usize) -> usize,
-    pub criterion: fn(&HashMap<isize, usize>, Vec<&HashMap<isize, usize>>) -> f64,
-    pub aggregation: Option<Combiner>,
+        final_predictions
+    }
 }
 
 pub trait OutlierForest<T: Tree>: Forest<T> {
-    fn get_forest_config(&self) -> (&OutlierForestConfig, &T::ForestConfig);
-    fn set_max_samples(&mut self, max_samples: usize);
-    fn get_max_samples(&self) -> usize;
-    fn fit_(
-        &mut self,
-        data: &[Sample],
-        max_samples: usize,
-        with_replacement: bool,
-        mut random_state: &mut RandomGenerator,
-    ) {
-        let mut trees = Vec::new();
-        self.set_max_samples(max_samples);
-        let (config, tree_config) = self.get_forest_config();
-        let random_generators = (0..config.n_trees).map(|_| {
-            RandomGenerator::from_rng(&mut random_state).expect("Error creating random generator")
-        });
-        trees.par_extend(
-            (0..config.n_trees)
-                .into_iter()
-                .zip(random_generators)
-                .par_bridge()
-                .map(|(_i, mut random_state)| {
-                    let indeces = Self::generate_indeces(
-                        max_samples,
-                        data.len(),
-                        with_replacement,
-                        &mut random_state,
-                    );
-                    let samples = indeces
-                        .iter()
-                        .map(|idx| data[*idx].clone())
-                        .collect::<Vec<Sample>>();
-                    let mut tree = T::from_config(
-                        &tree_config,
-                        max_samples,
-                        samples[0].features.len(),
-                        &mut random_state,
-                    );
-                    let samples = tree.transform(&samples);
-                    tree.fit(&samples, &mut random_state);
-                    tree
-                }),
-        );
-        *self.get_trees_mut() = trees;
-    }
     fn predict_(&self, data: &[Sample]) -> Vec<isize> {
         let scores = self.score_samples(data);
         let mut predictions = Vec::new();
@@ -356,4 +287,23 @@ pub trait OutlierForest<T: Tree>: Forest<T> {
     fn path_length(tree: &T, x: &Sample) -> f64 {
         T::SplitParameters::path_length(tree, x)
     }
+}
+
+fn generate_indeces(
+    n_samples: usize,
+    n_population: usize,
+    with_replacement: bool,
+    random_state: &mut RandomGenerator,
+) -> Vec<usize> {
+    let mut indeces = Vec::with_capacity(n_samples);
+    if with_replacement {
+        for _ in 0..n_samples {
+            indeces.push(random_state.gen_range(0..n_population));
+        }
+    } else {
+        let mut population = (0..n_population).collect::<Vec<usize>>();
+        population.shuffle(random_state);
+        indeces.extend(population.iter().take(n_samples).copied());
+    }
+    indeces
 }

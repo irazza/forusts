@@ -1,6 +1,6 @@
 use std::cmp::min;
 
-use super::forest::{OutlierForestConfig, SUBSAMPLE_SIZE};
+use super::forest::{ForestConfig, SUBSAMPLE_SIZE};
 use crate::{
     forest::forest::{Forest, OutlierForest},
     tree::isolation_tree::IsolationTree,
@@ -9,7 +9,7 @@ use crate::{
 };
 use rand::{thread_rng, SeedableRng};
 
-pub type IsolationForestConfig = OutlierForestConfig;
+pub type IsolationForestConfig = ForestConfig;
 
 pub struct IsolationForest {
     trees: Vec<IsolationTree>,
@@ -42,9 +42,7 @@ impl Forest<IsolationTree> for IsolationForest {
     fn get_trees_mut(&mut self) -> &mut Vec<IsolationTree> {
         &mut self.trees
     }
-}
-impl OutlierForest<IsolationTree> for IsolationForest {
-    fn get_forest_config(&self) -> (&OutlierForestConfig, &OutlierForestConfig) {
+    fn get_forest_config(&self) -> (&ForestConfig, &ForestConfig) {
         (&self.config, &self.config)
     }
     fn set_max_samples(&mut self, max_samples: usize) {
@@ -54,3 +52,5 @@ impl OutlierForest<IsolationTree> for IsolationForest {
         self.max_samples
     }
 }
+
+impl OutlierForest<IsolationTree> for IsolationForest {}

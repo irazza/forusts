@@ -34,7 +34,7 @@ impl SplitParameters for StandardSplit {
 }
 pub trait Tree: Sync + Send {
     type Config;
-    type ForestConfig: Sync + Send;
+    type ForestTreeConfig: Sync + Send;
     type SplitParameters: SplitParameters;
     fn new(init: Self::Config, random_state: &mut RandomGenerator) -> Self;
     fn transform(&self, data: &[Sample]) -> Vec<Sample>;
@@ -154,7 +154,7 @@ pub trait Tree: Sync + Send {
         (n as f64).ln() + EGAMMA
     }
     fn from_config(
-        config: &Self::ForestConfig,
+        config: &Self::ForestTreeConfig,
         max_samples: usize,
         n_features: usize,
         random_state: &mut RandomGenerator,
@@ -256,6 +256,22 @@ pub trait Tree: Sync + Send {
         }
 
         ranges
+    }
+
+    fn min_samples_leaf_split(
+        samples: &[Sample],
+        min_samples_leaf: usize,
+        split: &Self::SplitParameters,
+    ) -> (bool, Vec<Range<usize>>) {
+        let mut samples = samples.to_vec();
+        let splitted_data = Self::split(&mut samples, split);
+        for split in &splitted_data {
+            if split.len() < min_samples_leaf {
+                return (true, splitted_data);
+            }
+        }
+        // println!("min_samples_leaf_split: {:?}", splitted_data.len());
+        (false, splitted_data)
     }
 
     fn get_leaf_class(
@@ -389,18 +405,6 @@ pub trait Tree: Sync + Send {
 
     //     impurity
     // }
-    // fn gini_impurity(class_counts: &HashMap<isize, usize>) -> f64 {
-    //     let mut impurity = 1.0;
-    //     let total_samples = class_counts.values().sum::<usize>() as f64;
-    //     for &count in class_counts.values() {
-    //         if count > 0 {
-    //             let p = count as f64 / total_samples;
-    //             impurity -= p * p;
-    //         }
-    //     }
-
-    //     impurity
-    // }
     // fn random_impurity(_class_counts: &HashMap<isize, usize>) -> f64 {
     //     return thread_rng().gen_range(0.0..1.0);
     // }
@@ -409,4 +413,40 @@ pub trait Tree: Sync + Send {
     //     let den = stddev(&[y_l, y_r].concat());
     //     1.0 - num / den
     // }
+}
+
+pub fn class_counter(samples: &[Sample]) -> HashMap<isize, usize> {
+    let mut class_counts = HashMap::new();
+    for Sample { target, .. } in samples {
+        *class_counts.entry(*target).or_insert(0) += 1;
+    }
+    class_counts
+}
+
+pub fn gini_impurity(parent: &HashMap<isize, usize>, children: Vec<&HashMap<isize, usize>>) -> f64 {
+    let mut impurity = 0.0;
+    let total_samples = parent.values().sum::<usize>() as f64;
+    for child in children {
+        let total_child_samples = child.values().sum::<usize>() as f64;
+        let mut child_impurity = 1.0;
+        for &count in child.values() {
+            if count > 0 {
+                let p = count as f64 / total_child_samples;
+                child_impurity -= p * p;
+            }
+        }
+        impurity += total_child_samples / total_samples * child_impurity;
+    }
+
+    impurity
+    // let mut impurity = 1.0;
+    // let total_samples = class_counts.values().sum::<usize>() as f64;
+    // for &count in class_counts.values() {
+    //     if count > 0 {
+    //         let p = count as f64 / total_samples;
+    //         impurity -= p * p;
+    //     }
+    // }
+
+    // impurity
 }

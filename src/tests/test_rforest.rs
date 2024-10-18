@@ -18,7 +18,7 @@ mod tests {
     fn test_breiman() {
         // Settings for the experiments
         let config = RandomForestConfig {
-            n_trees: 5,
+            n_trees: 100,
             max_depth: None,
             min_samples_split: 2,
             min_samples_leaf: 1,
@@ -39,7 +39,7 @@ mod tests {
         }
         datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
         let mut predictions = vec![0.0; datasets.len()];
-        for (i, path) in datasets.iter().enumerate() {
+        for (i, path) in datasets[0..1].iter().enumerate() {
             let mut ds_train = read_csv(
                 path.path()
                     .join(format!("{}_TRAIN.tsv", path.file_name().to_string_lossy())),
@@ -54,7 +54,7 @@ mod tests {
                 false,
             )
             .unwrap();
-
+            let start_time = std::time::Instant::now();
             for j in 0..n_repetitions {
                 let mut model = RandomForest::new(&config);
                 model.fit(
@@ -70,10 +70,11 @@ mod tests {
                 );
             }
             println!(
-                "{}: {:.2}",
+                "{}: {:.2} in {:.2} seconds",
                 path.file_name().to_string_lossy(),
                 predictions[i] / n_repetitions as f64,
-            );return;
+                start_time.elapsed().as_secs_f64(),
+            );
         }
     }
 }

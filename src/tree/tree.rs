@@ -106,7 +106,7 @@ pub trait Tree: Sync + Send {
                 continue;
             };
 
-            let splitted_data = Self::split(node_samples, &split_parameters);
+            let splitted_data = Self::split_mut(node_samples, &split_parameters);
 
             assert!(splitted_data.len() >= 2);
 
@@ -220,7 +220,7 @@ pub trait Tree: Sync + Send {
         }
         node
     }
-    fn split<'a, 'b>(
+    fn split_mut<'a, 'b>(
         samples: &'a mut [Sample],
         parameters: &Self::SplitParameters,
     ) -> Vec<Range<usize>> {
@@ -258,19 +258,47 @@ pub trait Tree: Sync + Send {
         ranges
     }
 
+    fn split<'a, 'b>(
+        samples: &'a [Sample],
+        parameters: &Self::SplitParameters,
+    ) -> Vec<Range<usize>> {
+        let mut branches = Vec::new();
+        let mut counters = Vec::new();
+        let mut positions = Vec::new();
+        let mut ranges = Vec::new();
+
+        for sample in samples.iter() {
+            let branch = parameters.split(sample);
+            branches.push(branch);
+
+            if counters.len() <= branch {
+                counters.resize(branch + 1, 0);
+            }
+
+            counters[branch] += 1;
+        }
+
+        let mut count = 0;
+        for counter in counters.iter() {
+            ranges.push(count..count + counter);
+            positions.push(count);
+            count += counter;
+        }
+        ranges
+    }
+
     fn min_samples_leaf_split(
         samples: &[Sample],
         min_samples_leaf: usize,
         split: &Self::SplitParameters,
     ) -> (bool, Vec<Range<usize>>) {
-        let mut samples = samples.to_vec();
-        let splitted_data = Self::split(&mut samples, split);
+        let splitted_data = Self::split(samples, split);
+
         for split in &splitted_data {
             if split.len() < min_samples_leaf {
                 return (true, splitted_data);
             }
         }
-        // println!("min_samples_leaf_split: {:?}", splitted_data.len());
         (false, splitted_data)
     }
 
@@ -413,14 +441,9 @@ pub trait Tree: Sync + Send {
     //     let den = stddev(&[y_l, y_r].concat());
     //     1.0 - num / den
     // }
-}
+    fn get_best_split(non_constant_features: &mut [usize], samples: &mut[] ) {
 
-pub fn class_counter(samples: &[Sample]) -> HashMap<isize, usize> {
-    let mut class_counts = HashMap::new();
-    for Sample { target, .. } in samples {
-        *class_counts.entry(*target).or_insert(0) += 1;
     }
-    class_counts
 }
 
 pub fn gini_impurity(parent: &HashMap<isize, usize>, children: Vec<&HashMap<isize, usize>>) -> f64 {

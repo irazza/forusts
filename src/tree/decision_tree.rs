@@ -1,16 +1,10 @@
-use super::{
-    node::Node,
-    tree::{class_counter, StandardSplit},
-};
+use super::{node::Node, tree::StandardSplit};
 use crate::{
-    forest::random_forest::RandomForestConfig,
-    tree::tree::Tree,
-    utils::{split, structures::Sample},
+    forest::random_forest::RandomForestConfig, tree::tree::Tree, utils::structures::Sample,
     RandomGenerator,
 };
 use hashbrown::HashMap;
-use rand::{seq::SliceRandom, Rng};
-use rayon::vec;
+use rand::seq::SliceRandom;
 
 #[derive(Clone, Debug)]
 pub struct DecisionTreeConfig {
@@ -65,9 +59,9 @@ impl Tree for DecisionTree {
         let mut best_split = None;
 
         non_constant_features.shuffle(random_state);
-        while let Some(feature) = non_constant_features.pop() {
+        non_constant_features.retain(|&feature| {
             if current_feature_count >= self.config.max_features {
-                break;
+                return true;
             }
 
             let mut thresholds = samples
@@ -75,46 +69,56 @@ impl Tree for DecisionTree {
                 .map(|f| f.features[feature])
                 .collect::<Vec<_>>();
 
-            let min_feature = *thresholds.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+            let min_feature = *thresholds
+                .iter()
+                .min_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap();
 
-            let max_feature = *thresholds.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+            let max_feature = *thresholds
+                .iter()
+                .max_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap();
 
             if max_feature - min_feature <= f64::EPSILON {
                 // Remove constant features
-                continue;
-            } else {
-                non_constant_features.push(feature);
-                thresholds.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
-                thresholds.dedup();
-                for &threshold in thresholds[1..].iter() {
-                    let current_split = StandardSplit { feature, threshold };
-                    let (min_samples_leaf_split, splitted_data) =
-                        Self::min_samples_leaf_split(&samples, min_samples_leaf, &current_split);
-                    if min_samples_leaf_split {
-                        continue;
-                    }
-                    
-                    let mut parent_count = HashMap::new();
-                    let mut splitted_vec = vec![HashMap::new(); splitted_data.len()];
-                    for (i, split) in splitted_data.into_iter().enumerate() {
-                        for sample in samples[split].iter() {
-                            *splitted_vec[i].entry(sample.target).or_insert(0) += 1;
-                            *parent_count.entry(sample.target).or_insert(0) += 1;
-                        }
-                    }
+                return false;
+            }
 
-                    let current_gain = (self.config.criterion)(
-                        &parent_count,
-                        splitted_vec.iter().map(|x| x).collect(),
-                    );
-                    if current_gain > max_gain {
-                        max_gain = current_gain;
-                        best_split = Some((current_split, max_gain));
+            thresholds.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
+            thresholds.dedup();
+            
+            for &threshold in thresholds[1..].iter() {
+                let current_split = StandardSplit { feature, threshold };
+
+                let (min_samples_leaf_split, splitted_data) =
+                    Self::min_samples_leaf_split(samples, min_samples_leaf, &current_split);
+                if min_samples_leaf_split {
+                    continue;
+                }
+
+                let mut parent_count = HashMap::new();
+                let mut splitted_vec = vec![HashMap::new(); splitted_data.len()];
+                for (i, split) in splitted_data.into_iter().enumerate() {
+                    for sample in samples[split].iter() {
+                        *splitted_vec[i].entry(sample.target).or_insert(0) += 1;
+                        *parent_count.entry(sample.target).or_insert(0) += 1;
                     }
                 }
-                current_feature_count += 1;
+
+                let current_gain = (self.config.criterion)(
+                    &parent_count,
+                    splitted_vec.iter().map(|x| x).collect(),
+                );
+                if current_gain > max_gain {
+                    max_gain = current_gain;
+                    best_split = Some((current_split, max_gain));
+                }
             }
-        }
+            current_feature_count += 1;
+
+            return true;
+        });
+
         return best_split;
     }
 

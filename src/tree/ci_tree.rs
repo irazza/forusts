@@ -87,9 +87,15 @@ impl Tree for CITree {
                 .map(|f| f.features[feature])
                 .collect::<Vec<_>>();
 
-            let min_feature = *thresholds.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+            let min_feature = *thresholds
+                .iter()
+                .min_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap();
 
-            let max_feature = *thresholds.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+            let max_feature = *thresholds
+                .iter()
+                .max_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap();
 
             if max_feature - min_feature <= f64::EPSILON {
                 // Remove constant features

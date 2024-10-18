@@ -1,4 +1,10 @@
-use super::{node::Node, tree::StandardSplit};
+use std::ops::Range;
+
+use super::{
+    node::Node,
+    tree::{SplitParameters, StandardSplit},
+    utils::get_random_split,
+};
 use crate::{
     forest::isolation_forest::IsolationForestConfig, tree::tree::Tree, utils::structures::Sample,
     RandomGenerator,
@@ -47,47 +53,16 @@ impl Tree for IsolationTree {
     }
     fn get_split(
         &self,
-        samples: &[Sample],
-        min_samples_leaf: usize,
+        samples: &mut [Sample],
         non_constant_features: &mut Vec<usize>,
         random_state: &mut RandomGenerator,
-    ) -> Option<(Self::SplitParameters, f64)> {
-        non_constant_features.shuffle(random_state);
-
-        while let Some(feature) = non_constant_features.pop() {
-            let thresholds = samples
-                .iter()
-                .map(|f| f.features[feature])
-                .collect::<Vec<_>>();
-
-            let min_feature = *thresholds
-                .iter()
-                .min_by(|a, b| a.partial_cmp(b).unwrap())
-                .unwrap();
-
-            let max_feature = *thresholds
-                .iter()
-                .max_by(|a, b| a.partial_cmp(b).unwrap())
-                .unwrap();
-
-            if max_feature - min_feature <= f64::EPSILON {
-                // Remove constant features
-                continue;
-            } else {
-                let threshold = random_state.gen_range(min_feature..max_feature);
-                let split = StandardSplit { feature, threshold };
-                let (min_samples_leaf_split, _) =
-                    Self::min_samples_leaf_split(samples, min_samples_leaf, &split);
-                if min_samples_leaf_split {
-                    continue;
-                }
-
-                non_constant_features.push(feature);
-
-                return Some((split, f64::NAN));
-            }
-        }
-        return None;
+    ) -> Option<(Vec<Range<usize>>, Self::SplitParameters, f64)> {
+        get_random_split(
+            samples,
+            non_constant_features,
+            random_state,
+            self.config.min_samples_leaf,
+        )
     }
 
     fn get_max_depth(&self) -> usize {

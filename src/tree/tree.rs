@@ -46,11 +46,10 @@ pub trait Tree: Sync + Send {
     fn get_node_at(&self, id: usize) -> &Node<Self::SplitParameters>;
     fn get_split(
         &self,
-        samples: &[Sample],
-        min_samples_leaf: usize,
+        samples: &mut [Sample],
         non_constant_features: &mut Vec<usize>,
         random_state: &mut RandomGenerator,
-    ) -> Option<(Self::SplitParameters, f64)>;
+    ) -> Option<(Vec<Range<usize>>, Self::SplitParameters, f64)>;
     fn fit(&mut self, data: &[Sample], random_state: &mut RandomGenerator) {
         let mut data = data.to_vec();
         let nodes = self.build_tree(&mut data, random_state);
@@ -74,7 +73,7 @@ pub trait Tree: Sync + Send {
 
             let node_samples = &mut samples[range.clone()];
 
-            let get_leaf = || Node::External {
+            let get_leaf = |node_samples: &mut [Sample]| Node::External {
                 id,
                 class: Self::get_leaf_class(node_samples, None),
                 depth,
@@ -90,37 +89,34 @@ pub trait Tree: Sync + Send {
             };
 
             if is_leaf {
-                nodes.push(get_leaf());
+                nodes.push(get_leaf(node_samples));
                 add_children(&mut nodes);
                 continue;
             }
 
-            let Some((split_parameters, impurity)) = self.get_split(
+            let Some((splitted_ranges, split_parameters, impurity)) = self.get_split(
                 node_samples,
-                self.get_min_samples_leaf(),
                 &mut non_constant_features,
                 random_state,
             ) else {
-                nodes.push(get_leaf());
+                nodes.push(get_leaf(node_samples));
                 add_children(&mut nodes);
                 continue;
             };
 
-            let splitted_data = Self::split_mut(node_samples, &split_parameters);
-
-            assert!(splitted_data.len() >= 2);
+            assert!(splitted_ranges.len() >= 2);
 
             nodes.push(Node::Internal {
                 id,
                 split_params: split_parameters,
                 children: vec![],
-                n_children: splitted_data.len(),
+                n_children: splitted_ranges.len(),
                 depth: depth,
                 impurity,
                 n_samples: node_samples.len(),
             });
 
-            for child_range in splitted_data {
+            for child_range in splitted_ranges {
                 let child_depth = depth + 1;
                 let child_range =
                     (range.start + child_range.start)..(range.start + child_range.end);
@@ -220,87 +216,72 @@ pub trait Tree: Sync + Send {
         }
         node
     }
-    fn split_mut<'a, 'b>(
-        samples: &'a mut [Sample],
-        parameters: &Self::SplitParameters,
-    ) -> Vec<Range<usize>> {
-        let mut branches = Vec::new();
-        let mut counters = Vec::new();
-        let mut positions = Vec::new();
-        let mut ranges = Vec::new();
-        let mut samples_cp = samples.iter().cloned().map(Some).collect::<Vec<_>>();
+    // fn split_mut<'a, 'b>(
+    //     samples: &'a mut [Sample],
+    //     parameters: &Self::SplitParameters,
+    // ) -> Vec<Range<usize>> {
+    //     let mut branches = Vec::new();
+    //     let mut counters = Vec::new();
+    //     let mut positions = Vec::new();
+    //     let mut ranges = Vec::new();
+    //     let mut samples_cp = samples.iter().cloned().map(Some).collect::<Vec<_>>();
 
-        for sample in samples.iter() {
-            let branch = parameters.split(sample);
-            branches.push(branch);
+    //     for sample in samples.iter() {
+    //         let branch = parameters.split(sample);
+    //         branches.push(branch);
 
-            if counters.len() <= branch {
-                counters.resize(branch + 1, 0);
-            }
+    //         if counters.len() <= branch {
+    //             counters.resize(branch + 1, 0);
+    //         }
 
-            counters[branch] += 1;
-        }
+    //         counters[branch] += 1;
+    //     }
 
-        let mut count = 0;
-        for counter in counters.iter() {
-            ranges.push(count..count + counter);
-            positions.push(count);
-            count += counter;
-        }
+    //     let mut count = 0;
+    //     for counter in counters.iter() {
+    //         ranges.push(count..count + counter);
+    //         positions.push(count);
+    //         count += counter;
+    //     }
 
-        for idx in 0..samples_cp.len() {
-            let branch = branches[idx];
-            let position = positions[branch];
-            samples[position] = samples_cp[idx].take().unwrap();
-            positions[branch] += 1;
-        }
+    //     for idx in 0..samples_cp.len() {
+    //         let branch = branches[idx];
+    //         let position = positions[branch];
+    //         samples[position] = samples_cp[idx].take().unwrap();
+    //         positions[branch] += 1;
+    //     }
 
-        ranges
-    }
+    //     ranges
+    // }
 
-    fn split<'a, 'b>(
-        samples: &'a [Sample],
-        parameters: &Self::SplitParameters,
-    ) -> Vec<Range<usize>> {
-        let mut branches = Vec::new();
-        let mut counters = Vec::new();
-        let mut positions = Vec::new();
-        let mut ranges = Vec::new();
+    // fn split<'a, 'b>(
+    //     samples: &'a [Sample],
+    //     parameters: &Self::SplitParameters,
+    // ) -> Vec<Range<usize>> {
+    //     let mut branches = Vec::new();
+    //     let mut counters = Vec::new();
+    //     let mut positions = Vec::new();
+    //     let mut ranges = Vec::new();
 
-        for sample in samples.iter() {
-            let branch = parameters.split(sample);
-            branches.push(branch);
+    //     for sample in samples.iter() {
+    //         let branch = parameters.split(sample);
+    //         branches.push(branch);
 
-            if counters.len() <= branch {
-                counters.resize(branch + 1, 0);
-            }
+    //         if counters.len() <= branch {
+    //             counters.resize(branch + 1, 0);
+    //         }
 
-            counters[branch] += 1;
-        }
+    //         counters[branch] += 1;
+    //     }
 
-        let mut count = 0;
-        for counter in counters.iter() {
-            ranges.push(count..count + counter);
-            positions.push(count);
-            count += counter;
-        }
-        ranges
-    }
-
-    fn min_samples_leaf_split(
-        samples: &[Sample],
-        min_samples_leaf: usize,
-        split: &Self::SplitParameters,
-    ) -> (bool, Vec<Range<usize>>) {
-        let splitted_data = Self::split(samples, split);
-
-        for split in &splitted_data {
-            if split.len() < min_samples_leaf {
-                return (true, splitted_data);
-            }
-        }
-        (false, splitted_data)
-    }
+    //     let mut count = 0;
+    //     for counter in counters.iter() {
+    //         ranges.push(count..count + counter);
+    //         positions.push(count);
+    //         count += counter;
+    //     }
+    //     ranges
+    // }
 
     fn get_leaf_class(
         samples: &[Sample],
@@ -441,12 +422,9 @@ pub trait Tree: Sync + Send {
     //     let den = stddev(&[y_l, y_r].concat());
     //     1.0 - num / den
     // }
-    fn get_best_split(non_constant_features: &mut [usize], samples: &mut[] ) {
-
-    }
 }
 
-pub fn gini_impurity(parent: &HashMap<isize, usize>, children: Vec<&HashMap<isize, usize>>) -> f64 {
+pub fn gini_impurity(parent: &HashMap<isize, usize>, children: &[HashMap<isize, usize>]) -> f64 {
     let mut impurity = 0.0;
     let total_samples = parent.values().sum::<usize>() as f64;
     for child in children {

@@ -5,3 +5,4 @@ pub mod ci_tree;
 pub mod isolation_tree;
 
 pub mod decision_tree;
+pub mod utils;

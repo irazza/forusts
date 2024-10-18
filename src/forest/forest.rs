@@ -35,7 +35,7 @@ pub struct ForestConfig {
     pub min_samples_leaf: usize,
     pub max_samples: f64,
     pub max_features: fn(usize) -> usize,
-    pub criterion: fn(&HashMap<isize, usize>, Vec<&HashMap<isize, usize>>) -> f64,
+    pub criterion: fn(&HashMap<isize, usize>, &[HashMap<isize, usize>]) -> f64,
     pub aggregation: Option<Combiner>,
 }
 

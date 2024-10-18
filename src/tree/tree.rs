@@ -156,6 +156,60 @@ pub trait Tree: Sync + Send {
         random_state: &mut RandomGenerator,
     ) -> Self;
 
+    // fn split<'a, 'b>(
+    //     samples: &'a mut [Sample],
+    //     parameters: &Self::SplitParameters,
+    // ) -> Vec<Range<usize>> {
+    //     let mut branches = Vec::new();
+    //     let mut counters = Vec::new();
+    //     let mut positions = Vec::new();
+    //     let mut ranges = Vec::new();
+    //     let mut samples_cp = samples.iter().cloned().map(Some).collect::<Vec<_>>();
+
+    //     for sample in samples.iter() {
+    //         let branch = parameters.split(sample);
+    //         branches.push(branch);
+
+    //         if counters.len() <= branch {
+    //             counters.resize(branch + 1, 0);
+    //         }
+
+    //         counters[branch] += 1;
+    //     }
+
+    //     let mut count = 0;
+    //     for counter in counters.iter() {
+    //         ranges.push(count..count + counter);
+    //         positions.push(count);
+    //         count += counter;
+    //     }
+
+    //     for idx in 0..samples_cp.len() {
+    //         let branch = branches[idx];
+    //         let position = positions[branch];
+    //         samples[position] = samples_cp[idx].take().unwrap();
+    //         positions[branch] += 1;
+    //     }
+
+    //     ranges
+    // }
+
+    // fn min_samples_leaf_split(
+    //     samples: &[Sample],
+    //     min_samples_leaf: usize,
+    //     split: &Self::SplitParameters,
+    // ) -> (bool, Vec<Range<usize>>) {
+    //     let mut samples = samples.to_vec();
+    //     let splitted_data = Self::split(&mut samples, split);
+    //     for split in &splitted_data {
+    //         if split.len() < min_samples_leaf {
+    //             return (true, splitted_data);
+    //         }
+    //     }
+    //     // println!("min_samples_leaf_split: {:?}", splitted_data.len());
+    //     (false, splitted_data)
+    // }
+
     // fn get_leaves(&self) -> Vec<&Node<Self::SplitParameters>> {
     //     let mut leaves = Vec::new();
     //     let mut queue = vec![self.get_root()];

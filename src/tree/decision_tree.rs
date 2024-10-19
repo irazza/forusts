@@ -130,8 +130,8 @@ impl Tree for DecisionTree {
                         .or_insert(0) += 1;
                 }
 
-                // 0..split_index => class 0
-                // split_index..samples.len() => class 1
+                // 0..split_index => branch 0
+                // split_index..samples.len() => branch 1
 
                 if split_index < self.config.min_samples_leaf
                     || (samples.len() - split_index) < self.config.min_samples_leaf
@@ -139,14 +139,13 @@ impl Tree for DecisionTree {
                     continue;
                 }
 
-                let current_gain = random_state.gen_range(0.0..1.0); // (self.config.criterion)(&parent_count, &splitted_vec);
+                let current_gain = (self.config.criterion)(&parent_count, &splitted_vec);
                 if current_gain > max_gain {
                     max_gain = current_gain;
                     best_split = Some((current_split, max_gain));
                     best_split_index = split_index;
                 }
             }
-            current_feature_count = self.config.max_features;
             current_feature_count += 1;
 
             return true;

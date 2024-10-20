@@ -1,6 +1,9 @@
 use std::{error::Error, fs};
 
-use forest::{forest::Forest, random_forest::{RandomForest, RandomForestConfig}};
+use forest::{
+    forest::Forest,
+    random_forest::{RandomForest, RandomForestConfig},
+};
 use metrics::classification::accuracy_score;
 use rand::SeedableRng;
 use tree::tree::gini_impurity;

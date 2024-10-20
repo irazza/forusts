@@ -130,17 +130,17 @@ impl Tree for DecisionTree {
 
                 while split_index < samples.len() && current_split.split(&samples[split_index]) == 1
                 {
-                    split_index += 1;
                     *children_count[1]
                         .get_mut(&samples[split_index].target)
                         .unwrap() -= 1;
                     *children_count[0]
                         .entry(samples[split_index].target)
                         .or_insert(0) += 1;
+                    split_index += 1;
                 }
 
-                // 0..split_index => branch 0
-                // split_index..samples.len() => branch 1
+                // 0..split_index => branch 1
+                // split_index..samples.len() => branch 0
 
                 if split_index < self.config.min_samples_leaf
                     || (samples.len() - split_index) < self.config.min_samples_leaf
@@ -162,11 +162,18 @@ impl Tree for DecisionTree {
 
         let best_split = best_split?;
 
-        samples.sort_unstable_by(|a, b| {
-            a.features[best_split.0.feature]
-                .partial_cmp(&b.features[best_split.0.feature])
-                .unwrap()
-        });
+        // Reorder according to the split
+        let mut start = 0;
+        let mut end = samples.len();
+        while start < end {
+            if best_split.0.split(&samples[start]) == 0 {
+                start += 1;
+            } else {
+                samples.swap(start, end - 1);
+                end -= 1;
+            }
+        }
+        let best_split_index = start;
 
         Some((
             vec![0..best_split_index, best_split_index..samples.len()],

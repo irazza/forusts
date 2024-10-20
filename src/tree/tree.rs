@@ -94,11 +94,9 @@ pub trait Tree: Sync + Send {
                 continue;
             }
 
-            let Some((splitted_ranges, split_parameters, impurity)) = self.get_split(
-                node_samples,
-                &mut non_constant_features,
-                random_state,
-            ) else {
+            let Some((splitted_ranges, split_parameters, impurity)) =
+                self.get_split(node_samples, &mut non_constant_features, random_state)
+            else {
                 nodes.push(get_leaf(node_samples));
                 add_children(&mut nodes);
                 continue;

@@ -17,6 +17,21 @@ pub struct RandomForest {
 impl Forest<DecisionTree> for RandomForest {
     type Config = RandomForestConfig;
 
+    fn get_forest_config(&self) -> (&ForestConfig, &ForestConfig) {
+        (&self.config, &self.config)
+    }
+    fn get_max_samples(&self) -> usize {
+        self.max_samples
+    }
+    fn get_trees(&self) -> &Vec<DecisionTree> {
+        &self.trees
+    }
+    fn get_trees_mut(&mut self) -> &mut Vec<DecisionTree> {
+        &mut self.trees
+    }
+    fn set_max_samples(&mut self, max_samples: usize) {
+        self.max_samples = max_samples;
+    }
     fn new(config: &Self::Config) -> Self {
         Self {
             trees: Vec::new(),
@@ -32,21 +47,6 @@ impl Forest<DecisionTree> for RandomForest {
     }
     fn predict(&self, data: &[Sample]) -> Vec<isize> {
         self.predict_(data)
-    }
-    fn get_trees(&self) -> &Vec<DecisionTree> {
-        &self.trees
-    }
-    fn get_trees_mut(&mut self) -> &mut Vec<DecisionTree> {
-        &mut self.trees
-    }
-    fn get_forest_config(&self) -> (&ForestConfig, &ForestConfig) {
-        (&self.config, &self.config)
-    }
-    fn set_max_samples(&mut self, max_samples: usize) {
-        self.max_samples = max_samples;
-    }
-    fn get_max_samples(&self) -> usize {
-        self.max_samples
     }
 }
 impl ClassificationForest<DecisionTree> for RandomForest {}

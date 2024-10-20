@@ -20,6 +20,21 @@ pub struct IsolationForest {
 impl Forest<IsolationTree> for IsolationForest {
     type Config = IsolationForestConfig;
 
+    fn get_forest_config(&self) -> (&ForestConfig, &ForestConfig) {
+        (&self.config, &self.config)
+    }
+    fn get_max_samples(&self) -> usize {
+        self.max_samples
+    }
+    fn get_trees(&self) -> &Vec<IsolationTree> {
+        &self.trees
+    }
+    fn get_trees_mut(&mut self) -> &mut Vec<IsolationTree> {
+        &mut self.trees
+    }
+    fn set_max_samples(&mut self, max_samples: usize) {
+        self.max_samples = max_samples;
+    }
     fn new(config: &Self::Config) -> Self {
         Self {
             trees: Vec::new(),
@@ -35,21 +50,6 @@ impl Forest<IsolationTree> for IsolationForest {
     }
     fn predict(&self, data: &[Sample]) -> Vec<isize> {
         self.predict_(data)
-    }
-    fn get_trees(&self) -> &Vec<IsolationTree> {
-        &self.trees
-    }
-    fn get_trees_mut(&mut self) -> &mut Vec<IsolationTree> {
-        &mut self.trees
-    }
-    fn get_forest_config(&self) -> (&ForestConfig, &ForestConfig) {
-        (&self.config, &self.config)
-    }
-    fn set_max_samples(&mut self, max_samples: usize) {
-        self.max_samples = max_samples;
-    }
-    fn get_max_samples(&self) -> usize {
-        self.max_samples
     }
 }
 

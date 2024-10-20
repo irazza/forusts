@@ -25,6 +25,21 @@ pub struct CIForest {
 impl Forest<CITree> for CIForest {
     type Config = CIForestConfig;
 
+    fn get_forest_config(&self) -> (&ForestConfig, &CIForestConfig) {
+        (&self.config.outlier_config, &self.config)
+    }
+    fn get_max_samples(&self) -> usize {
+        self.max_samples
+    }
+    fn get_trees(&self) -> &Vec<CITree> {
+        &self.trees
+    }
+    fn get_trees_mut(&mut self) -> &mut Vec<CITree> {
+        &mut self.trees
+    }
+    fn set_max_samples(&mut self, max_samples: usize) {
+        self.max_samples = max_samples;
+    }
     fn new(config: &Self::Config) -> Self {
         Self {
             trees: Vec::new(),
@@ -40,21 +55,6 @@ impl Forest<CITree> for CIForest {
     }
     fn predict(&self, data: &[Sample]) -> Vec<isize> {
         self.predict_(data)
-    }
-    fn get_trees(&self) -> &Vec<CITree> {
-        &self.trees
-    }
-    fn get_trees_mut(&mut self) -> &mut Vec<CITree> {
-        &mut self.trees
-    }
-    fn get_forest_config(&self) -> (&ForestConfig, &CIForestConfig) {
-        (&self.config.outlier_config, &self.config)
-    }
-    fn set_max_samples(&mut self, max_samples: usize) {
-        self.max_samples = max_samples;
-    }
-    fn get_max_samples(&self) -> usize {
-        self.max_samples
     }
 }
 impl OutlierForest<CITree> for CIForest {}

@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         aggregation: None,
     };
     let n_repetitions = 1;
-    let paths = fs::read_dir("/media/DATA/UCRArchive_2018/").unwrap();
+    let paths = fs::read_dir("../UCRArchive_2018/").unwrap();
 
     let mut datasets = Vec::new();
     for entry in paths {

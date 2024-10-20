@@ -7,7 +7,7 @@ use crate::{
     RandomGenerator,
 };
 use hashbrown::HashMap;
-use rand::{seq::SliceRandom, thread_rng, Rng};
+use rand::seq::SliceRandom;
 
 #[derive(Clone, Debug)]
 pub struct DecisionTreeConfig {
@@ -33,22 +33,31 @@ impl Tree for DecisionTree {
             config,
         }
     }
-    fn from_config(
-        config: &Self::ForestTreeConfig,
-        _max_samples: usize,
-        n_features: usize,
-        random_state: &mut RandomGenerator,
-    ) -> Self {
-        Self::new(
-            DecisionTreeConfig {
-                max_depth: config.max_depth.unwrap_or(usize::MAX),
-                max_features: n_features,
-                min_samples_split: config.min_samples_split,
-                min_samples_leaf: config.min_samples_leaf,
-                criterion: config.criterion,
-            },
-            random_state,
-        )
+    fn transform(&self, data: &[Sample]) -> Vec<Sample> {
+        data.to_vec()
+    }
+
+    fn get_max_depth(&self) -> usize {
+        self.config.max_depth
+    }
+
+    fn get_min_samples_split(&self) -> usize {
+        self.config.min_samples_split
+    }
+    fn get_min_samples_leaf(&self) -> usize {
+        self.config.min_samples_leaf
+    }
+
+    fn get_root(&self) -> &Node<Self::SplitParameters> {
+        &self.nodes[0]
+    }
+
+    fn set_nodes(&mut self, nodes: Vec<Node<Self::SplitParameters>>) {
+        self.nodes = nodes;
+    }
+
+    fn get_node_at(&self, id: usize) -> &Node<Self::SplitParameters> {
+        &self.nodes[id]
     }
 
     fn get_split(
@@ -113,8 +122,8 @@ impl Tree for DecisionTree {
 
             let mut split_index = 0;
 
-            let mut splitted_vec = vec![HashMap::new(); 2];
-            splitted_vec[1] = parent_count.clone();
+            let mut children_count = vec![HashMap::new(); 2];
+            children_count[1] = parent_count.clone();
 
             for &threshold in thresholds[1..].iter() {
                 let current_split = StandardSplit { feature, threshold };
@@ -122,10 +131,10 @@ impl Tree for DecisionTree {
                 while split_index < samples.len() && current_split.split(&samples[split_index]) == 1
                 {
                     split_index += 1;
-                    *splitted_vec[1]
+                    *children_count[1]
                         .get_mut(&samples[split_index].target)
                         .unwrap() -= 1;
-                    *splitted_vec[0]
+                    *children_count[0]
                         .entry(samples[split_index].target)
                         .or_insert(0) += 1;
                 }
@@ -139,7 +148,7 @@ impl Tree for DecisionTree {
                     continue;
                 }
 
-                let current_gain = (self.config.criterion)(&parent_count, &splitted_vec);
+                let current_gain = (self.config.criterion)(&parent_count, &children_count);
                 if current_gain > max_gain {
                     max_gain = current_gain;
                     best_split = Some((current_split, max_gain));
@@ -166,30 +175,21 @@ impl Tree for DecisionTree {
         ))
     }
 
-    fn get_max_depth(&self) -> usize {
-        self.config.max_depth
-    }
-    fn get_root(&self) -> &Node<Self::SplitParameters> {
-        &self.nodes[0]
-    }
-
-    fn get_min_samples_split(&self) -> usize {
-        self.config.min_samples_split
-    }
-
-    fn get_min_samples_leaf(&self) -> usize {
-        self.config.min_samples_leaf
-    }
-
-    fn set_nodes(&mut self, nodes: Vec<Node<Self::SplitParameters>>) {
-        self.nodes = nodes;
-    }
-
-    fn get_node_at(&self, id: usize) -> &Node<Self::SplitParameters> {
-        &self.nodes[id]
-    }
-
-    fn transform(&self, data: &[Sample]) -> Vec<Sample> {
-        data.to_vec()
+    fn from_config(
+        config: &Self::ForestTreeConfig,
+        _max_samples: usize,
+        n_features: usize,
+        random_state: &mut RandomGenerator,
+    ) -> Self {
+        Self::new(
+            DecisionTreeConfig {
+                max_depth: config.max_depth.unwrap_or(usize::MAX),
+                max_features: n_features,
+                min_samples_split: config.min_samples_split,
+                min_samples_leaf: config.min_samples_leaf,
+                criterion: config.criterion,
+            },
+            random_state,
+        )
     }
 }

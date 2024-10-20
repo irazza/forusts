@@ -1,5 +1,5 @@
 [package]
-name = "forests"
+name = "forust"
 version = "0.0.1"
 edition = "2021"
 
@@ -23,10 +23,9 @@ dashmap = "6.1.0"
 kodama = "0.3.0"
 
 [profile.dev]
-debug = 1
+debug = true
 
 [profile.release]
 codegen-units = 1
 lto = "fat"
 panic = "abort"
-debug = true

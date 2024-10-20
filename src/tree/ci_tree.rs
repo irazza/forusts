@@ -52,64 +52,6 @@ impl Tree for CITree {
             },
         }
     }
-    fn from_config(
-        config: &Self::ForestTreeConfig,
-        max_samples: usize,
-        n_features: usize,
-        random_state: &mut RandomGenerator,
-    ) -> Self {
-        Self::new(
-            CITreeConfig {
-                max_depth: config
-                    .outlier_config
-                    .max_depth
-                    .unwrap_or((max_samples as f64).max(2.0).log2().ceil() as usize + 1),
-                min_samples_split: config.outlier_config.min_samples_split,
-                min_samples_leaf: config.outlier_config.min_samples_leaf,
-                n_intervals: config.n_intervals.get_interval(n_features),
-                n_attributes: config.n_attributes,
-            },
-            random_state,
-        )
-    }
-
-    fn get_split(
-        &self,
-        samples: &mut [Sample],
-        non_constant_features: &mut Vec<usize>,
-        random_state: &mut RandomGenerator,
-    ) -> Option<(Vec<std::ops::Range<usize>>, Self::SplitParameters, f64)> {
-        get_random_split(
-            samples,
-            non_constant_features,
-            random_state,
-            self.config.min_samples_leaf,
-        )
-    }
-
-    fn get_max_depth(&self) -> usize {
-        self.config.max_depth
-    }
-    fn get_root(&self) -> &Node<Self::SplitParameters> {
-        &self.nodes[0]
-    }
-
-    fn get_min_samples_split(&self) -> usize {
-        self.config.min_samples_split
-    }
-
-    fn get_min_samples_leaf(&self) -> usize {
-        self.config.min_samples_leaf
-    }
-
-    fn set_nodes(&mut self, nodes: Vec<Node<Self::SplitParameters>>) {
-        self.nodes = nodes;
-    }
-
-    fn get_node_at(&self, id: usize) -> &Node<Self::SplitParameters> {
-        &self.nodes[id]
-    }
-
     fn transform(&self, data: &[Sample]) -> Vec<Sample> {
         let mut transformed = Vec::with_capacity(data.len());
         for sample in data {
@@ -133,5 +75,63 @@ impl Tree for CITree {
             });
         }
         transformed
+    }
+
+    fn get_max_depth(&self) -> usize {
+        self.config.max_depth
+    }
+
+    fn get_min_samples_split(&self) -> usize {
+        self.config.min_samples_split
+    }
+    fn get_min_samples_leaf(&self) -> usize {
+        self.config.min_samples_leaf
+    }
+
+    fn get_root(&self) -> &Node<Self::SplitParameters> {
+        &self.nodes[0]
+    }
+
+    fn set_nodes(&mut self, nodes: Vec<Node<Self::SplitParameters>>) {
+        self.nodes = nodes;
+    }
+
+    fn get_node_at(&self, id: usize) -> &Node<Self::SplitParameters> {
+        &self.nodes[id]
+    }
+
+    fn get_split(
+        &self,
+        samples: &mut [Sample],
+        non_constant_features: &mut Vec<usize>,
+        random_state: &mut RandomGenerator,
+    ) -> Option<(Vec<std::ops::Range<usize>>, Self::SplitParameters, f64)> {
+        get_random_split(
+            samples,
+            non_constant_features,
+            random_state,
+            self.config.min_samples_leaf,
+        )
+    }
+
+    fn from_config(
+        config: &Self::ForestTreeConfig,
+        max_samples: usize,
+        n_features: usize,
+        random_state: &mut RandomGenerator,
+    ) -> Self {
+        Self::new(
+            CITreeConfig {
+                max_depth: config
+                    .outlier_config
+                    .max_depth
+                    .unwrap_or((max_samples as f64).max(2.0).log2().ceil() as usize + 1),
+                min_samples_split: config.outlier_config.min_samples_split,
+                min_samples_leaf: config.outlier_config.min_samples_leaf,
+                n_intervals: config.n_intervals.get_interval(n_features),
+                n_attributes: config.n_attributes,
+            },
+            random_state,
+        )
     }
 }

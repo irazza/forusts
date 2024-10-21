@@ -1,14 +1,19 @@
-use std::{sync::Arc, usize};
-
-use super::{node::Node, tree::StandardSplit, utils::get_random_split};
+use std::sync::Arc;
+use catch22::{compute, N_CATCH22};
+use super::{
+    node::Node,
+    tree::{SplitParameters, StandardSplit},
+};
+use crate::tree::tree::gini_impurity;
 use crate::{
-    forest::{ci_forest::CIForestConfig, forest::CACHE},
-    tree::tree::Tree,
-    utils::structures::Sample,
+    forest::ci_forest::CIForestConfig, tree::tree::Tree, utils::structures::Sample,
     RandomGenerator,
 };
-use catch22::{compute, N_CATCH22};
-use rand::{seq::SliceRandom, Rng};
+use hashbrown::HashMap;
+use rand::Rng;
+use rand::seq::SliceRandom;
+use crate::forest::forest::CACHE;
+
 const MIN_INTERVAL_PERC: f64 = 0.1;
 
 #[derive(Clone, Debug)]
@@ -16,6 +21,8 @@ pub struct CITreeConfig {
     pub max_depth: usize,
     pub min_samples_split: usize,
     pub min_samples_leaf: usize,
+    pub max_features: usize,
+    pub criterion: fn(&HashMap<isize, usize>, &[HashMap<isize, usize>]) -> f64,
     pub n_intervals: usize,
     pub n_attributes: usize,
 }
@@ -106,28 +113,152 @@ impl Tree for CITree {
         non_constant_features: &mut Vec<usize>,
         random_state: &mut RandomGenerator,
     ) -> Option<(Vec<std::ops::Range<usize>>, Self::SplitParameters, f64)> {
-        get_random_split(
-            samples,
-            non_constant_features,
-            random_state,
-            self.config.min_samples_leaf,
-        )
+        let mut current_feature_count = 0;
+        let mut max_gain = f64::NEG_INFINITY;
+        let mut best_split = None;
+        let mut best_split_index = 0;
+
+        let mut parent_count = HashMap::new();
+        for sample in samples.iter() {
+            *parent_count.entry(sample.target).or_insert(0) += 1;
+        }
+        let parent_impurity = gini_impurity(&parent_count);
+        non_constant_features.shuffle(random_state);
+        non_constant_features.retain(|&feature| {
+            if current_feature_count >= self.config.max_features {
+                return true;
+            }
+
+            let min_feature = samples
+                .iter()
+                .min_by(|a, b| {
+                    a.features[feature]
+                        .partial_cmp(&b.features[feature])
+                        .unwrap()
+                })
+                .unwrap()
+                .features[feature];
+
+            let max_feature = samples
+                .iter()
+                .max_by(|a, b| {
+                    a.features[feature]
+                        .partial_cmp(&b.features[feature])
+                        .unwrap()
+                })
+                .unwrap()
+                .features[feature];
+
+            if max_feature - min_feature <= f64::EPSILON {
+                // Remove constant features
+                return false;
+            }
+
+            samples.sort_unstable_by(|a, b| {
+                a.features[feature]
+                    .partial_cmp(&b.features[feature])
+                    .unwrap()
+            });
+
+            let mut thresholds = samples
+                .iter()
+                .map(|f| f.features[feature])
+                .collect::<Vec<_>>();
+
+            thresholds.dedup();
+
+
+            let mut split_index = 0;
+
+            let mut children_count = vec![HashMap::new(); 2];
+            children_count[1] = parent_count.clone();
+            let mut left_impurity = 1.0;
+            let mut left_count = 0;
+            let mut right_impurity = parent_impurity;
+            let mut right_count = samples.len();
+
+            for &threshold in &thresholds {
+
+                let current_split = StandardSplit { feature, threshold };
+
+                while split_index < samples.len() && current_split.split(&samples[split_index]) == 1
+                {
+                    *children_count[1]
+                        .get_mut(&samples[split_index].target)
+                        .unwrap() -= 1;
+                    right_count -= 1;
+                    *children_count[0]
+                        .entry(samples[split_index].target)
+                        .or_insert(0) += 1;
+                    left_count += 1;
+                    // right_impurity -=
+                    //     (children_count[1][&samples[split_index].target] as f64 / right_count as f64).powi(2);
+                    // left_impurity -=
+                    //     (children_count[0][&samples[split_index].target] as f64 / left_count as f64).powi(2);
+                    split_index += 1;
+                }
+
+                // 0..split_index => branch 1
+                // split_index..samples.len() => branch 0
+
+                if split_index < self.config.min_samples_leaf
+                    || (samples.len() - split_index) < self.config.min_samples_leaf
+                {
+                    continue;
+                }
+
+                left_impurity = gini_impurity(&children_count[0]);
+                right_impurity = gini_impurity(&children_count[1]);
+
+                let current_gain = parent_impurity
+                    - (left_impurity * left_count as f64 + right_impurity * right_count as f64)
+                    / samples.len() as f64;
+                if current_gain > max_gain {
+                    max_gain = current_gain;
+                    best_split = Some((current_split, max_gain));
+                    best_split_index = split_index;
+                }
+            }
+            current_feature_count += 1;
+
+            return true;
+        });
+
+        let best_split = best_split?;
+
+        // Reorder according to the split
+        let mut start = 0;
+        let mut end = samples.len();
+        while start < end {
+            if best_split.0.split(&samples[start]) == 0 {
+                start += 1;
+            } else {
+                samples.swap(start, end - 1);
+                end -= 1;
+            }
+        }
+        let best_split_index = start;
+
+        Some((
+            vec![0..best_split_index, best_split_index..samples.len()],
+            best_split.0,
+            best_split.1,
+        ))
     }
 
     fn from_config(
         config: &Self::ForestTreeConfig,
-        max_samples: usize,
+        _max_samples: usize,
         n_features: usize,
         random_state: &mut RandomGenerator,
     ) -> Self {
         Self::new(
             CITreeConfig {
-                max_depth: config
-                    .outlier_config
-                    .max_depth
-                    .unwrap_or((max_samples as f64).max(2.0).log2().ceil() as usize + 1),
-                min_samples_split: config.outlier_config.min_samples_split,
-                min_samples_leaf: config.outlier_config.min_samples_leaf,
+                max_depth: config.classification_config.max_depth.unwrap_or(usize::MAX),
+                max_features: config.classification_config.max_features.get_features(config.n_intervals.get_interval(n_features)*config.n_attributes),
+                min_samples_split: config.classification_config.min_samples_split,
+                min_samples_leaf: config.classification_config.min_samples_leaf,
+                criterion: config.classification_config.criterion,
                 n_intervals: config.n_intervals.get_interval(n_features),
                 n_attributes: config.n_attributes,
             },

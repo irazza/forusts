@@ -33,3 +33,24 @@ impl IntervalType {
         }
     }
 }
+
+#[derive(Clone)]
+pub enum MaxFeatures {
+    LOG2,
+    LOG10,
+    LN,
+    SQRT,
+    ALL,
+}
+impl crate::utils::structures::MaxFeatures {
+    pub fn get_features(&self, n: usize) -> usize {
+        match self {
+            crate::utils::structures::MaxFeatures::LOG2 => (n as f64).log2() as usize,
+            crate::utils::structures::MaxFeatures::LOG10 => (n as f64).log10() as usize,
+            crate::utils::structures::MaxFeatures::LN => (n as f64).ln() as usize,
+            crate::utils::structures::MaxFeatures::SQRT => (n as f64).sqrt() as usize,
+            crate::utils::structures::MaxFeatures::ALL => n,
+
+        }
+    }
+}

@@ -1,10 +1,6 @@
 use std::ops::Range;
 
-use super::{
-    node::Node,
-    tree::StandardSplit,
-    utils::get_random_split,
-};
+use super::{node::Node, tree::StandardSplit, utils::get_random_split};
 use crate::{
     forest::isolation_forest::IsolationForestConfig, tree::tree::Tree, utils::structures::Sample,
     RandomGenerator,

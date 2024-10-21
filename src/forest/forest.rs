@@ -18,6 +18,7 @@ use lazy_static::lazy_static;
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rayon::prelude::*;
 use std::{cmp::max, sync::atomic::AtomicUsize};
+use crate::utils::structures::MaxFeatures;
 
 lazy_static! {
     pub static ref CACHE: DashMap<(Sample, usize, usize, usize), f64> = DashMap::new();
@@ -34,7 +35,7 @@ pub struct ForestConfig {
     pub min_samples_split: usize,
     pub min_samples_leaf: usize,
     pub max_samples: f64,
-    pub max_features: fn(usize) -> usize,
+    pub max_features: MaxFeatures,
     pub criterion: fn(&HashMap<isize, usize>, &[HashMap<isize, usize>]) -> f64,
     pub aggregation: Option<Combiner>,
 }
@@ -67,13 +68,13 @@ pub trait Forest<T: Tree>: Sync + Send {
                 .zip(random_generators)
                 .par_bridge()
                 .map(|(_i, mut random_state)| {
-                    let indeces = generate_indeces(
+                    let indices = generate_indices(
                         max_samples,
                         data.len(),
                         with_replacement,
                         &mut random_state,
                     );
-                    let samples = indeces
+                    let samples = indices
                         .iter()
                         .map(|idx| data[*idx].clone())
                         .collect::<Vec<Sample>>();
@@ -221,15 +222,15 @@ pub trait ClassificationForest<T: Tree>: Forest<T> {
         let n_samples = data.len();
         let mut predictions = Vec::new();
         // Make predictions for each sample using each tree in the forest
-        let trees: &Vec<T> = self.get_trees();
-        predictions.par_extend(trees.par_iter().map(|tree| tree.predict(data)));
+        let trees= self.get_trees();
+        predictions.par_extend(trees.par_iter().map(|tree| tree.predict(&tree.transform(data))));
 
         // Combine predictions using a majority vote
         let mut final_predictions = vec![0; n_samples];
 
         for i in 0..n_samples {
             let mut class_counts = HashMap::new();
-            for j in 0..self.get_forest_config().0.n_trees {
+            for j in 0..trees.len() {
                 let class = predictions[j][i];
                 *class_counts.entry(class).or_insert(0) += 1;
             }
@@ -289,7 +290,7 @@ pub trait OutlierForest<T: Tree>: Forest<T> {
     }
 }
 
-fn generate_indeces(
+fn generate_indices(
     n_samples: usize,
     n_population: usize,
     with_replacement: bool,

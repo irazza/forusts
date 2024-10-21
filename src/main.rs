@@ -6,8 +6,9 @@ use forest::{
 };
 use metrics::classification::accuracy_score;
 use rand::SeedableRng;
-use tree::tree::gini_impurity;
+use tree::tree::gini_impurity2;
 use utils::csv_io::read_csv;
+use crate::utils::structures::MaxFeatures;
 
 mod cluster;
 mod forest;
@@ -27,8 +28,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         min_samples_split: 2,
         min_samples_leaf: 1,
         max_samples: 1.0,
-        max_features: |x| x,
-        criterion: gini_impurity,
+        max_features: MaxFeatures::SQRT,
+        criterion: gini_impurity2,
         aggregation: None,
     };
     let n_repetitions = 1;
@@ -43,7 +44,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
     let mut predictions = vec![0.0; datasets.len()];
-    for (i, path) in datasets[0..1].iter().enumerate() {
+    for (i, path) in datasets[1..2].iter().enumerate() {
         let mut ds_train = read_csv(
             path.path()
                 .join(format!("{}_TRAIN.tsv", path.file_name().to_string_lossy())),

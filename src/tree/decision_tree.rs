@@ -2,6 +2,7 @@ use super::{
     node::Node,
     tree::{SplitParameters, StandardSplit},
 };
+use crate::tree::tree::gini_impurity;
 use crate::{
     forest::random_forest::RandomForestConfig, tree::tree::Tree, utils::structures::Sample,
     RandomGenerator,
@@ -75,7 +76,7 @@ impl Tree for DecisionTree {
         for sample in samples.iter() {
             *parent_count.entry(sample.target).or_insert(0) += 1;
         }
-
+        let parent_impurity = gini_impurity(&parent_count);
         non_constant_features.shuffle(random_state);
         non_constant_features.retain(|&feature| {
             if current_feature_count >= self.config.max_features {
@@ -120,12 +121,18 @@ impl Tree for DecisionTree {
 
             thresholds.dedup();
 
+
             let mut split_index = 0;
 
             let mut children_count = vec![HashMap::new(); 2];
             children_count[1] = parent_count.clone();
+            let mut left_impurity = 1.0;
+            let mut left_count = 0;
+            let mut right_impurity = parent_impurity;
+            let mut right_count = samples.len();
 
-            for &threshold in thresholds[1..].iter() {
+            for &threshold in &thresholds {
+
                 let current_split = StandardSplit { feature, threshold };
 
                 while split_index < samples.len() && current_split.split(&samples[split_index]) == 1
@@ -133,9 +140,15 @@ impl Tree for DecisionTree {
                     *children_count[1]
                         .get_mut(&samples[split_index].target)
                         .unwrap() -= 1;
+                    right_count -= 1;
                     *children_count[0]
                         .entry(samples[split_index].target)
                         .or_insert(0) += 1;
+                    left_count += 1;
+                    // right_impurity -=
+                    //     (children_count[1][&samples[split_index].target] as f64 / right_count as f64).powi(2);
+                    // left_impurity -=
+                    //     (children_count[0][&samples[split_index].target] as f64 / left_count as f64).powi(2);
                     split_index += 1;
                 }
 
@@ -148,7 +161,12 @@ impl Tree for DecisionTree {
                     continue;
                 }
 
-                let current_gain = (self.config.criterion)(&parent_count, &children_count);
+                left_impurity = gini_impurity(&children_count[0]);
+                right_impurity = gini_impurity(&children_count[1]);
+
+                let current_gain = parent_impurity
+                    - (left_impurity * left_count as f64 + right_impurity * right_count as f64)
+                        / samples.len() as f64;
                 if current_gain > max_gain {
                     max_gain = current_gain;
                     best_split = Some((current_split, max_gain));
@@ -191,7 +209,7 @@ impl Tree for DecisionTree {
         Self::new(
             DecisionTreeConfig {
                 max_depth: config.max_depth.unwrap_or(usize::MAX),
-                max_features: n_features,
+                max_features: config.max_features.get_features(n_features),
                 min_samples_split: config.min_samples_split,
                 min_samples_leaf: config.min_samples_leaf,
                 criterion: config.criterion,

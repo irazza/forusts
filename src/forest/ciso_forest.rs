@@ -1,19 +1,28 @@
-use super::{ciso_forest::CIsoForestConfig, forest::ForestConfig};
+use std::cmp::min;
+
+use super::forest::{ForestConfig, SUBSAMPLE_SIZE};
 use crate::{
     forest::forest::{Forest, OutlierForest},
     tree::ciso_tree::CIsoTree,
-    utils::structures::Sample,
+    utils::structures::{IntervalType, Sample},
     RandomGenerator,
 };
 use rand::{thread_rng, SeedableRng};
 
-pub struct ERCIForest {
+#[derive(Clone)]
+pub struct CIsoForestConfig {
+    pub n_intervals: IntervalType,
+    pub n_attributes: usize,
+    pub outlier_config: ForestConfig,
+}
+
+pub struct CIsoForest {
     trees: Vec<CIsoTree>,
     config: CIsoForestConfig,
     max_samples: usize,
 }
 
-impl Forest<CIsoTree> for ERCIForest {
+impl Forest<CIsoTree> for CIsoForest {
     type Config = CIsoForestConfig;
 
     fn get_forest_config(&self) -> (&ForestConfig, &CIsoForestConfig) {
@@ -41,12 +50,11 @@ impl Forest<CIsoTree> for ERCIForest {
     fn fit(&mut self, samples: &mut [Sample], random_state: Option<RandomGenerator>) {
         let mut random_state =
             random_state.unwrap_or_else(|| RandomGenerator::from_rng(thread_rng()).unwrap());
-        let max_samples = samples.len();
-        self.fit_(&samples, max_samples, true, &mut random_state)
+        let max_samples = min(SUBSAMPLE_SIZE, samples.len());
+        self.fit_(&samples, max_samples, false, &mut random_state)
     }
     fn predict(&self, data: &[Sample]) -> Vec<isize> {
         self.predict_(data)
     }
 }
-
-impl OutlierForest<CIsoTree> for ERCIForest {}
+impl OutlierForest<CIsoTree> for CIsoForest {}

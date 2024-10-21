@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use hashbrown::HashSet;
 use std::hash::Hash;
 

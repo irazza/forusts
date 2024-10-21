@@ -1,21 +1,21 @@
-use std::{fmt::Debug, sync::Arc};
+use std::fmt::Debug;
 
 use super::tree::SplitParameters;
 
-pub trait LeafClassifier: Sync + Send + Debug {
-    fn classify(&self, x: &[f64]) -> isize;
-}
-#[derive(Debug, Clone)]
-pub enum LeafClassification {
-    Simple(isize),
-    Complex(Arc<dyn LeafClassifier>),
-}
+// pub trait LeafClassifier: Sync + Send + Debug {
+//     fn classify(&self, x: &[f64]) -> isize;
+// }
+// #[derive(Debug, Clone)]
+// pub enum LeafClassification {
+//     Simple(isize),
+//     Complex(Arc<dyn LeafClassifier>),
+// }
 
 #[derive(Debug, Clone)]
 pub enum Node<S: SplitParameters> {
     External {
         id: usize,
-        class: LeafClassification,
+        class: isize, //LeafClassification,
         depth: usize,
         n_samples: usize,
     },
@@ -42,12 +42,18 @@ impl<S: SplitParameters> Node<S> {
     //         Node::Internal { children, .. } => children.len(),
     //     }
     // }
-    pub fn get_class(&self, sample: &[f64]) -> isize {
+    // pub fn get_class(&self, sample: &[f64]) -> isize {
+    //     match self {
+    //         Node::External { class, .. } => match class {
+    //             LeafClassification::Simple(c) => *c,
+    //             LeafClassification::Complex(c) => c.classify(sample),
+    //         },
+    //         Node::Internal { .. } => panic!("Cannot get class of a split node"),
+    //     }
+    // }
+    pub fn get_class(&self) -> isize {
         match self {
-            Node::External { class, .. } => match class {
-                LeafClassification::Simple(c) => *c,
-                LeafClassification::Complex(c) => c.classify(sample),
-            },
+            Node::External { class, .. } => *class,
             Node::Internal { .. } => panic!("Cannot get class of a split node"),
         }
     }

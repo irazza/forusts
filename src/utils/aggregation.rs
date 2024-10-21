@@ -1,5 +1,3 @@
-use std::slice::Iter;
-
 const ANOMALY_SCORE: f64 = 2.0;
 const TRIM: f64 = 0.05;
 

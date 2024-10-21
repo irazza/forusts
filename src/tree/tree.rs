@@ -1,9 +1,9 @@
-use crate::{forest::forest::EGAMMA, utils::structures::Sample, RandomGenerator};
+use crate::{forest::forest::EGAMMA, utils::structures::Sample, RandomGenerator, tree::node::Node};
 use core::fmt::Debug;
 use hashbrown::HashMap;
 use std::{collections::VecDeque, ops::Range};
 
-use super::node::{LeafClassification, Node};
+// use super::node::{LeafClassification, Node};
 
 pub trait SplitParameters: Sync + Send + Debug + Ord + Eq {
     fn split(&self, sample: &Sample) -> usize;
@@ -75,7 +75,7 @@ pub trait Tree: Sync + Send {
 
             let get_leaf = |node_samples: &mut [Sample]| Node::External {
                 id,
-                class: Self::get_leaf_class(node_samples, None),
+                class: Self::majority_class(node_samples),
                 depth,
                 n_samples: node_samples.len(),
             };
@@ -109,7 +109,7 @@ pub trait Tree: Sync + Send {
                 split_params: split_parameters,
                 children: vec![],
                 n_children: splitted_ranges.len(),
-                depth: depth,
+                depth,
                 impurity,
                 n_samples: node_samples.len(),
             });
@@ -132,7 +132,7 @@ pub trait Tree: Sync + Send {
     }
     fn predict(&self, x: &[Sample]) -> Vec<isize> {
         x.iter()
-            .map(|sample| self.predict_leaf(sample).get_class(&sample.features))
+            .map(|sample| self.predict_leaf(sample).get_class())//get_class(&sample.features))
             .collect()
     }
     fn average_path_length(n_samples: usize) -> f64 {
@@ -334,11 +334,7 @@ pub trait Tree: Sync + Send {
     //     }
     //     ranges
     // }
-
-    fn get_leaf_class(
-        samples: &[Sample],
-        _parameters: Option<&Self::SplitParameters>,
-    ) -> LeafClassification {
+    fn majority_class(samples: &[Sample]) -> isize {
         let mut class_counts = HashMap::new();
         for Sample { target, .. } in samples {
             *class_counts.entry(*target).or_insert(0) += 1;
@@ -354,8 +350,29 @@ pub trait Tree: Sync + Send {
             }
         }
 
-        LeafClassification::Simple(most_common_class)
+        most_common_class
     }
+    // fn get_leaf_class(
+    //     samples: &[Sample],
+    //     _parameters: Option<&Self::SplitParameters>,
+    // ) -> LeafClassification {
+    //     let mut class_counts = HashMap::new();
+    //     for Sample { target, .. } in samples {
+    //         *class_counts.entry(*target).or_insert(0) += 1;
+    //     }
+    //
+    //     let mut max_count = 0;
+    //     let mut most_common_class = 0;
+    //
+    //     for (class, count) in &class_counts {
+    //         if *count > max_count {
+    //             max_count = *count;
+    //             most_common_class = *class;
+    //         }
+    //     }
+    //
+    //     LeafClassification::Simple(most_common_class)
+    // }
     // fn bfs(&self) -> Vec<&Node<Self::SplitParameters>> {
     //     let mut queue = vec![self.get_root()];
     //     let mut bfs = Vec::new();
@@ -476,7 +493,7 @@ pub trait Tree: Sync + Send {
     // }
 }
 
-pub fn gini_impurity(parent: &HashMap<isize, usize>, children: &[HashMap<isize, usize>]) -> f64 {
+pub fn gini_impurity2(parent: &HashMap<isize, usize>, children: &[HashMap<isize, usize>]) -> f64 {
     let mut impurity = 0.0;
     let total_samples = parent.values().sum::<usize>() as f64;
     for child in children {
@@ -502,4 +519,15 @@ pub fn gini_impurity(parent: &HashMap<isize, usize>, children: &[HashMap<isize, 
     // }
 
     // impurity
+}
+
+pub fn gini_impurity(node: &HashMap<isize, usize>) -> f64 {
+    let mut impurity = 1.0;
+    let total_samples = node.values().sum::<usize>() as f64;
+    for &count in node.values() {
+        let p = count as f64 / total_samples;
+        impurity -= p * p;
+    }
+
+    impurity
 }

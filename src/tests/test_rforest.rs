@@ -10,9 +10,10 @@ mod tests {
             random_forest::{RandomForest, RandomForestConfig},
         },
         metrics::classification::accuracy_score,
-        tree::tree::gini_impurity,
+        tree::tree::gini_impurity2,
         utils::csv_io::read_csv,
     };
+    use crate::utils::structures::MaxFeatures;
 
     #[test]
     fn test_breiman() {
@@ -23,12 +24,12 @@ mod tests {
             min_samples_split: 2,
             min_samples_leaf: 1,
             max_samples: 1.0,
-            max_features: |x| x,
-            criterion: gini_impurity,
+            max_features: MaxFeatures::ALL,
+            criterion: gini_impurity2,
             aggregation: None,
         };
-        let n_repetitions = 1;
-        let paths = fs::read_dir("/media/DATA/UCRArchive_2018/").unwrap();
+        let n_repetitions = 10;
+        let paths = fs::read_dir("../UCRArchive_2018/").unwrap();
 
         let mut datasets = Vec::new();
         for entry in paths {
@@ -39,7 +40,7 @@ mod tests {
         }
         datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
         let mut predictions = vec![0.0; datasets.len()];
-        for (i, path) in datasets[0..1].iter().enumerate() {
+        for (i, path) in datasets[..5].iter().enumerate() {
             let mut ds_train = read_csv(
                 path.path()
                     .join(format!("{}_TRAIN.tsv", path.file_name().to_string_lossy())),

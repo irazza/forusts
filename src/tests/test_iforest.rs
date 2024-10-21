@@ -12,6 +12,7 @@ mod tests {
         metrics::classification::{precision_at_k, roc_auc_score},
         utils::{aggregation::Combiner, csv_io::read_csv},
     };
+    use crate::utils::structures::MaxFeatures;
 
     #[test]
     fn test_liu() {
@@ -21,7 +22,7 @@ mod tests {
             min_samples_split: 2,
             min_samples_leaf: 1,
             max_samples: 1.0,
-            max_features: |x| x,
+            max_features: MaxFeatures::ALL,
             criterion: |_a, _b| 1.0,
             aggregation: None,
         };
@@ -106,7 +107,7 @@ mod tests {
                     min_samples_split: 2,
                     min_samples_leaf: 1,
                     max_samples: 1.0,
-                    max_features: |x| x,
+                    max_features: MaxFeatures::ALL,
                     criterion: |_a, _b| 1.0,
                     aggregation: Some(combiner.clone()),
                 };

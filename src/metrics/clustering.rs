@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use hashbrown::HashMap;
 
 pub fn adjusted_rand_score(y_pred: &[isize], y_true: &[isize]) -> f64 {

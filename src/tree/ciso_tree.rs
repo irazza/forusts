@@ -1,6 +1,7 @@
 use std::{sync::Arc, usize};
 
 use super::{node::Node, tree::StandardSplit};
+use crate::utils::split::get_random_split;
 use crate::{
     forest::{ciso_forest::CIsoForestConfig, forest::CACHE},
     tree::tree::Tree,
@@ -9,7 +10,6 @@ use crate::{
 };
 use catch22::{compute, N_CATCH22};
 use rand::{seq::SliceRandom, Rng};
-use crate::utils::split::get_random_split;
 
 const MIN_INTERVAL_PERC: f64 = 0.1;
 

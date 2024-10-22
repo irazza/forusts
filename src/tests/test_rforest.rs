@@ -11,7 +11,6 @@ mod tests {
             random_forest::{RandomForest, RandomForestConfig},
         },
         metrics::classification::accuracy_score,
-        tree::tree::gini_impurity2,
         utils::csv_io::read_csv,
     };
 
@@ -25,10 +24,10 @@ mod tests {
             min_samples_leaf: 1,
             max_samples: 1.0,
             max_features: MaxFeatures::ALL,
-            criterion: gini_impurity2,
+            criterion: |_a, _b| f64::NAN,
             aggregation: None,
         };
-        let n_repetitions = 20;
+        let n_repetitions = 10;
         let paths = fs::read_dir("../UCRArchive_2018/").unwrap();
 
         let mut datasets = Vec::new();

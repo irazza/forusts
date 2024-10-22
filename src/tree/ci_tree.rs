@@ -1,8 +1,6 @@
-use super::{
-    node::Node,
-    tree::StandardSplit,
-};
+use super::{node::Node, tree::StandardSplit};
 use crate::forest::forest::CACHE;
+use crate::utils::split::get_best_split;
 use crate::{
     forest::ci_forest::CIForestConfig, tree::tree::Tree, utils::structures::Sample, RandomGenerator,
 };
@@ -11,7 +9,6 @@ use hashbrown::HashMap;
 use rand::seq::SliceRandom;
 use rand::Rng;
 use std::sync::Arc;
-use crate::utils::split::get_best_split;
 
 const MIN_INTERVAL_PERC: f64 = 0.1;
 

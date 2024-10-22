@@ -1,7 +1,4 @@
-use super::{
-    node::Node,
-    tree::StandardSplit,
-};
+use super::{node::Node, tree::StandardSplit};
 use crate::utils::split::get_best_split;
 use crate::{
     forest::random_forest::RandomForestConfig, tree::tree::Tree, utils::structures::Sample,
@@ -32,9 +29,6 @@ impl Tree for DecisionTree {
             nodes: Vec::new(),
             config,
         }
-    }
-    fn transform(&self, data: &[Sample]) -> Vec<Sample> {
-        data.to_vec()
     }
 
     fn get_max_depth(&self) -> usize {

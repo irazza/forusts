@@ -1,11 +1,11 @@
 use std::ops::Range;
 
 use super::{node::Node, tree::StandardSplit};
+use crate::utils::split::get_random_split;
 use crate::{
     forest::isolation_forest::IsolationForestConfig, tree::tree::Tree, utils::structures::Sample,
     RandomGenerator,
 };
-use crate::utils::split::get_random_split;
 
 #[derive(Clone, Debug)]
 pub struct IsolationTreeConfig {
@@ -29,9 +29,6 @@ impl Tree for IsolationTree {
             nodes: Vec::new(),
             config,
         }
-    }
-    fn transform(&self, data: &[Sample]) -> Vec<Sample> {
-        data.to_vec()
     }
     fn get_max_depth(&self) -> usize {
         self.config.max_depth

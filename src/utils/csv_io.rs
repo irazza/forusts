@@ -38,3 +38,16 @@ pub fn read_csv(
     }
     Ok(samples)
 }
+
+pub fn write_csv(path: impl AsRef<Path>, data: Vec<Vec<f64>>) {
+    if let Some(parent) = path.as_ref().parent() {
+        std::fs::create_dir_all(parent).unwrap();
+    }
+    let mut writer = csv::Writer::from_path(path).unwrap();
+    for row in data {
+        writer
+            .write_record(row.iter().map(|v| v.to_string()))
+            .unwrap();
+    }
+    writer.flush().unwrap();
+}

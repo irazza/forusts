@@ -3,8 +3,6 @@ use core::fmt::Debug;
 use hashbrown::HashMap;
 use std::{collections::VecDeque, ops::Range};
 
-// use super::node::{LeafClassification, Node};
-
 pub trait SplitParameters: Sync + Send + Debug + Ord + Eq {
     fn split(&self, sample: &Sample) -> usize;
     fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, sample: &Sample) -> f64;
@@ -37,7 +35,9 @@ pub trait Tree: Sync + Send {
     type ForestTreeConfig: Sync + Send;
     type SplitParameters: SplitParameters;
     fn new(init: Self::Config, random_state: &mut RandomGenerator) -> Self;
-    fn transform(&self, data: &[Sample]) -> Vec<Sample>;
+    fn transform(&self, data: &[Sample]) -> Vec<Sample> {
+        data.to_vec()
+    }
     fn get_max_depth(&self) -> usize;
     fn get_min_samples_split(&self) -> usize;
     fn get_min_samples_leaf(&self) -> usize;

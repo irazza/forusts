@@ -1,7 +1,5 @@
 use std::error::Error;
 
-use rand::SeedableRng;
-
 mod cluster;
 mod forest;
 mod metrics;

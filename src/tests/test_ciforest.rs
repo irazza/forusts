@@ -5,16 +5,16 @@ mod tests {
     use std::fs;
 
     use crate::metrics::classification::accuracy_score;
+    use crate::utils::csv_io::write_csv;
     use crate::utils::structures::MaxFeatures;
     use crate::{
-        cluster::agglomerative::agglomerative_clustering,
         forest::{
             ci_forest::{CIForest, CIForestConfig},
             ciso_forest::{CIsoForest, CIsoForestConfig},
             erci_forest::ERCIForest,
             forest::{Forest, ForestConfig, OutlierForest},
         },
-        metrics::{classification::roc_auc_score, clustering::adjusted_rand_score},
+        metrics::classification::roc_auc_score,
         utils::{csv_io::read_csv, structures::IntervalType},
     };
 
@@ -119,10 +119,9 @@ mod tests {
             }
         }
         datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
-        let mut predictions = vec![0.0; datasets.len()];
 
         for (i, path) in datasets.iter().enumerate() {
-            let ds_train = read_csv(
+            let mut ds_train = read_csv(
                 path.path()
                     .join(format!("{}_TRAIN.tsv", path.file_name().to_string_lossy())),
                 b'\t',
@@ -137,36 +136,42 @@ mod tests {
             )
             .unwrap();
 
-            let mut ds = ds_train.clone();
-            ds.extend(ds_test.clone());
-            let y_true = ds.iter().map(|s| s.target).collect::<Vec<_>>();
-
-            let mut classes = y_true.clone();
-            classes.sort();
-            classes.dedup();
             for j in 0..n_repetitions {
                 let mut model = ERCIForest::new(&config);
                 model.fit(
-                    &mut ds,
+                    &mut ds_train,
                     Some(rand_chacha::ChaCha8Rng::seed_from_u64(
                         ((i + 2) * (j + 2)) as u64,
                     )),
                 );
-                let distance_matrix = model.pairwise_breiman(&ds, &ds);
 
-                let prediction = agglomerative_clustering(
-                    classes.len(),
-                    kodama::Method::Average,
-                    distance_matrix,
+                // breiman
+                let distance_matrix = model.pairwise_breiman(&ds_test, &ds_train);
+                let breiman_path = format!(
+                    "/media/DATA/TSRFDist/breiman/{}_{}.csv",
+                    path.file_name().to_string_lossy(),
+                    j
                 );
+                write_csv(breiman_path, distance_matrix);
 
-                predictions[i] += adjusted_rand_score(&prediction, &y_true);
+                // zhu
+                let distance_matrix = model.pairwise_zhu(&ds_test, &ds_train);
+                let zhu_path = format!(
+                    "/media/DATA/TSRFDist/zhu/{}_{}.csv",
+                    path.file_name().to_string_lossy(),
+                    j
+                );
+                write_csv(zhu_path, distance_matrix);
+
+                // ratiorf
+                let distance_matrix = model.pairwise_ratiorf(&ds_test, &ds_train);
+                let ratiorf_path = format!(
+                    "/media/DATA/TSRFDist/ratiorf/{}_{}.csv",
+                    path.file_name().to_string_lossy(),
+                    j
+                );
+                write_csv(ratiorf_path, distance_matrix);
             }
-            println!(
-                "{}: {:.2}",
-                path.file_name().to_string_lossy(),
-                predictions[i] / n_repetitions as f64
-            );
         }
     }
 

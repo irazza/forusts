@@ -1,4 +1,4 @@
-use crate::{forest::forest::EGAMMA, utils::structures::Sample, RandomGenerator, tree::node::Node};
+use crate::{forest::forest::EGAMMA, tree::node::Node, utils::structures::Sample, RandomGenerator};
 use core::fmt::Debug;
 use hashbrown::HashMap;
 use std::{collections::VecDeque, ops::Range};
@@ -132,7 +132,7 @@ pub trait Tree: Sync + Send {
     }
     fn predict(&self, x: &[Sample]) -> Vec<isize> {
         x.iter()
-            .map(|sample| self.predict_leaf(sample).get_class())//get_class(&sample.features))
+            .map(|sample| self.predict_leaf(sample).get_class()) //get_class(&sample.features))
             .collect()
     }
     fn average_path_length(n_samples: usize) -> f64 {
@@ -491,43 +491,4 @@ pub trait Tree: Sync + Send {
     //     let den = stddev(&[y_l, y_r].concat());
     //     1.0 - num / den
     // }
-}
-
-pub fn gini_impurity2(parent: &HashMap<isize, usize>, children: &[HashMap<isize, usize>]) -> f64 {
-    let mut impurity = 0.0;
-    let total_samples = parent.values().sum::<usize>() as f64;
-    for child in children {
-        let total_child_samples = child.values().sum::<usize>() as f64;
-        let mut child_impurity = 1.0;
-        for &count in child.values() {
-            if count > 0 {
-                let p = count as f64 / total_child_samples;
-                child_impurity -= p * p;
-            }
-        }
-        impurity += total_child_samples / total_samples * child_impurity;
-    }
-
-    impurity
-    // let mut impurity = 1.0;
-    // let total_samples = class_counts.values().sum::<usize>() as f64;
-    // for &count in class_counts.values() {
-    //     if count > 0 {
-    //         let p = count as f64 / total_samples;
-    //         impurity -= p * p;
-    //     }
-    // }
-
-    // impurity
-}
-
-pub fn gini_impurity(node: &HashMap<isize, usize>) -> f64 {
-    let mut impurity = 1.0;
-    let total_samples = node.values().sum::<usize>() as f64;
-    for &count in node.values() {
-        let p = count as f64 / total_samples;
-        impurity -= p * p;
-    }
-
-    impurity
 }

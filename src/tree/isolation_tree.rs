@@ -1,10 +1,11 @@
 use std::ops::Range;
 
-use super::{node::Node, tree::StandardSplit, utils::get_random_split};
+use super::{node::Node, tree::StandardSplit};
 use crate::{
     forest::isolation_forest::IsolationForestConfig, tree::tree::Tree, utils::structures::Sample,
     RandomGenerator,
 };
+use crate::utils::split::get_random_split;
 
 #[derive(Clone, Debug)]
 pub struct IsolationTreeConfig {

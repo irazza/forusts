@@ -4,19 +4,19 @@ mod tests {
     use rand::SeedableRng;
     use std::fs;
 
+    use crate::metrics::classification::accuracy_score;
+    use crate::utils::structures::MaxFeatures;
     use crate::{
         cluster::agglomerative::agglomerative_clustering,
         forest::{
+            ci_forest::{CIForest, CIForestConfig},
             ciso_forest::{CIsoForest, CIsoForestConfig},
             erci_forest::ERCIForest,
-            ci_forest::{CIForest, CIForestConfig},
             forest::{Forest, ForestConfig, OutlierForest},
         },
         metrics::{classification::roc_auc_score, clustering::adjusted_rand_score},
         utils::{csv_io::read_csv, structures::IntervalType},
     };
-    use crate::metrics::classification::accuracy_score;
-    use crate::utils::structures::MaxFeatures;
 
     #[test]
     fn test_cif() {
@@ -206,14 +206,14 @@ mod tests {
                 b'\t',
                 false,
             )
-                .unwrap();
+            .unwrap();
             let ds_test = read_csv(
                 path.path()
                     .join(format!("{}_TEST.tsv", path.file_name().to_string_lossy())),
                 b'\t',
                 false,
             )
-                .unwrap();
+            .unwrap();
             let start_time = std::time::Instant::now();
             for j in 0..n_repetitions {
                 let mut model = CIForest::new(&config);

@@ -1,3 +1,4 @@
+#[warn(dead_code)]
 use hashbrown::HashMap;
 use kodama::linkage;
 

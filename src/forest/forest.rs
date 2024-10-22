@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+use crate::utils::structures::MaxFeatures;
 use crate::{
     tree::{
         node::Node,
@@ -18,7 +19,6 @@ use lazy_static::lazy_static;
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rayon::prelude::*;
 use std::{cmp::max, sync::atomic::AtomicUsize};
-use crate::utils::structures::MaxFeatures;
 
 lazy_static! {
     pub static ref CACHE: DashMap<(Sample, usize, usize, usize), f64> = DashMap::new();
@@ -222,8 +222,12 @@ pub trait ClassificationForest<T: Tree>: Forest<T> {
         let n_samples = data.len();
         let mut predictions = Vec::new();
         // Make predictions for each sample using each tree in the forest
-        let trees= self.get_trees();
-        predictions.par_extend(trees.par_iter().map(|tree| tree.predict(&tree.transform(data))));
+        let trees = self.get_trees();
+        predictions.par_extend(
+            trees
+                .par_iter()
+                .map(|tree| tree.predict(&tree.transform(data))),
+        );
 
         // Combine predictions using a majority vote
         let mut final_predictions = vec![0; n_samples];

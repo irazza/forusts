@@ -4,6 +4,7 @@ mod tests {
     use rand::SeedableRng;
     use std::fs;
 
+    use crate::utils::structures::MaxFeatures;
     use crate::{
         forest::{
             forest::Forest,
@@ -13,7 +14,6 @@ mod tests {
         tree::tree::gini_impurity2,
         utils::csv_io::read_csv,
     };
-    use crate::utils::structures::MaxFeatures;
 
     #[test]
     fn test_breiman() {
@@ -28,7 +28,7 @@ mod tests {
             criterion: gini_impurity2,
             aggregation: None,
         };
-        let n_repetitions = 10;
+        let n_repetitions = 20;
         let paths = fs::read_dir("../UCRArchive_2018/").unwrap();
 
         let mut datasets = Vec::new();

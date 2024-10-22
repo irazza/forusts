@@ -11,6 +11,7 @@ use hashbrown::HashMap;
 //     impurity
 // }
 
+#[derive(Clone)]
 pub struct FastGini {
     classes: HashMap<isize, usize>,
     p_sum: u128,
@@ -18,7 +19,14 @@ pub struct FastGini {
 }
 
 impl FastGini {
-    pub fn new(classes: HashMap<isize, usize>) -> Self {
+    pub fn new() -> Self {
+        Self {
+            classes: HashMap::new(),
+            p_sum: 0,
+            total: 0,
+        }
+    }
+    pub fn from_classes_count(classes: HashMap<isize, usize>) -> Self {
         let mut p_sum = 0;
         let mut total = 0;
         for mult in classes.values() {

@@ -50,7 +50,6 @@ impl crate::utils::structures::MaxFeatures {
             crate::utils::structures::MaxFeatures::LN => (n as f64).ln() as usize,
             crate::utils::structures::MaxFeatures::SQRT => (n as f64).sqrt() as usize,
             crate::utils::structures::MaxFeatures::ALL => n,
-
         }
     }
 }

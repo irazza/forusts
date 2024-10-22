@@ -4,6 +4,7 @@ mod tests {
     use rand::SeedableRng;
     use std::fs;
 
+    use crate::utils::structures::MaxFeatures;
     use crate::{
         forest::{
             forest::{Forest, OutlierForest},
@@ -12,7 +13,6 @@ mod tests {
         metrics::classification::{precision_at_k, roc_auc_score},
         utils::{aggregation::Combiner, csv_io::read_csv},
     };
-    use crate::utils::structures::MaxFeatures;
 
     #[test]
     fn test_liu() {

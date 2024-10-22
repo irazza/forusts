@@ -1,7 +1,7 @@
 use crate::{
     forest::forest::{ClassificationForest, Forest, ForestConfig},
-    utils::structures::{IntervalType, Sample},
     tree::ci_tree::CITree,
+    utils::structures::{IntervalType, Sample},
     RandomGenerator,
 };
 use rand::{thread_rng, SeedableRng};

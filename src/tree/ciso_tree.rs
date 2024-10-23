@@ -66,6 +66,9 @@ impl Tree for CIsoTree {
                         features.push(*value);
                     } else {
                         let value = compute(&sample.features[start..end], *attribute);
+                        if CACHE.len() > 100000 {
+                            CACHE.clear();
+                        }
                         CACHE.insert((sample.clone(), start, end, *attribute), value);
                         features.push(value);
                     }

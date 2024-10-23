@@ -4,6 +4,7 @@ mod tests {
     use rand::SeedableRng;
     use std::fs;
 
+    use crate::forest::forest::CACHE;
     use crate::metrics::classification::accuracy_score;
     use crate::utils::csv_io::write_csv;
     use crate::utils::structures::MaxFeatures;
@@ -119,8 +120,12 @@ mod tests {
             }
         }
         datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
+        let mut times = vec![vec![0.0; 4]; datasets.len()];
 
         for (i, path) in datasets.iter().enumerate() {
+
+            println!("Dataset: {}", path.file_name().to_string_lossy());
+
             let mut ds_train = read_csv(
                 path.path()
                     .join(format!("{}_TRAIN.tsv", path.file_name().to_string_lossy())),
@@ -137,18 +142,21 @@ mod tests {
             .unwrap();
 
             for j in 0..n_repetitions {
+                CACHE.clear();
                 let mut model = ERCIForest::new(&config);
+                let start_time = std::time::Instant::now();
                 model.fit(
                     &mut ds_train,
                     Some(rand_chacha::ChaCha8Rng::seed_from_u64(
                         ((i + 2) * (j + 2)) as u64,
                     )),
                 );
-
+                times[i][0] += start_time.elapsed().as_secs_f64();
                 // breiman
                 let distance_matrix = model.pairwise_breiman(&ds_test, &ds_train);
+                times[i][1] += start_time.elapsed().as_secs_f64();
                 let breiman_path = format!(
-                    "/media/DATA/TSRFDist/breiman/{}_{}.csv",
+                    "/media/DATA/TSRFDist/LIGHT/breiman/{}_{}.csv",
                     path.file_name().to_string_lossy(),
                     j
                 );
@@ -156,8 +164,9 @@ mod tests {
 
                 // zhu
                 let distance_matrix = model.pairwise_zhu(&ds_test, &ds_train);
+                times[i][2] += start_time.elapsed().as_secs_f64();
                 let zhu_path = format!(
-                    "/media/DATA/TSRFDist/zhu/{}_{}.csv",
+                    "/media/DATA/TSRFDist/LIGHT/zhu/{}_{}.csv",
                     path.file_name().to_string_lossy(),
                     j
                 );
@@ -165,14 +174,19 @@ mod tests {
 
                 // ratiorf
                 let distance_matrix = model.pairwise_ratiorf(&ds_test, &ds_train);
+                times[i][3] += start_time.elapsed().as_secs_f64();
                 let ratiorf_path = format!(
-                    "/media/DATA/TSRFDist/ratiorf/{}_{}.csv",
+                    "/media/DATA/TSRFDist/LIGHT/ratiorf/{}_{}.csv",
                     path.file_name().to_string_lossy(),
                     j
                 );
                 write_csv(ratiorf_path, distance_matrix);
             }
+            times[i] = times[i].iter().map(|x| x / n_repetitions as f64).collect::<Vec<_>>();
         }
+        let times_path = "/media/DATA/TSRFDist/LIGHT/times.csv";
+        write_csv(times_path, times);
+
     }
 
     #[test]

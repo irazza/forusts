@@ -27,8 +27,8 @@ mod tests {
             criterion: |_a, _b| f64::NAN,
             aggregation: None,
         };
-        let n_repetitions = 10;
-        let paths = fs::read_dir("../UCRArchive_2018/").unwrap();
+        let n_repetitions = 1;
+        let paths = fs::read_dir("../DATA/ucr").unwrap();
 
         let mut datasets = Vec::new();
         for entry in paths {

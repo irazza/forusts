@@ -27,7 +27,7 @@ mod tests {
             aggregation: None,
         };
         let n_repetitions = 10;
-        let paths = fs::read_dir("/media/DATA/IFDatasets").unwrap();
+        let paths = fs::read_dir("../DATA/IF_BENCHMARK").unwrap();
 
         let mut datasets = Vec::new();
         for entry in paths {

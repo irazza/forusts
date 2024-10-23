@@ -1,5 +1,5 @@
 use super::{node::Node, tree::StandardSplit};
-use crate::forest::forest::CACHE;
+use crate::tree::transform::catch_transform;
 use crate::utils::split::get_best_split;
 use crate::{
     forest::ci_forest::CIForestConfig, tree::tree::Tree, utils::structures::Sample, RandomGenerator,
@@ -11,6 +11,7 @@ use rand::Rng;
 use std::sync::Arc;
 
 const MIN_INTERVAL_PERC: f64 = 0.1;
+const MIN_INTERVALS_LEN: usize = 3;
 
 #[derive(Clone, Debug)]
 pub struct CITreeConfig {
@@ -19,6 +20,7 @@ pub struct CITreeConfig {
     pub min_samples_leaf: usize,
     pub max_features: usize,
     pub criterion: fn(&HashMap<isize, usize>, &[HashMap<isize, usize>]) -> f64,
+    pub n_features: usize,
     pub n_intervals: usize,
     pub n_attributes: usize,
 }
@@ -27,7 +29,7 @@ pub struct CITreeConfig {
 pub struct CITree {
     nodes: Vec<Node<StandardSplit>>,
     config: CITreeConfig,
-    intervals: Vec<(f64, f64)>,
+    intervals: Vec<(usize, usize)>,
     attributes: Vec<usize>,
 }
 impl Tree for CITree {
@@ -41,8 +43,8 @@ impl Tree for CITree {
             intervals: {
                 let mut intervals = Vec::with_capacity(config.n_intervals);
                 for _ in 0..config.n_intervals {
-                    let start = random_state.gen_range(0.0..=1.0 - MIN_INTERVAL_PERC);
-                    let end = random_state.gen_range(start + MIN_INTERVAL_PERC..=1.0);
+                    let start = random_state.gen_range(0..=config.n_features - MIN_INTERVALS_LEN);
+                    let end = random_state.gen_range(start + MIN_INTERVALS_LEN..=config.n_features);
                     intervals.push((start, end));
                 }
                 intervals
@@ -56,28 +58,7 @@ impl Tree for CITree {
         }
     }
     fn transform(&self, data: &[Sample]) -> Vec<Sample> {
-        let mut transformed = Vec::with_capacity(data.len());
-        for sample in data {
-            let mut features = Vec::with_capacity(self.intervals.len() * self.attributes.len());
-            for (start, end) in &self.intervals {
-                let start = (start * sample.features.len() as f64).round() as usize;
-                let end = (end * sample.features.len() as f64).round() as usize;
-                for attribute in &self.attributes {
-                    if let Some(value) = CACHE.get(&(sample.clone(), start, end, *attribute)) {
-                        features.push(*value);
-                    } else {
-                        let value = compute(&sample.features[start..end], *attribute);
-                        CACHE.insert((sample.clone(), start, end, *attribute), value);
-                        features.push(value);
-                    }
-                }
-            }
-            transformed.push(Sample {
-                features: Arc::new(features),
-                target: sample.target,
-            });
-        }
-        transformed
+        catch_transform(data, &self.intervals, &self.attributes)
     }
 
     fn get_max_depth(&self) -> usize {
@@ -133,6 +114,7 @@ impl Tree for CITree {
                 min_samples_split: config.classification_config.min_samples_split,
                 min_samples_leaf: config.classification_config.min_samples_leaf,
                 criterion: config.classification_config.criterion,
+                n_features,
                 n_intervals: config.n_intervals.get_interval(n_features),
                 n_attributes: config.n_attributes,
             },

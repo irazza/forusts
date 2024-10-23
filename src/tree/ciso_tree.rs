@@ -1,23 +1,24 @@
 use std::{sync::Arc, usize};
 
 use super::{node::Node, tree::StandardSplit};
+use crate::tree::transform::catch_transform;
 use crate::utils::split::get_random_split;
 use crate::{
-    forest::{ciso_forest::CIsoForestConfig, forest::CACHE},
-    tree::tree::Tree,
-    utils::structures::Sample,
+    forest::ciso_forest::CIsoForestConfig, tree::tree::Tree, utils::structures::Sample,
     RandomGenerator,
 };
-use catch22::{compute, N_CATCH22};
+use catch22::N_CATCH22;
 use rand::{seq::SliceRandom, Rng};
 
 const MIN_INTERVAL_PERC: f64 = 0.1;
+const MIN_INTERVALS_LEN: usize = 3;
 
 #[derive(Clone, Debug)]
 pub struct CIsoTreeConfig {
     pub max_depth: usize,
     pub min_samples_split: usize,
     pub min_samples_leaf: usize,
+    pub n_features: usize,
     pub n_intervals: usize,
     pub n_attributes: usize,
 }
@@ -26,7 +27,7 @@ pub struct CIsoTreeConfig {
 pub struct CIsoTree {
     nodes: Vec<Node<StandardSplit>>,
     config: CIsoTreeConfig,
-    intervals: Vec<(f64, f64)>,
+    intervals: Vec<(usize, usize)>,
     attributes: Vec<usize>,
 }
 impl Tree for CIsoTree {
@@ -40,8 +41,8 @@ impl Tree for CIsoTree {
             intervals: {
                 let mut intervals = Vec::with_capacity(config.n_intervals);
                 for _ in 0..config.n_intervals {
-                    let start = random_state.gen_range(0.0..=1.0 - MIN_INTERVAL_PERC);
-                    let end = random_state.gen_range(start + MIN_INTERVAL_PERC..=1.0);
+                    let start = random_state.gen_range(0..=config.n_features - MIN_INTERVALS_LEN);
+                    let end = random_state.gen_range(start + MIN_INTERVALS_LEN..=config.n_features);
                     intervals.push((start, end));
                 }
                 intervals
@@ -55,28 +56,7 @@ impl Tree for CIsoTree {
         }
     }
     fn transform(&self, data: &[Sample]) -> Vec<Sample> {
-        let mut transformed = Vec::with_capacity(data.len());
-        for sample in data {
-            let mut features = Vec::with_capacity(self.intervals.len() * self.attributes.len());
-            for (start, end) in &self.intervals {
-                let start = (start * sample.features.len() as f64).round() as usize;
-                let end = (end * sample.features.len() as f64).round() as usize;
-                for attribute in &self.attributes {
-                    if let Some(value) = CACHE.get(&(sample.clone(), start, end, *attribute)) {
-                        features.push(*value);
-                    } else {
-                        let value = compute(&sample.features[start..end], *attribute);
-                        CACHE.insert((sample.clone(), start, end, *attribute), value);
-                        features.push(value);
-                    }
-                }
-            }
-            transformed.push(Sample {
-                features: Arc::new(features),
-                target: sample.target,
-            });
-        }
-        transformed
+        catch_transform(data, &self.intervals, &self.attributes)
     }
 
     fn get_max_depth(&self) -> usize {
@@ -130,6 +110,7 @@ impl Tree for CIsoTree {
                     .unwrap_or((max_samples as f64).max(2.0).log2().ceil() as usize + 1),
                 min_samples_split: config.outlier_config.min_samples_split,
                 min_samples_leaf: config.outlier_config.min_samples_leaf,
+                n_features,
                 n_intervals: config.n_intervals.get_interval(n_features),
                 n_attributes: config.n_attributes,
             },

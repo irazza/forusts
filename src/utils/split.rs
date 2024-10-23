@@ -185,7 +185,6 @@ pub fn get_best_split(
                 .partial_cmp(&b.features[feature])
                 .unwrap()
         });
-
         let mut thresholds = samples
             .iter()
             .map(|f| f.features[feature])
@@ -194,7 +193,6 @@ pub fn get_best_split(
         thresholds.dedup();
 
         let mut split_index = 0;
-
         let mut children_count = [FastGini::new(), parent_impurity.clone()];
         let mut left_count = 0;
         let mut right_count = samples.len();

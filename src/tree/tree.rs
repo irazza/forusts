@@ -27,7 +27,7 @@ impl SplitParameters for StandardSplit {
     }
     fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample) -> f64 {
         let leaf = tree.predict_leaf(x);
-        return leaf.get_depth() as f64 + T::average_path_length(leaf.get_n_samples());
+        leaf.get_depth() as f64 + T::average_path_length(leaf.get_n_samples())
     }
 }
 pub trait Tree: Sync + Send {
@@ -94,7 +94,7 @@ pub trait Tree: Sync + Send {
                 continue;
             }
 
-            let Some((splitted_ranges, split_parameters, impurity)) =
+            let Some((split_ranges, split_parameters, impurity)) =
                 self.get_split(node_samples, &mut non_constant_features, random_state)
             else {
                 nodes.push(get_leaf(node_samples));
@@ -102,19 +102,19 @@ pub trait Tree: Sync + Send {
                 continue;
             };
 
-            assert!(splitted_ranges.len() >= 2);
+            assert!(split_ranges.len() >= 2);
 
             nodes.push(Node::Internal {
                 id,
                 split_params: split_parameters,
                 children: vec![],
-                n_children: splitted_ranges.len(),
+                n_children: split_ranges.len(),
                 depth,
                 impurity,
                 n_samples: node_samples.len(),
             });
 
-            for child_range in splitted_ranges {
+            for child_range in split_ranges {
                 let child_depth = depth + 1;
                 let child_range =
                     (range.start + child_range.start)..(range.start + child_range.end);
@@ -132,7 +132,7 @@ pub trait Tree: Sync + Send {
     }
     fn predict(&self, x: &[Sample]) -> Vec<isize> {
         x.iter()
-            .map(|sample| self.predict_leaf(sample).get_class()) //get_class(&sample.features))
+            .map(|sample| self.predict_leaf(sample).get_class())
             .collect()
     }
     fn average_path_length(n_samples: usize) -> f64 {
@@ -191,55 +191,6 @@ pub trait Tree: Sync + Send {
 
     //     ranges
     // }
-
-    // fn min_samples_leaf_split(
-    //     samples: &[Sample],
-    //     min_samples_leaf: usize,
-    //     split: &Self::SplitParameters,
-    // ) -> (bool, Vec<Range<usize>>) {
-    //     let mut samples = samples.to_vec();
-    //     let splitted_data = Self::split(&mut samples, split);
-    //     for split in &splitted_data {
-    //         if split.len() < min_samples_leaf {
-    //             return (true, splitted_data);
-    //         }
-    //     }
-    //     // println!("min_samples_leaf_split: {:?}", splitted_data.len());
-    //     (false, splitted_data)
-    // }
-
-    // fn get_leaves(&self) -> Vec<&Node<Self::SplitParameters>> {
-    //     let mut leaves = Vec::new();
-    //     let mut queue = vec![self.get_root()];
-
-    //     while !queue.is_empty() {
-    //         let node = queue.remove(0);
-    //         if let Node::External { .. } = node {
-    //             leaves.push(node);
-    //         } else if let Node::Internal { left, right, .. } = node {
-    //             queue.push(left);
-    //             queue.push(right);
-    //         }
-    //     }
-
-    //     leaves
-    // }
-
-    // fn get_diameter(n: &Node<Self::SplitParameters>) -> (usize, usize) {
-    //     match n {
-    //         Node::External { .. } => (1, 1),
-    //         Node::Internal { left, right, .. } => {
-    //             let (left_diameter, left_height) = Self::get_diameter(left);
-    //             let (right_diameter, right_height) = Self::get_diameter(right);
-    //             let current_diameter = left_height + right_height;
-
-    //             (
-    //                 max(current_diameter, max(left_diameter, right_diameter)),
-    //                 1 + max(left_height, right_height),
-    //             )
-    //         }
-    //     }
-    // }
     fn get_splits(&self, x: &Sample) -> Vec<&Self::SplitParameters> {
         let mut path = Vec::new();
         let mut node = self.get_root();
@@ -268,72 +219,6 @@ pub trait Tree: Sync + Send {
         }
         node
     }
-    // fn split_mut<'a, 'b>(
-    //     samples: &'a mut [Sample],
-    //     parameters: &Self::SplitParameters,
-    // ) -> Vec<Range<usize>> {
-    //     let mut branches = Vec::new();
-    //     let mut counters = Vec::new();
-    //     let mut positions = Vec::new();
-    //     let mut ranges = Vec::new();
-    //     let mut samples_cp = samples.iter().cloned().map(Some).collect::<Vec<_>>();
-
-    //     for sample in samples.iter() {
-    //         let branch = parameters.split(sample);
-    //         branches.push(branch);
-
-    //         if counters.len() <= branch {
-    //             counters.resize(branch + 1, 0);
-    //         }
-
-    //         counters[branch] += 1;
-    //     }
-
-    //     let mut count = 0;
-    //     for counter in counters.iter() {
-    //         ranges.push(count..count + counter);
-    //         positions.push(count);
-    //         count += counter;
-    //     }
-
-    //     for idx in 0..samples_cp.len() {
-    //         let branch = branches[idx];
-    //         let position = positions[branch];
-    //         samples[position] = samples_cp[idx].take().unwrap();
-    //         positions[branch] += 1;
-    //     }
-
-    //     ranges
-    // }
-
-    // fn split<'a, 'b>(
-    //     samples: &'a [Sample],
-    //     parameters: &Self::SplitParameters,
-    // ) -> Vec<Range<usize>> {
-    //     let mut branches = Vec::new();
-    //     let mut counters = Vec::new();
-    //     let mut positions = Vec::new();
-    //     let mut ranges = Vec::new();
-
-    //     for sample in samples.iter() {
-    //         let branch = parameters.split(sample);
-    //         branches.push(branch);
-
-    //         if counters.len() <= branch {
-    //             counters.resize(branch + 1, 0);
-    //         }
-
-    //         counters[branch] += 1;
-    //     }
-
-    //     let mut count = 0;
-    //     for counter in counters.iter() {
-    //         ranges.push(count..count + counter);
-    //         positions.push(count);
-    //         count += counter;
-    //     }
-    //     ranges
-    // }
     fn majority_class(samples: &[Sample]) -> isize {
         let mut class_counts = HashMap::new();
         for Sample { target, .. } in samples {
@@ -352,57 +237,6 @@ pub trait Tree: Sync + Send {
 
         most_common_class
     }
-    // fn get_leaf_class(
-    //     samples: &[Sample],
-    //     _parameters: Option<&Self::SplitParameters>,
-    // ) -> LeafClassification {
-    //     let mut class_counts = HashMap::new();
-    //     for Sample { target, .. } in samples {
-    //         *class_counts.entry(*target).or_insert(0) += 1;
-    //     }
-    //
-    //     let mut max_count = 0;
-    //     let mut most_common_class = 0;
-    //
-    //     for (class, count) in &class_counts {
-    //         if *count > max_count {
-    //             max_count = *count;
-    //             most_common_class = *class;
-    //         }
-    //     }
-    //
-    //     LeafClassification::Simple(most_common_class)
-    // }
-    // fn bfs(&self) -> Vec<&Node<Self::SplitParameters>> {
-    //     let mut queue = vec![self.get_root()];
-    //     let mut bfs = Vec::new();
-
-    //     while !queue.is_empty() {
-    //         let node = queue.remove(0);
-    //         bfs.push(node);
-    //         if let Node::Internal { left, right, .. } = node {
-    //             queue.push(left);
-    //             queue.push(right);
-    //         }
-    //     }
-
-    //     bfs
-    // }
-    // fn get_depth(&self) -> usize {
-    //     let mut max_depth = 0;
-    //     let mut queue = vec![(self.get_root(), 0)];
-
-    //     while !queue.is_empty() {
-    //         let (node, depth) = queue.remove(0);
-    //         max_depth = max(max_depth, depth);
-    //         if let Node::Internal { left, right, .. } = node {
-    //             queue.push((left, depth + 1));
-    //             queue.push((right, depth + 1));
-    //         }
-    //     }
-
-    //     max_depth
-    // }
     fn compute_ancestor<'a>(
         &'a self,
         node: &'a Node<Self::SplitParameters>,

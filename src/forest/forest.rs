@@ -13,16 +13,11 @@ use crate::{
     RandomGenerator,
 };
 use atomic_float::AtomicF64;
-use dashmap::DashMap;
+
 use hashbrown::HashMap;
-use lazy_static::lazy_static;
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rayon::prelude::*;
 use std::{cmp::max, sync::atomic::AtomicUsize};
-
-lazy_static! {
-    pub static ref CACHE: DashMap<(Sample, usize, usize, usize), f64> = DashMap::new();
-}
 
 pub const SUBSAMPLE_SIZE: usize = 256;
 const ANOMALY_SCORE: f64 = 2.0;

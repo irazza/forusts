@@ -38,5 +38,5 @@ def test_rf(datasets, repetitions=10):
             print(p.name, round(avg_score / repetitions, 2), round(time.time() - start_time, 2))
 
 if __name__ == "__main__":
-    datasets = sorted([x for x  in pathlib.Path("../UCRArchive_2018").iterdir() if x.is_dir()])
-    test_rf(datasets, 10)
+    datasets = sorted([x for x  in pathlib.Path("../DATA/ucr").iterdir() if x.is_dir()])
+    test_rf(datasets, 1)

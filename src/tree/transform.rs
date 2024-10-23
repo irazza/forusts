@@ -2,11 +2,16 @@ use crate::utils::structures::Sample;
 use catch22::compute;
 use dashmap::DashMap;
 use lazy_static::lazy_static;
-use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 
 lazy_static! {
     pub static ref CACHE: DashMap<(usize, usize, usize, usize), f64> = DashMap::new();
+}
+
+pub fn zscore(data: &[f64]) -> Vec<f64> {
+    let mean = data.iter().sum::<f64>() / data.len() as f64;
+    let std = (data.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / data.len() as f64).sqrt();
+    (0..data.len()).map(|i| (data[i] - mean) / std).collect()
 }
 
 pub fn catch_transform(
@@ -18,26 +23,17 @@ pub fn catch_transform(
     //     CACHE.clear();
     // }
     let mut transformed = Vec::with_capacity(data.len());
-    static COUNTER_GET: AtomicUsize = AtomicUsize::new(0);
     for sample in data {
+
         let mut features = Vec::with_capacity(intervals.len() * attributes.len());
         for (start, end) in intervals {
             for attribute in attributes {
-                // static COUNTER: AtomicUsize = AtomicUsize::new(0);
-                // if COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % 1000 == 0 {
-                //     println!("COUNTER: {}", COUNTER.load(std::sync::atomic::Ordering::Relaxed));
-                //     println!("COUNTER GET: {}", COUNTER_GET.load(std::sync::atomic::Ordering::Relaxed));
-                //
-                // }
-
                 let key_cache = (sample.features.as_ptr() as usize, *start, *end, *attribute);
                 if let Some(value) = CACHE.get(&key_cache) {
-                    // if COUNTER_GET.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % 1000 == 0 {
-                    //     println!("COUNTER GET: {}", COUNTER_GET.load(std::sync::atomic::Ordering::Relaxed));
-                    // }
                     features.push(*value);
                 } else {
-                    let value = compute(&sample.features[*start..*end], *attribute);
+                    let ts = zscore(&sample.features);
+                    let value = compute(&ts[*start..*end], *attribute);
                     CACHE.insert(key_cache, value);
                     features.push(value);
                 }

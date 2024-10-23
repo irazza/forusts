@@ -1,66 +1,10 @@
 use serde::{Deserialize, Serialize};
-use std::mem::transmute;
-use std::ops::Deref;
 use std::{hash::Hash, sync::Arc};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone, PartialOrd)]
 pub struct Sample {
     pub target: isize,
     pub features: Arc<Vec<f64>>,
-}
-
-pub struct HashVecF64(pub Arc<Vec<f64>>);
-
-impl PartialEq for HashVecF64 {
-    fn eq(&self, other: &Self) -> bool {
-        unsafe {
-            let self_: &Vec<HashF64> = transmute(self.0.deref());
-            let other_: &Vec<HashF64> = transmute(other.0.deref());
-
-            self_.eq(other_)
-        }
-    }
-}
-
-impl Eq for HashVecF64 {}
-
-impl Hash for HashVecF64 {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        unsafe {
-            let self_: &Vec<HashF64> = transmute(self.0.deref());
-            self_.hash(state);
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
-#[repr(transparent)]
-pub struct HashF64(pub f64);
-
-impl PartialEq for HashF64 {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.eq(&other.0)
-    }
-}
-
-impl Eq for HashF64 {}
-
-impl Hash for HashF64 {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0.to_bits().hash(state);
-    }
-}
-
-impl PartialOrd for HashF64 {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.0.partial_cmp(&other.0)
-    }
-}
-
-impl Ord for HashF64 {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.0.partial_cmp(&other.0).unwrap()
-    }
 }
 
 #[derive(Clone)]

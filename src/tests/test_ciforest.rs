@@ -85,7 +85,11 @@ mod tests {
             .iter()
             .map(|x| x / n_repetitions as f64)
             .collect::<Vec<_>>();
-        write_csv("admep_L.csv", vec![predictions]);
+        write_csv("admep_L.csv", vec![predictions.clone()]);
+        println!(
+            "Mean: {:.2}",
+            predictions.iter().sum::<f64>() / predictions.len() as f64
+        );
     }
 
     #[test]

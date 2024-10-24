@@ -35,7 +35,7 @@ mod tests {
                 aggregation: None,
             },
         };
-        let n_repetitions = 1;
+        let n_repetitions = 10;
         let paths = fs::read_dir("../DATA/ADMEP/").unwrap();
 
         let mut datasets = Vec::new();
@@ -46,7 +46,7 @@ mod tests {
             }
         }
         datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
-        let mut predictions = vec![0.0; datasets.len()];
+        let mut predictions = vec![vec![0.0; n_repetitions]; datasets.len()];
 
         for (i, path) in datasets.iter().enumerate() {
             let mut ds_train = read_csv(
@@ -73,23 +73,16 @@ mod tests {
                     )),
                 );
                 let prediction = model.score_samples(&ds_test);
-                predictions[i] += roc_auc_score(&prediction, &y_true);
+                predictions[i][j] = roc_auc_score(&prediction, &y_true);
             }
             println!(
                 "{}: {:.2}",
                 path.file_name().to_string_lossy(),
-                predictions[i] / n_repetitions as f64
+                predictions[i].iter().sum::<f64>() / n_repetitions as f64
             );
         }
-        let predictions = predictions
-            .iter()
-            .map(|x| x / n_repetitions as f64)
-            .collect::<Vec<_>>();
-        write_csv("admep_L.csv", vec![predictions.clone()]);
-        println!(
-            "Mean: {:.2}",
-            predictions.iter().sum::<f64>() / predictions.len() as f64
-        );
+        
+        write_csv("admep_L.csv", predictions);
     }
 
     #[test]

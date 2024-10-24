@@ -1,4 +1,4 @@
-use std::{sync::Arc, usize};
+use std::cmp::max;
 
 use super::{node::Node, tree::StandardSplit};
 use crate::tree::transform::catch_transform;
@@ -39,10 +39,15 @@ impl Tree for CIsoTree {
             nodes: Vec::new(),
             config: config.clone(),
             intervals: {
-                let mut intervals = Vec::with_capacity(config.n_intervals);
+                let mut intervals = Vec::with_capacity(config.n_intervals+1);
+                let min_interval_len = max(
+                    (config.n_features as f64 * MIN_INTERVAL_PERC).ceil() as usize,
+                    MIN_INTERVALS_LEN,
+                );
+                intervals.push((0, config.n_features));
                 for _ in 0..config.n_intervals {
-                    let start = random_state.gen_range(0..=config.n_features - MIN_INTERVALS_LEN);
-                    let end = random_state.gen_range(start + MIN_INTERVALS_LEN..=config.n_features);
+                    let start = random_state.gen_range(0..=config.n_features - min_interval_len);
+                    let end = random_state.gen_range(start + min_interval_len..=config.n_features);
                     intervals.push((start, end));
                 }
                 intervals

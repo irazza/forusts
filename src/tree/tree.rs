@@ -72,7 +72,7 @@ pub trait Tree: Sync + Send {
                 || range.len() < self.get_min_samples_split()
                 || range.len() < 2 * self.get_min_samples_leaf()
                 || non_constant_features.is_empty()
-                || previous_impurity < f64::EPSILON;
+            || previous_impurity < f64::EPSILON;
 
             let node_samples = &mut samples[range.clone()];
 
@@ -104,6 +104,7 @@ pub trait Tree: Sync + Send {
                 add_children(&mut nodes);
                 continue;
             };
+
             assert!(split_ranges.len() >= 2);
 
             nodes.push(Node::Internal {

@@ -39,7 +39,7 @@ impl Tree for CIsoTree {
             nodes: Vec::new(),
             config: config.clone(),
             intervals: {
-                let mut intervals = Vec::with_capacity(config.n_intervals+1);
+                let mut intervals = Vec::with_capacity(config.n_intervals + 1);
                 let min_interval_len = max(
                     (config.n_features as f64 * MIN_INTERVAL_PERC).ceil() as usize,
                     MIN_INTERVALS_LEN,

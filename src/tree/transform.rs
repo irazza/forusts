@@ -24,7 +24,6 @@ pub fn catch_transform(
     }
     let mut transformed = Vec::with_capacity(data.len());
     for sample in data {
-
         let mut features = Vec::with_capacity(intervals.len() * attributes.len() + N_CATCH22);
         let ts = zscore(&sample.features);
 

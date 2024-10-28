@@ -39,11 +39,17 @@ pub fn read_csv(
     Ok(samples)
 }
 
-pub fn write_csv(path: impl AsRef<Path>, data: Vec<Vec<f64>>) {
+pub fn write_csv<T>(path: impl AsRef<Path>, data: Vec<Vec<T>>, header: Option<Vec<String>>)
+where
+    T: std::fmt::Display,
+{
     if let Some(parent) = path.as_ref().parent() {
         std::fs::create_dir_all(parent).unwrap();
     }
     let mut writer = csv::Writer::from_path(path).unwrap();
+    if header.is_some() {
+        writer.write_record(header.unwrap()).unwrap();
+    }
     for row in data {
         writer
             .write_record(row.iter().map(|v| v.to_string()))

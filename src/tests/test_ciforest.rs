@@ -85,7 +85,7 @@ mod tests {
             .iter()
             .map(|x| x / n_repetitions as f64)
             .collect::<Vec<_>>();
-        write_csv("admep_L.csv", vec![predictions.clone()]);
+        write_csv("admep_L.csv", vec![predictions.clone()], None);
         println!(
             "Mean: {:.2}",
             predictions.iter().sum::<f64>() / predictions.len() as f64
@@ -154,14 +154,14 @@ mod tests {
                 times[i][1] += start_time.elapsed().as_secs_f64();
                 let breiman_path =
                     format!("breiman/{}_{}.csv", path.file_name().to_string_lossy(), j);
-                write_csv(breiman_path, distance_matrix);
+                write_csv(breiman_path, distance_matrix, None);
 
                 // zhu
                 let start_time = std::time::Instant::now();
                 let distance_matrix = model.pairwise_zhu(&ds_test, &ds_train);
                 times[i][2] += start_time.elapsed().as_secs_f64();
                 let zhu_path = format!("zhu/{}_{}.csv", path.file_name().to_string_lossy(), j);
-                write_csv(zhu_path, distance_matrix);
+                write_csv(zhu_path, distance_matrix, None);
 
                 // ratiorf
                 let start_time = std::time::Instant::now();
@@ -169,7 +169,7 @@ mod tests {
                 times[i][3] += start_time.elapsed().as_secs_f64();
                 let ratiorf_path =
                     format!("ratiorf/{}_{}.csv", path.file_name().to_string_lossy(), j);
-                write_csv(ratiorf_path, distance_matrix);
+                write_csv(ratiorf_path, distance_matrix, None);
             }
             println!(
                 "{}: Fit in {:.2}s, breiman in {:.2}s, zhu in {:.2}s, ratiorf in {:.2}s",

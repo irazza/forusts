@@ -1,4 +1,3 @@
-from sklearn.cluster import AgglomerativeClustering
 from sklearn.metrics import roc_auc_score, accuracy_score
 from sklearn.ensemble import IsolationForest, RandomForestClassifier
 import numpy as np
@@ -28,15 +27,17 @@ def test_rf(datasets, repetitions=10):
             test = np.loadtxt(p/f"{p.name}_TEST.tsv", delimiter="\t")
             X_train, y_train = train[:, 1:], train[:, 0]
             X_test, y_test = test[:, 1:], test[:, 0]
-            start_time = time.time()
+            tot_time = 0
             for _ in range(repetitions):
                 model = RandomForestClassifier(n_estimators=100, n_jobs=-1, max_features=None)
+                start_time = time.time()
                 model.fit(X_train, y_train)
+                tot_time += time.time() - start_time
                 score = accuracy_score(y_test, model.predict(X_test))
                 avg_score += score
             # print dataset name and average score with 2 decimal digits
-            print(p.name, round(avg_score / repetitions, 2), round(time.time() - start_time, 2))
+            print(p.name, round(avg_score / repetitions, 2), round(tot_time, 2))
 
 if __name__ == "__main__":
     datasets = sorted([x for x  in pathlib.Path("../DATA/ucr").iterdir() if x.is_dir()])
-    test_rf(datasets, 1)
+    test_rf(datasets, 10)

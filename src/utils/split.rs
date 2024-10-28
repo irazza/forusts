@@ -189,7 +189,6 @@ pub fn get_best_split(
             .iter()
             .map(|f| f.features[feature])
             .collect::<Vec<_>>();
-
         thresholds.dedup();
 
         let mut split_index = 0;
@@ -197,7 +196,7 @@ pub fn get_best_split(
         let mut left_count = 0;
         let mut right_count = samples.len();
 
-        for &threshold in &thresholds {
+        for threshold in thresholds.windows(2).map(|x| (x[0] + x[1]) / 2.0) {
             let current_split = StandardSplit { feature, threshold };
 
             while split_index < samples.len() && current_split.split(&samples[split_index]) == 1 {
@@ -224,7 +223,6 @@ pub fn get_best_split(
             }
         }
         current_feature_count += 1;
-
         return true;
     });
 

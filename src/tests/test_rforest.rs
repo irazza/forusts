@@ -27,7 +27,7 @@ mod tests {
             criterion: |_a, _b| f64::NAN,
             aggregation: None,
         };
-        let n_repetitions = 1;
+        let n_repetitions = 10;
         let paths = fs::read_dir("../DATA/ucr").unwrap();
 
         let mut datasets = Vec::new();
@@ -54,15 +54,17 @@ mod tests {
                 false,
             )
             .unwrap();
-            let start_time = std::time::Instant::now();
+            let mut total_time = 0.0;
             for j in 0..n_repetitions {
                 let mut model = RandomForest::new(&config);
+                let start_time = std::time::Instant::now();
                 model.fit(
                     &mut ds_train,
                     Some(rand_chacha::ChaCha8Rng::seed_from_u64(
                         ((i + 2) * (j + 2)) as u64,
                     )),
                 );
+                total_time += start_time.elapsed().as_secs_f64();
                 let prediction = model.predict(&ds_test);
                 predictions[i] += accuracy_score(
                     &prediction,
@@ -73,7 +75,7 @@ mod tests {
                 "{}: {:.2} in {:.2} seconds",
                 path.file_name().to_string_lossy(),
                 predictions[i] / n_repetitions as f64,
-                start_time.elapsed().as_secs_f64(),
+                total_time,
             );
         }
     }

@@ -61,15 +61,18 @@ pub trait Tree: Sync + Send {
         random_state: &mut RandomGenerator,
     ) -> Vec<Node<Self::SplitParameters>> {
         let features = (0..samples[0].features.len()).collect::<Vec<_>>();
-        let mut queue = VecDeque::from(vec![(0..samples.len(), 0, None, features)]);
+        let mut queue = VecDeque::from(vec![(0..samples.len(), 0, None, features, 1.0)]);
         let mut nodes = Vec::new();
-        while let Some((range, depth, parent, mut non_constant_features)) = queue.pop_front() {
+        while let Some((range, depth, parent, mut non_constant_features, previous_impurity)) =
+            queue.pop_front()
+        {
             let id = nodes.len();
 
             let is_leaf = depth >= self.get_max_depth()
                 || range.len() < self.get_min_samples_split()
                 || range.len() < 2 * self.get_min_samples_leaf()
-                || non_constant_features.is_empty();
+                || non_constant_features.is_empty()
+                || previous_impurity < f64::EPSILON;
 
             let node_samples = &mut samples[range.clone()];
 
@@ -101,7 +104,6 @@ pub trait Tree: Sync + Send {
                 add_children(&mut nodes);
                 continue;
             };
-
             assert!(split_ranges.len() >= 2);
 
             nodes.push(Node::Internal {
@@ -123,6 +125,7 @@ pub trait Tree: Sync + Send {
                     child_depth,
                     Some(id),
                     non_constant_features.clone(),
+                    impurity,
                 ));
             }
 

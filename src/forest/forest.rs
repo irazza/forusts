@@ -105,10 +105,9 @@ pub trait Forest<T: Tree>: Sync + Send {
             let ds_b_leaves = if let Some(ds_b) = ds_b {
                 let ds_b = tree.transform(ds_b);
 
-                ds_b
-                .iter()
-                .map(|x| tree.predict_leaf(x))
-                .collect::<Vec<_>>()
+                ds_b.iter()
+                    .map(|x| tree.predict_leaf(x))
+                    .collect::<Vec<_>>()
             } else {
                 ds_a_leaves.clone()
             };
@@ -116,8 +115,7 @@ pub trait Forest<T: Tree>: Sync + Send {
             for (i, &ds_a_node) in ds_a_leaves.iter().enumerate() {
                 for (j, &ds_b_node) in ds_b_leaves.iter().enumerate() {
                     distance_matrix[i][j].fetch_add(
-                        ((ds_a_node as *const Node<_>) != (ds_b_node as *const Node<_>))
-                            as usize,
+                        ((ds_a_node as *const Node<_>) != (ds_b_node as *const Node<_>)) as usize,
                         std::sync::atomic::Ordering::Relaxed,
                     );
                 }
@@ -152,10 +150,9 @@ pub trait Forest<T: Tree>: Sync + Send {
             let ds_b_leaves = if let Some(ds_b) = ds_b {
                 let ds_b = tree.transform(ds_b);
 
-                ds_b
-                .iter()
-                .map(|x| tree.predict_leaf(x))
-                .collect::<Vec<_>>()
+                ds_b.iter()
+                    .map(|x| tree.predict_leaf(x))
+                    .collect::<Vec<_>>()
             } else {
                 ds_a_leaves.clone()
             };
@@ -190,7 +187,9 @@ pub trait Forest<T: Tree>: Sync + Send {
         let trees: &Vec<T> = self.get_trees();
         trees.par_iter().for_each(|tree| {
             let ds_a = tree.transform(ds_a);
-            let ds_b = ds_b.map(|ds_b| tree.transform(ds_b)).unwrap_or_else(|| ds_a.clone());
+            let ds_b = ds_b
+                .map(|ds_b| tree.transform(ds_b))
+                .unwrap_or_else(|| ds_a.clone());
 
             let mut union = Vec::new();
             for (i, sample_test) in ds_a.iter().enumerate() {

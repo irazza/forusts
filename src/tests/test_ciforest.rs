@@ -146,26 +146,34 @@ mod tests {
                 let start_time = std::time::Instant::now();
                 let distance_matrix = model.pairwise_breiman(&ds, None);
                 times[i][1] += start_time.elapsed().as_secs_f64();
-                let breiman_path =
-                    format!("breiman/{}_{}.csv", path.file_name().to_string_lossy(), j);
+                let breiman_path = format!(
+                    "../tsrf/HEAVY/breiman/{}_{}.csv",
+                    path.file_name().to_string_lossy(),
+                    j
+                );
                 write_csv(breiman_path, distance_matrix, None);
 
                 // zhu
                 let start_time = std::time::Instant::now();
                 let distance_matrix = model.pairwise_zhu(&ds, None);
                 times[i][2] += start_time.elapsed().as_secs_f64();
-                let zhu_path = format!("zhu/{}_{}.csv", path.file_name().to_string_lossy(), j);
+                let zhu_path = format!(
+                    "../tsrf/HEAVY/zhu/{}_{}.csv",
+                    path.file_name().to_string_lossy(),
+                    j
+                );
                 write_csv(zhu_path, distance_matrix, None);
 
                 // ratiorf
                 let start_time = std::time::Instant::now();
                 let distance_matrix = model.pairwise_ratiorf(&ds, None);
                 times[i][3] += start_time.elapsed().as_secs_f64();
-                let ratiorf_path =
-                    format!("ratiorf/{}_{}.csv", path.file_name().to_string_lossy(), j);
+                let ratiorf_path = format!(
+                    "../tsrf/HEAVY/ratiorf/{}_{}.csv",
+                    path.file_name().to_string_lossy(),
+                    j
+                );
                 write_csv(ratiorf_path, distance_matrix, None);
-
-                panic!();
             }
             println!(
                 "{}: Fit in {:.2}s, breiman in {:.2}s, zhu in {:.2}s, ratiorf in {:.2}s",

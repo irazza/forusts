@@ -134,6 +134,7 @@ pub fn get_random_split(
 }
 pub fn get_best_split(
     samples: &mut [Sample],
+    _criterion: fn(&HashMap<isize, usize>, &[HashMap<isize, usize>]) -> f64,
     non_constant_features: &mut Vec<usize>,
     min_samples_leaf: usize,
     max_features: usize,

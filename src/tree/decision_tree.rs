@@ -62,6 +62,7 @@ impl Tree for DecisionTree {
     ) -> Option<(Vec<std::ops::Range<usize>>, Self::SplitParameters, f64)> {
         get_best_split(
             samples,
+            self.config.criterion,
             non_constant_features,
             self.config.min_samples_leaf,
             self.config.max_features,

@@ -19,9 +19,7 @@ pub fn catch_transform(
     intervals: &[(usize, usize)],
     attributes: &[usize],
 ) -> Vec<Sample> {
-    if CACHE.len() > 10_000_000 {
-        CACHE.clear();
-    }
+    
     let mut transformed = Vec::with_capacity(data.len());
     for sample in data {
         let mut features = Vec::with_capacity(intervals.len() * attributes.len());

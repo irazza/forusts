@@ -4,6 +4,7 @@ mod tests {
     use std::fs;
 
     use crate::metrics::classification::{accuracy_score, precision_at_k};
+    use crate::tree::transform::CACHE;
     use crate::utils::csv_io::write_csv;
     use crate::utils::structures::MaxFeatures;
     use crate::{
@@ -175,6 +176,7 @@ mod tests {
                 );
                 write_csv(ratiorf_path, distance_matrix, None);
             }
+            CACHE.clear();
             times[i][0] /= n_repetitions as f64;
             times[i][1] /= n_repetitions as f64;
             times[i][2] /= n_repetitions as f64;

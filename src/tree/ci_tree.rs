@@ -4,13 +4,10 @@ use crate::utils::split::get_best_split;
 use crate::{
     forest::ci_forest::CIForestConfig, tree::tree::Tree, utils::structures::Sample, RandomGenerator,
 };
-use catch22::{compute, N_CATCH22};
+use catch22::N_CATCH22;
 use hashbrown::HashMap;
 use rand::seq::SliceRandom;
 use rand::Rng;
-use std::sync::Arc;
-
-const MIN_INTERVAL_PERC: f64 = 0.1;
 const MIN_INTERVALS_LEN: usize = 3;
 
 #[derive(Clone, Debug)]
@@ -92,6 +89,7 @@ impl Tree for CITree {
     ) -> Option<(Vec<std::ops::Range<usize>>, Self::SplitParameters, f64)> {
         get_best_split(
             samples,
+            self.config.criterion,
             non_constant_features,
             self.config.min_samples_leaf,
             self.config.max_features,

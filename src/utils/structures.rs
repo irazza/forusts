@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{hash::Hash, sync::Arc};
+use std::sync::Arc;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone, PartialOrd)]
 pub struct Sample {

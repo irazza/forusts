@@ -1,10 +1,9 @@
 #[cfg(test)]
 mod tests {
-
     use rand::SeedableRng;
     use std::fs;
 
-    use crate::metrics::classification::accuracy_score;
+    use crate::metrics::classification::{accuracy_score, precision_at_k};
     use crate::utils::csv_io::write_csv;
     use crate::utils::structures::MaxFeatures;
     use crate::{
@@ -14,7 +13,6 @@ mod tests {
             erci_forest::ERCIForest,
             forest::{Forest, ForestConfig, OutlierForest},
         },
-        metrics::classification::roc_auc_score,
         utils::{csv_io::read_csv, structures::IntervalType},
     };
 
@@ -22,10 +20,10 @@ mod tests {
     fn test_admep() {
         // Settings for the experiments
         let config = CIsoForestConfig {
-            n_intervals: IntervalType::LOG2,
+            n_intervals: IntervalType::LOG10,
             n_attributes: 8,
             outlier_config: ForestConfig {
-                n_trees: 200,
+                n_trees: 100,
                 max_depth: None,
                 min_samples_split: 2,
                 min_samples_leaf: 1,
@@ -64,6 +62,7 @@ mod tests {
             )
             .unwrap();
             let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
+            let n_anomalies = y_true.iter().sum::<isize>() as usize;
             for j in 0..n_repetitions {
                 let mut model = CIsoForest::new(&config);
                 model.fit(
@@ -73,7 +72,7 @@ mod tests {
                     )),
                 );
                 let prediction = model.score_samples(&ds_test);
-                predictions[i][j] = roc_auc_score(&prediction, &y_true);
+                predictions[i][j] = precision_at_k(&prediction, &y_true, n_anomalies);
             }
             println!(
                 "{}: {:.2}",
@@ -81,8 +80,7 @@ mod tests {
                 predictions[i].iter().sum::<f64>() / n_repetitions as f64
             );
         }
-
-        write_csv("admep_L.csv", predictions, None);
+        write_csv("admep_L_pk.csv", predictions, None);
     }
 
     #[test]
@@ -102,7 +100,7 @@ mod tests {
                 aggregation: None,
             },
         };
-        let n_repetitions = 1;
+        let n_repetitions = 10;
         let paths = fs::read_dir("../DATA/ucr").unwrap();
 
         let mut datasets = Vec::new();
@@ -115,7 +113,7 @@ mod tests {
         datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
         let mut times = vec![vec![0.0; 4]; datasets.len()];
         for (i, path) in datasets[..1].iter().enumerate() {
-            let mut ds_train = read_csv(
+            let ds_train = read_csv(
                 path.path()
                     .join(format!("{}_TRAIN.tsv", path.file_name().to_string_lossy())),
                 b'\t',
@@ -130,11 +128,14 @@ mod tests {
             )
             .unwrap();
 
+            let mut ds = ds_train.clone();
+            ds.extend(ds_test);
+
             for j in 0..n_repetitions {
                 let mut model = ERCIForest::new(&config);
                 let start_time = std::time::Instant::now();
                 model.fit(
-                    &mut ds_train,
+                    &mut ds,
                     Some(rand_chacha::ChaCha8Rng::seed_from_u64(
                         ((i + 2) * (j + 2)) as u64,
                     )),
@@ -143,7 +144,7 @@ mod tests {
 
                 // breiman
                 let start_time = std::time::Instant::now();
-                let distance_matrix = model.pairwise_breiman(&ds_test, &ds_train);
+                let distance_matrix = model.pairwise_breiman(&ds, None);
                 times[i][1] += start_time.elapsed().as_secs_f64();
                 let breiman_path =
                     format!("breiman/{}_{}.csv", path.file_name().to_string_lossy(), j);
@@ -151,18 +152,20 @@ mod tests {
 
                 // zhu
                 let start_time = std::time::Instant::now();
-                let distance_matrix = model.pairwise_zhu(&ds_test, &ds_train);
+                let distance_matrix = model.pairwise_zhu(&ds, None);
                 times[i][2] += start_time.elapsed().as_secs_f64();
                 let zhu_path = format!("zhu/{}_{}.csv", path.file_name().to_string_lossy(), j);
                 write_csv(zhu_path, distance_matrix, None);
 
                 // ratiorf
                 let start_time = std::time::Instant::now();
-                let distance_matrix = model.pairwise_ratiorf(&ds_test, &ds_train);
+                let distance_matrix = model.pairwise_ratiorf(&ds, None);
                 times[i][3] += start_time.elapsed().as_secs_f64();
                 let ratiorf_path =
                     format!("ratiorf/{}_{}.csv", path.file_name().to_string_lossy(), j);
                 write_csv(ratiorf_path, distance_matrix, None);
+
+                panic!();
             }
             println!(
                 "{}: Fit in {:.2}s, breiman in {:.2}s, zhu in {:.2}s, ratiorf in {:.2}s",

@@ -87,28 +87,36 @@ pub trait Forest<T: Tree>: Sync + Send {
         *self.get_trees_mut() = trees;
     }
     fn predict(&self, data: &[Sample]) -> Vec<isize>;
-    fn pairwise_breiman(&self, ds_test: &[Sample], ds_train: &[Sample]) -> Vec<Vec<f64>> {
-        let distance_matrix: Vec<Vec<_>> = (0..ds_test.len())
-            .map(|_| (0..ds_train.len()).map(|_| AtomicUsize::new(0)).collect())
+    fn pairwise_breiman(&self, ds_a: &[Sample], ds_b: Option<&[Sample]>) -> Vec<Vec<f64>> {
+        // let ds_b = ds_b.unwrap_or(ds_a);
+        let ds_b_len = ds_b.map_or(ds_a.len(), |x| x.len());
+        let distance_matrix: Vec<Vec<_>> = (0..ds_a.len())
+            .map(|_| (0..ds_b_len).map(|_| AtomicUsize::new(0)).collect())
             .collect();
         let trees: &Vec<T> = self.get_trees();
         trees.par_iter().for_each(|tree| {
-            let ds_train = tree.transform(ds_train);
-            let ds_test = tree.transform(ds_test);
+            let ds_a = tree.transform(ds_a);
 
-            let ds_test_leaves = ds_test
-                .iter()
-                .map(|x| tree.predict_leaf(x))
-                .collect::<Vec<_>>();
-            let ds_train_leaves = ds_train
+            let ds_a_leaves = ds_a
                 .iter()
                 .map(|x| tree.predict_leaf(x))
                 .collect::<Vec<_>>();
 
-            for (i, &ds_test_node) in ds_test_leaves.iter().enumerate() {
-                for (j, &ds_train_node) in ds_train_leaves.iter().enumerate() {
+            let ds_b_leaves = if let Some(ds_b) = ds_b {
+                let ds_b = tree.transform(ds_b);
+
+                ds_b
+                .iter()
+                .map(|x| tree.predict_leaf(x))
+                .collect::<Vec<_>>()
+            } else {
+                ds_a_leaves.clone()
+            };
+
+            for (i, &ds_a_node) in ds_a_leaves.iter().enumerate() {
+                for (j, &ds_b_node) in ds_b_leaves.iter().enumerate() {
                     distance_matrix[i][j].fetch_add(
-                        ((ds_test_node as *const Node<_>) != (ds_train_node as *const Node<_>))
+                        ((ds_a_node as *const Node<_>) != (ds_b_node as *const Node<_>))
                             as usize,
                         std::sync::atomic::Ordering::Relaxed,
                     );
@@ -127,30 +135,36 @@ pub trait Forest<T: Tree>: Sync + Send {
 
     // https://openaccess.thecvf.com/content_cvpr_2014/papers/Zhu_Constructing_Robust_Affinity_2014_CVPR_paper.pdf
     // VARIANT II
-    fn pairwise_zhu(&self, ds_test: &[Sample], ds_train: &[Sample]) -> Vec<Vec<f64>> {
-        let distance_matrix: Vec<Vec<_>> = (0..ds_test.len())
-            .map(|_| (0..ds_train.len()).map(|_| AtomicF64::new(0.0)).collect())
+    fn pairwise_zhu(&self, ds_a: &[Sample], ds_b: Option<&[Sample]>) -> Vec<Vec<f64>> {
+        let ds_b_len = ds_b.map_or(ds_a.len(), |x| x.len());
+        let distance_matrix: Vec<Vec<_>> = (0..ds_a.len())
+            .map(|_| (0..ds_b_len).map(|_| AtomicF64::new(0.0)).collect())
             .collect();
         let trees: &Vec<T> = self.get_trees();
         trees.par_iter().for_each(|tree| {
-            let ds_train = tree.transform(ds_train);
-            let ds_test = tree.transform(ds_test);
+            let ds_a = tree.transform(ds_a);
 
-            let ds_test_nodes = ds_test
-                .iter()
-                .map(|x| tree.predict_leaf(x))
-                .collect::<Vec<_>>();
-            let ds_train_nodes = ds_train
+            let ds_a_leaves = ds_a
                 .iter()
                 .map(|x| tree.predict_leaf(x))
                 .collect::<Vec<_>>();
 
-            for (i, &ds_test_node) in ds_test_nodes.iter().enumerate() {
-                let distances = tree.compute_ancestor(ds_test_node);
+            let ds_b_leaves = if let Some(ds_b) = ds_b {
+                let ds_b = tree.transform(ds_b);
 
-                for (j, &ds_train_node) in ds_train_nodes.iter().enumerate() {
-                    let value = distances[&(ds_train_node as *const Node<_>)].get_depth() as f64
-                        / max(ds_test_node.get_depth(), ds_train_node.get_depth()) as f64;
+                ds_b
+                .iter()
+                .map(|x| tree.predict_leaf(x))
+                .collect::<Vec<_>>()
+            } else {
+                ds_a_leaves.clone()
+            };
+            for (i, &ds_a_node) in ds_a_leaves.iter().enumerate() {
+                let distances = tree.compute_ancestor(ds_a_node);
+
+                for (j, &ds_b_node) in ds_b_leaves.iter().enumerate() {
+                    let value = distances[&(ds_b_node as *const Node<_>)].get_depth() as f64
+                        / max(ds_a_node.get_depth(), ds_b_node.get_depth()) as f64;
                     distance_matrix[i][j].fetch_add(value, std::sync::atomic::Ordering::Relaxed);
                 }
             }
@@ -167,22 +181,23 @@ pub trait Forest<T: Tree>: Sync + Send {
     }
 
     // http://profs.sci.univr.it/~bicego/papers/2021_TKDE.pdf
-    fn pairwise_ratiorf(&self, ds_test: &[Sample], ds_train: &[Sample]) -> Vec<Vec<f64>> {
-        let distance_matrix: Vec<Vec<_>> = (0..ds_test.len())
-            .map(|_| (0..ds_train.len()).map(|_| AtomicF64::new(0.0)).collect())
+    fn pairwise_ratiorf(&self, ds_a: &[Sample], ds_b: Option<&[Sample]>) -> Vec<Vec<f64>> {
+        let ds_b_len = ds_b.map_or(ds_a.len(), |x| x.len());
+        let distance_matrix: Vec<Vec<_>> = (0..ds_a.len())
+            .map(|_| (0..ds_b_len).map(|_| AtomicF64::new(0.0)).collect())
             .collect();
 
         let trees: &Vec<T> = self.get_trees();
         trees.par_iter().for_each(|tree| {
-            let ds_train = tree.transform(ds_train);
-            let ds_test = tree.transform(ds_test);
+            let ds_a = tree.transform(ds_a);
+            let ds_b = ds_b.map(|ds_b| tree.transform(ds_b)).unwrap_or_else(|| ds_a.clone());
 
             let mut union = Vec::new();
-            for (i, sample_test) in ds_test.iter().enumerate() {
-                let ds_test_splits = tree.get_splits(sample_test);
-                for (j, sample_train) in ds_train.iter().enumerate() {
+            for (i, sample_test) in ds_a.iter().enumerate() {
+                let ds_a_splits = tree.get_splits(sample_test);
+                for (j, sample_train) in ds_b.iter().enumerate() {
                     union.clear();
-                    union.extend(ds_test_splits.iter().copied());
+                    union.extend(ds_a_splits.iter().copied());
                     union.extend(tree.get_splits(sample_train).into_iter());
                     union.sort_unstable();
                     union.dedup();

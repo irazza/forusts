@@ -72,7 +72,7 @@ pub trait Tree: Sync + Send {
                 || range.len() < self.get_min_samples_split()
                 || range.len() < 2 * self.get_min_samples_leaf()
                 || non_constant_features.is_empty()
-            || previous_impurity < f64::EPSILON;
+                || previous_impurity < f64::EPSILON;
 
             let node_samples = &mut samples[range.clone()];
 

@@ -1,5 +1,5 @@
 use crate::utils::structures::Sample;
-use catch22::{compute, N_CATCH22};
+use catch22::compute;
 use dashmap::DashMap;
 use lazy_static::lazy_static;
 use std::sync::Arc;
@@ -24,9 +24,8 @@ pub fn catch_transform(
     }
     let mut transformed = Vec::with_capacity(data.len());
     for sample in data {
-        let mut features = Vec::with_capacity(intervals.len() * attributes.len() + N_CATCH22);
+        let mut features = Vec::with_capacity(intervals.len() * attributes.len());
         let ts = zscore(&sample.features);
-
         for (start, end) in intervals {
             for attribute in attributes {
                 let key_cache = (sample.features.as_ptr() as usize, *start, *end, *attribute);

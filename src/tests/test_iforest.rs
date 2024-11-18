@@ -90,7 +90,7 @@ mod tests {
 
             let ds_test = ds_train.clone();
             let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
-            let k = y_true.iter().filter(|&&x| x == 1).count();
+            // let k = y_true.iter().filter(|&&x| x == 1).count();
             for (j, combiner) in [
                 Combiner::PROD,
                 Combiner::SUM,

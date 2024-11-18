@@ -87,10 +87,10 @@ mod tests {
     fn test_dmkd() {
         // Settings for the experiments
         let config = CIsoForestConfig {
-            n_intervals: IntervalType::LOG2,
+            n_intervals: IntervalType::SQRT,
             n_attributes: 8,
             outlier_config: ForestConfig {
-                n_trees: 200,
+                n_trees: 500,
                 max_depth: Some(usize::MAX),
                 min_samples_split: 2,
                 min_samples_leaf: 1,
@@ -112,7 +112,7 @@ mod tests {
         }
         datasets.sort_by_key(|dir| dir.file_name().to_string_lossy().to_string());
         let mut times = vec![vec![0.0; 4]; datasets.len()];
-        for (i, path) in datasets[..1].iter().enumerate() {
+        for (i, path) in datasets.iter().enumerate() {
             let ds_train = read_csv(
                 path.path()
                     .join(format!("{}_TRAIN.tsv", path.file_name().to_string_lossy())),
@@ -175,15 +175,20 @@ mod tests {
                 );
                 write_csv(ratiorf_path, distance_matrix, None);
             }
+            times[i][0] /= n_repetitions as f64;
+            times[i][1] /= n_repetitions as f64;
+            times[i][2] /= n_repetitions as f64;
+            times[i][3] /= n_repetitions as f64;
             println!(
                 "{}: Fit in {:.2}s, breiman in {:.2}s, zhu in {:.2}s, ratiorf in {:.2}s",
                 path.file_name().to_string_lossy(),
-                times[i][0] / n_repetitions as f64,
-                times[i][1] / n_repetitions as f64,
-                times[i][2] / n_repetitions as f64,
-                times[i][3] / n_repetitions as f64,
+                times[i][0],
+                times[i][1],
+                times[i][2],
+                times[i][3],
             );
         }
+        write_csv("../tsrf/HEAVY/times.csv", times, None);
     }
 
     #[test]

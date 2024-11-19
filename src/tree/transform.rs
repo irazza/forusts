@@ -3,9 +3,15 @@ use catch22::compute;
 use dashmap::DashMap;
 use lazy_static::lazy_static;
 use std::sync::Arc;
+use sys_info;
 
 lazy_static! {
     pub static ref CACHE: DashMap<(usize, usize, usize, usize), f64> = DashMap::new();
+    pub static ref TOT_RAM: usize = sys_info::mem_info().unwrap().total as usize * 1024;
+}
+
+fn cache_size(cache: &DashMap<(usize, usize, usize, usize), f64>) -> usize {
+    return 2 * cache.capacity() * (std::mem::size_of::<(usize, usize, usize, usize, f64)>() + 1)
 }
 
 pub fn zscore(data: &[f64]) -> Vec<f64> {
@@ -31,7 +37,9 @@ pub fn catch_transform(
                     features.push(*value);
                 } else {
                     let value = compute(&ts[*start..*end], *attribute);
-                    CACHE.insert(key_cache, value);
+                    if cache_size(&CACHE) < (*TOT_RAM as f64 * 0.8) as usize  {
+                        CACHE.insert(key_cache, value);
+                    }
                     features.push(value);
                 }
             }

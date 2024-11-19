@@ -21,6 +21,7 @@ catch22 = { git = "https://github.com/albertoazzari/catch22_rs.git", version = "
 atomic_float = "1.1.0"
 dashmap = "6.1.0"
 kodama = "0.3.0"
+sys-info = "0.9.1"
 
 [profile.dev]
 debug = true

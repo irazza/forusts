@@ -148,7 +148,7 @@ mod tests {
                 let distance_matrix = model.pairwise_breiman(&ds, None);
                 times[i][1] += start_time.elapsed().as_secs_f64();
                 let breiman_path = format!(
-                    "/media/albertoazzari/tsrf/LIGHT/breiman/{}_{}.csv",
+                    "/media/DATA/albertoazzari/tsrf/LIGHT/breiman/{}_{}.csv",
                     path.file_name().to_string_lossy(),
                     j
                 );
@@ -159,7 +159,7 @@ mod tests {
                 let distance_matrix = model.pairwise_zhu(&ds, None);
                 times[i][2] += start_time.elapsed().as_secs_f64();
                 let zhu_path = format!(
-                    "/media/albertoazzari/tsrf/LIGHT/zhu/{}_{}.csv",
+                    "/media/DATA/albertoazzari/tsrf/LIGHT/zhu/{}_{}.csv",
                     path.file_name().to_string_lossy(),
                     j
                 );
@@ -170,7 +170,7 @@ mod tests {
                 let distance_matrix = model.pairwise_ratiorf(&ds, None);
                 times[i][3] += start_time.elapsed().as_secs_f64();
                 let ratiorf_path = format!(
-                    "/media/albertoazzari/tsrf/LIGHT/ratiorf/{}_{}.csv",
+                    "/media/DATA/albertoazzari/tsrf/LIGHT/ratiorf/{}_{}.csv",
                     path.file_name().to_string_lossy(),
                     j
                 );
@@ -190,7 +190,7 @@ mod tests {
                 times[i][3],
             );
         }
-        write_csv("/media/albertoazzari/tsrf/LIGHT/times.csv", times, None);
+        write_csv("/media/DATA/albertoazzari/tsrf/LIGHT/times.csv", times, None);
     }
 
     #[test]

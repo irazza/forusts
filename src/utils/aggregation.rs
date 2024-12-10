@@ -1,3 +1,5 @@
+use std::fmt;
+
 const ANOMALY_SCORE: f64 = 2.0;
 const TRIM: f64 = 0.05;
 
@@ -74,5 +76,33 @@ impl Aggregation for Combiner {
                 ANOMALY_SCORE.powf(-*value / (average_path_length * values.len() as f64))
             }
         }
+    }
+}
+impl fmt::Display for Combiner {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Combiner::PROD => {
+                    "PROD"
+                }
+                Combiner::SUM => {
+                    "SUM"
+                }
+                Combiner::TRIMMEDSUM => {
+                    "TRIMMEDSUM"
+                }
+                Combiner::MEDIAN => {
+                    "MEDIAN"
+                }
+                Combiner::MIN => {
+                    "MIN"
+                }
+                Combiner::MAX => {
+                    "MAX"
+                }
+            }
+        )
     }
 }

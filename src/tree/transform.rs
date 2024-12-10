@@ -11,7 +11,7 @@ lazy_static! {
 }
 
 fn cache_size(cache: &DashMap<(usize, usize, usize, usize), f64>) -> usize {
-    return 2 * cache.capacity() * (std::mem::size_of::<(usize, usize, usize, usize, f64)>() + 1)
+    return 2 * cache.capacity() * (std::mem::size_of::<(usize, usize, usize, usize, f64)>() + 1);
 }
 
 pub fn zscore(data: &[f64]) -> Vec<f64> {
@@ -25,7 +25,6 @@ pub fn catch_transform(
     intervals: &[(usize, usize)],
     attributes: &[usize],
 ) -> Vec<Sample> {
-    
     let mut transformed = Vec::with_capacity(data.len());
     for sample in data {
         let mut features = Vec::with_capacity(intervals.len() * attributes.len());
@@ -37,7 +36,7 @@ pub fn catch_transform(
                     features.push(*value);
                 } else {
                     let value = compute(&ts[*start..*end], *attribute);
-                    if cache_size(&CACHE) < (*TOT_RAM as f64 * 0.8) as usize  {
+                    if cache_size(&CACHE) < (*TOT_RAM as f64 * 0.8) as usize {
                         CACHE.insert(key_cache, value);
                     }
                     features.push(value);

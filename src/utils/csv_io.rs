@@ -1,7 +1,7 @@
 use csv::ReaderBuilder;
 use std::error::Error;
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader, Read, Write};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -56,4 +56,29 @@ where
             .unwrap();
     }
     writer.flush().unwrap();
+}
+
+pub fn write_bin<T>(path: impl AsRef<Path>, data: Vec<T>) -> Result<(), std::io::Error>
+where
+    T: serde::Serialize,
+{
+    if let Some(parent) = path.as_ref().parent() {
+        std::fs::create_dir_all(parent).unwrap();
+    }
+
+    let mut f = File::create(path).unwrap();
+    let encoded: Vec<u8> = bincode::serialize(&data).unwrap();
+    f.write_all(&encoded)?;
+    f.flush()
+}
+
+pub fn read_bin<T>(path: impl AsRef<Path>) -> Vec<T>
+where
+    T: serde::de::DeserializeOwned,
+{
+    let mut f = File::open(path).unwrap();
+    let mut buf: Vec<u8> = Vec::new();
+    f.read_to_end(&mut buf).unwrap();
+    let decoded: Vec<T> = bincode::deserialize(&buf).expect("Could not deserialize");
+    decoded
 }

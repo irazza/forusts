@@ -1,11 +1,19 @@
 #![allow(dead_code)]
 
 use super::structures::Sample;
+use hashbrown::HashMap;
+use rand::Rng;
 use rand::{seq::SliceRandom, SeedableRng};
+use std::ops::Range;
 use std::{
     cmp::{max, min},
+    i32,
     mem::swap,
 };
+
+use crate::tree::fast_gini::FastGini;
+use crate::tree::tree::{SplitParameters, StandardSplit};
+use crate::RandomGenerator;
 
 pub fn train_test_split(
     data: &[Sample],
@@ -70,14 +78,6 @@ pub fn train_test_split(
     test_data.shuffle(&mut random_state);
     (train_data, test_data)
 }
-
-use hashbrown::HashMap;
-use rand::Rng;
-use std::ops::Range;
-
-use crate::tree::fast_gini::FastGini;
-use crate::tree::tree::{SplitParameters, StandardSplit};
-use crate::RandomGenerator;
 
 pub fn get_random_split(
     samples: &mut [Sample],
@@ -248,3 +248,52 @@ pub fn get_best_split(
         best_split.1,
     ))
 }
+
+pub fn binarize(y: &[isize]) -> Vec<isize> {
+    let mut class_counts = HashMap::new();
+    for target in y {
+        *class_counts.entry(*target).or_insert(0) += 1;
+    }
+
+    let mut min_count = i32::MAX;
+    let mut less_common_class = 0;
+
+    for (class, count) in &class_counts {
+        if *count < min_count {
+            min_count = *count;
+            less_common_class = *class;
+        }
+    }
+    y.iter()
+        .map(|t| if *t == less_common_class { 1 } else { 0 })
+        .collect()
+}
+
+// Adiac: 0.23 in 14.42 seconds
+// ArrowHead: 0.40 in 5.80 seconds
+// Beef: 0.43 in 1.54 seconds
+// BeetleFly: 0.70 in 1.12 seconds
+// BirdChicken: 0.74 in 0.13 seconds
+// CBF: 0.77 in 21.04 seconds
+// ChlorineConcentration: 0.61 in 95.64 seconds
+// Coffee: 0.37 in 1.26 seconds
+// ECG200: 0.83 in 3.31 seconds
+// ECGFiveDays: 0.29 in 18.90 seconds
+// FaceFour: 0.15 in 2.79 seconds
+// GunPoint: 0.81 in 4.03 seconds
+// Ham: 0.55 in 5.37 seconds
+// Herring: 0.53 in 3.61 seconds
+// Lightning2: 0.65 in 3.80 seconds
+// Lightning7: 0.44 in 3.57 seconds
+// Meat: 0.44 in 2.96 seconds
+// MedicalImages: 0.98 in 18.77 seconds
+// MoteStrain: 0.71 in 22.88 seconds
+// Plane: 0.19 in 4.46 seconds
+// Strawberry: 0.15 in 27.61 seconds
+// Symbols: 0.19 in 24.70 seconds
+// ToeSegmentation1: 0.83 in 6.29 seconds
+// ToeSegmentation2: 0.92 in 3.98 seconds
+// Trace: 0.17 in 4.71 seconds
+// TwoLeadECG: 0.36 in 19.15 seconds
+// Wafer: 0.94 in 137.90 seconds
+// Wine: 0.30 in 2.11 seconds

@@ -1,8 +1,8 @@
 use super::{node::Node, tree::SplitParameters};
 use crate::tree::transform::catch_transform;
-use crate::utils::split::{get_extended_split, get_random_split};
+use crate::utils::split::get_extended_split;
 use crate::{
-    forest::ciso_forest::CIsoForestConfig, tree::tree::Tree, utils::structures::Sample,
+    forest::ceiso_forest::CEIsoForestConfig, tree::tree::Tree, utils::structures::Sample,
     RandomGenerator,
 };
 use catch22::N_CATCH22;
@@ -87,15 +87,15 @@ pub struct CEIsoTreeConfig {
 }
 
 #[derive(Clone, Debug)]
-pub struct CIsoTree {
+pub struct CEIsoTree {
     nodes: Vec<Node<CEIsoSplit>>,
     config: CEIsoTreeConfig,
     intervals: Vec<(usize, usize)>,
     attributes: Vec<usize>,
 }
-impl Tree for CIsoTree {
+impl Tree for CEIsoTree {
     type Config = CEIsoTreeConfig;
-    type ForestTreeConfig = CIsoForestConfig;
+    type ForestTreeConfig = CEIsoForestConfig;
     type SplitParameters = CEIsoSplit;
     fn new(config: Self::Config, mut random_state: &mut RandomGenerator) -> Self {
         Self {
@@ -181,7 +181,7 @@ impl Tree for CIsoTree {
                 n_features,
                 n_intervals: config.n_intervals.get_interval(n_features),
                 n_attributes: config.n_attributes,
-                extended_level: todo!(), //config.extended_level,
+                extended_level: config.extension_level,
             },
             random_state,
         )

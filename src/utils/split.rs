@@ -196,8 +196,8 @@ pub fn get_extended_split(
 
     let split_idx = split_samples(&extended_split, samples);
 
-    // return Some((vec![0..start, start..samples.len()], rand_split, f64::NAN));
-    return None;
+    return Some((vec![0..split_idx, split_idx..samples.len()], extended_split, f64::NAN));
+    // return None;
 }
 pub fn get_best_split(
     samples: &mut [Sample],

@@ -3,6 +3,7 @@ mod tests {
     use rand::SeedableRng;
     use std::fs;
 
+    use crate::forest::ceiso_forest::{CEIsoForest, CEIsoForestConfig};
     use crate::metrics::classification::{accuracy_score, precision_at_k, roc_auc_score};
     use crate::tree::transform::CACHE;
     use crate::utils::csv_io::{write_bin, write_csv};
@@ -21,9 +22,10 @@ mod tests {
     #[test]
     fn test_admep() {
         // Settings for the experiments
-        let config = CIsoForestConfig {
+        let config = CEIsoForestConfig {
             n_intervals: IntervalType::LOG10,
             n_attributes: 8,
+            extension_level: 0,
             outlier_config: ForestConfig {
                 n_trees: 100,
                 max_depth: None,
@@ -36,7 +38,7 @@ mod tests {
             },
         };
         let n_repetitions = 10;
-        let paths = fs::read_dir("../DATA/ADMEP/").unwrap();
+        let paths = fs::read_dir("../admep/ADMEP/").unwrap();
 
         let mut datasets = Vec::new();
         for entry in paths {
@@ -51,26 +53,26 @@ mod tests {
         for (i, path) in datasets.iter().enumerate() {
             let mut ds_train = read_csv(
                 path.path()
-                    .join(format!("{}_TRAIN.tsv", path.file_name().to_string_lossy())),
-                b'\t',
+                    .join(format!("{}_TRAIN.csv", path.file_name().to_string_lossy())),
+                b',',
                 false,
             )
             .unwrap();
             let ds_test = read_csv(
                 path.path()
-                    .join(format!("{}_TEST.tsv", path.file_name().to_string_lossy())),
-                b'\t',
+                    .join(format!("{}_TEST.csv", path.file_name().to_string_lossy())),
+                b',',
                 false,
             )
             .unwrap();
             let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
             let n_anomalies = y_true.iter().sum::<isize>() as usize;
             for j in 0..n_repetitions {
-                let mut model = CIsoForest::new(&config);
+                let mut model = CEIsoForest::new(&config);
                 model.fit(
                     &mut ds_train,
                     Some(rand_chacha::ChaCha8Rng::seed_from_u64(
-                        ((i + 2) * (j + 2)) as u64,
+                        j as u64,
                     )),
                 );
                 let prediction = model.score_samples(&ds_test);

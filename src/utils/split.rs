@@ -80,6 +80,21 @@ pub fn train_test_split(
     (train_data, test_data)
 }
 
+fn split_samples<S: SplitParameters>(split: &S, samples: &mut [Sample]) -> usize {
+    let mut start = 0;
+    let mut end = samples.len();
+
+    while start < end {
+        if split.split(&samples[start]) == 0 {
+            start += 1;
+        } else {
+            samples.swap(start, end - 1);
+            end -= 1;
+        }
+    }
+    start
+}
+
 pub fn get_random_split(
     samples: &mut [Sample],
     non_constant_features: &mut Vec<usize>,
@@ -111,24 +126,19 @@ pub fn get_random_split(
             let threshold = random_state.gen_range(min_feature..max_feature);
             let rand_split = StandardSplit { feature, threshold };
 
-            let mut start = 0;
-            let mut end = samples.len();
-            while start < end {
-                if rand_split.split(&samples[start]) == 0 {
-                    start += 1;
-                } else {
-                    samples.swap(start, end - 1);
-                    end -= 1;
-                }
-            }
+            let split_idx = split_samples(&rand_split, samples);
 
-            if start < min_samples_leaf || (samples.len() - start) < min_samples_leaf {
+            if split_idx < min_samples_leaf || (samples.len() - split_idx) < min_samples_leaf {
                 continue;
             }
 
             non_constant_features.push(feature);
 
-            return Some((vec![0..start, start..samples.len()], rand_split, f64::NAN));
+            return Some((
+                vec![0..split_idx, split_idx..samples.len()],
+                rand_split,
+                f64::NAN,
+            ));
         }
     }
     return None;
@@ -139,11 +149,14 @@ pub fn get_extended_split(
     non_constant_features: &mut Vec<usize>,
     random_state: &mut RandomGenerator,
     min_samples_leaf: usize,
-    max_features: usize,
+    max_features_count: usize,
 ) -> Option<(Vec<Range<usize>>, CEIsoSplit, f64)> {
     non_constant_features.shuffle(random_state);
 
-    let mut features_idx = Vec::new();
+    let mut features_idx = Vec::with_capacity(max_features_count);
+    let mut min_features = Vec::with_capacity(max_features_count);
+    let mut max_features = Vec::with_capacity(max_features_count);
+
     while let Some(feature) = non_constant_features.pop() {
         let thresholds = samples
             .iter()
@@ -165,13 +178,24 @@ pub fn get_extended_split(
             continue;
         } else {
             features_idx.push(feature);
-            if features_idx.len() >= max_features {
+            min_features.push(min_feature);
+            max_features.push(max_feature);
+            if features_idx.len() >= max_features_count {
                 break;
-            }            
+            }
         }
     }
     non_constant_features.extend_from_slice(&features_idx);
-    let extended_split = CEIsoSplit::from_features(&features_idx);
+    let extended_split = CEIsoSplit::from_features(
+        &features_idx,
+        &min_features,
+        &max_features,
+        samples,
+        random_state,
+    );
+
+    let split_idx = split_samples(&extended_split, samples);
+
     // return Some((vec![0..start, start..samples.len()], rand_split, f64::NAN));
     return None;
 }

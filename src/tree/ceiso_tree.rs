@@ -1,21 +1,51 @@
-use std::cmp::max;
 use super::{node::Node, tree::SplitParameters};
 use crate::tree::transform::catch_transform;
-use crate::utils::split::get_random_split;
+use crate::utils::split::{get_extended_split, get_random_split};
 use crate::{
     forest::ciso_forest::CIsoForestConfig, tree::tree::Tree, utils::structures::Sample,
     RandomGenerator,
 };
 use catch22::N_CATCH22;
 use rand::{seq::SliceRandom, Rng};
+use rand_distr::StandardNormal;
+use std::cmp::max;
 
 const MIN_INTERVAL_PERC: f64 = 0.1;
 const MIN_INTERVALS_LEN: usize = 3;
 
 #[derive(Clone, Debug, PartialOrd, PartialEq)]
 pub struct CEIsoSplit {
-
+    offset: Vec<f64>,
+    weights: Vec<f64>,
 }
+
+impl CEIsoSplit {
+    pub fn from_features(
+        features_idx: &[usize],
+        min_values: &[f64],
+        max_values: &[f64],
+        samples: &[Sample],
+        random_state: &mut RandomGenerator,
+    ) -> Self {
+        let mut offset = vec![0.0; samples[0].features.len()];
+        let mut weights = vec![0.0f64; samples[0].features.len()];
+
+        let mut vector_len: f64 = 0.0;
+        for (&feature_idx, (&min_value, &max_value)) in features_idx
+            .iter()
+            .zip(min_values.iter().zip(max_values.iter()))
+        {
+            offset[feature_idx] = random_state.gen_range(min_value..=max_value);
+            weights[feature_idx] = random_state.sample(StandardNormal);
+            vector_len += weights[feature_idx].powi(2);
+        }
+        vector_len = vector_len.sqrt();
+        weights.iter_mut().for_each(|x| *x /= vector_len);
+
+        CEIsoSplit { offset, weights }
+    }
+}
+
 impl Eq for CEIsoSplit {}
 impl Ord for CEIsoSplit {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
@@ -24,10 +54,24 @@ impl Ord for CEIsoSplit {
 }
 impl SplitParameters for CEIsoSplit {
     fn split(&self, sample: &Sample) -> usize {
-        todo!()
+        let mut sum = 0.0;
+        for ((&feature, &offset), &weight) in sample
+            .features
+            .iter()
+            .zip(self.offset.iter())
+            .zip(self.weights.iter())
+        {
+            sum += (feature - offset) * weight;
+        }
+        if sum < 0.0 {
+            0
+        } else {
+            1
+        }
     }
-    fn path_length<T: Tree<SplitParameters = Self>>(_tree: &T, _x: &Sample) -> f64 {
-        todo!()
+    fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample) -> f64 {
+        let leaf = tree.predict_leaf(x);
+        leaf.get_depth() as f64 + T::average_path_length(leaf.get_n_samples())
     }
 }
 
@@ -39,6 +83,7 @@ pub struct CEIsoTreeConfig {
     pub n_features: usize,
     pub n_intervals: usize,
     pub n_attributes: usize,
+    pub extended_level: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -110,7 +155,13 @@ impl Tree for CIsoTree {
         non_constant_features: &mut Vec<usize>,
         random_state: &mut RandomGenerator,
     ) -> Option<(Vec<std::ops::Range<usize>>, Self::SplitParameters, f64)> {
-        todo!()
+        get_extended_split(
+            samples,
+            non_constant_features,
+            random_state,
+            self.config.min_samples_leaf,
+            samples[0].features.len() - self.config.extended_level,
+        )
     }
 
     fn from_config(
@@ -130,6 +181,7 @@ impl Tree for CIsoTree {
                 n_features,
                 n_intervals: config.n_intervals.get_interval(n_features),
                 n_attributes: config.n_attributes,
+                extended_level: todo!(), //config.extended_level,
             },
             random_state,
         )

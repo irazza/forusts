@@ -11,6 +11,7 @@ use std::{
     mem::swap,
 };
 
+use crate::tree::ceiso_tree::CEIsoSplit;
 use crate::tree::fast_gini::FastGini;
 use crate::tree::tree::{SplitParameters, StandardSplit};
 use crate::RandomGenerator;
@@ -130,6 +131,48 @@ pub fn get_random_split(
             return Some((vec![0..start, start..samples.len()], rand_split, f64::NAN));
         }
     }
+    return None;
+}
+
+pub fn get_extended_split(
+    samples: &mut [Sample],
+    non_constant_features: &mut Vec<usize>,
+    random_state: &mut RandomGenerator,
+    min_samples_leaf: usize,
+    max_features: usize,
+) -> Option<(Vec<Range<usize>>, CEIsoSplit, f64)> {
+    non_constant_features.shuffle(random_state);
+
+    let mut features_idx = Vec::new();
+    while let Some(feature) = non_constant_features.pop() {
+        let thresholds = samples
+            .iter()
+            .map(|f| f.features[feature])
+            .collect::<Vec<_>>();
+
+        let min_feature = *thresholds
+            .iter()
+            .min_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap();
+
+        let max_feature = *thresholds
+            .iter()
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap();
+
+        if max_feature - min_feature <= f64::EPSILON {
+            // Remove constant features
+            continue;
+        } else {
+            features_idx.push(feature);
+            if features_idx.len() >= max_features {
+                break;
+            }            
+        }
+    }
+    non_constant_features.extend_from_slice(&features_idx);
+    let extended_split = CEIsoSplit::from_features(&features_idx);
+    // return Some((vec![0..start, start..samples.len()], rand_split, f64::NAN));
     return None;
 }
 pub fn get_best_split(

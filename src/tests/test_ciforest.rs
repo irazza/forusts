@@ -76,7 +76,7 @@ mod tests {
                     )),
                 );
                 let prediction = model.score_samples(&ds_test);
-                predictions[i][j] = precision_at_k(&prediction, &y_true, n_anomalies);
+                predictions[i][j] = roc_auc_score(&prediction, &y_true);
             }
             println!(
                 "{}: {:.2}",

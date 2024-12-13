@@ -140,6 +140,7 @@ pub trait Tree: Sync + Send {
             .collect()
     }
     fn average_path_length(n_samples: usize) -> f64 {
+        debug_assert!(n_samples > 0);
         if n_samples == 1 {
             0.0
         } else {

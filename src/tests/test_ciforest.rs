@@ -25,7 +25,7 @@ mod tests {
         let config = CEIsoForestConfig {
             n_intervals: IntervalType::LOG10,
             n_attributes: 8,
-            extension_level: 0,
+            extension_level: 20,
             outlier_config: ForestConfig {
                 n_trees: 100,
                 max_depth: None,

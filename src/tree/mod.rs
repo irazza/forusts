@@ -3,8 +3,8 @@ pub mod tree;
 
 pub mod transform;
 
-pub mod ciso_tree;
 pub mod ceiso_tree;
+pub mod ciso_tree;
 pub mod isolation_tree;
 
 pub mod ci_tree;

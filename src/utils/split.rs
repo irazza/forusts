@@ -151,53 +151,68 @@ pub fn get_extended_split(
     min_samples_leaf: usize,
     max_features_count: usize,
 ) -> Option<(Vec<Range<usize>>, CEIsoSplit, f64)> {
-    non_constant_features.shuffle(random_state);
-
     let mut features_idx = Vec::with_capacity(max_features_count);
     let mut min_features = Vec::with_capacity(max_features_count);
     let mut max_features = Vec::with_capacity(max_features_count);
 
-    while let Some(feature) = non_constant_features.pop() {
-        let thresholds = samples
-            .iter()
-            .map(|f| f.features[feature])
-            .collect::<Vec<_>>();
+    let tries_count = ((samples.len() as f64).sqrt() as usize).max(1);
+    for _ in 0..tries_count {
+        non_constant_features.shuffle(random_state);
 
-        let min_feature = *thresholds
-            .iter()
-            .min_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap();
+        features_idx.clear();
+        min_features.clear();
+        max_features.clear();
 
-        let max_feature = *thresholds
-            .iter()
-            .max_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap();
+        while let Some(feature) = non_constant_features.pop() {
+            let thresholds = samples
+                .iter()
+                .map(|f| f.features[feature])
+                .collect::<Vec<_>>();
 
-        if max_feature - min_feature <= f64::EPSILON {
-            // Remove constant features
-            continue;
-        } else {
-            features_idx.push(feature);
-            min_features.push(min_feature);
-            max_features.push(max_feature);
-            if features_idx.len() >= max_features_count {
-                break;
+            let min_feature = *thresholds
+                .iter()
+                .min_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap();
+
+            let max_feature = *thresholds
+                .iter()
+                .max_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap();
+
+            if max_feature - min_feature <= f64::EPSILON {
+                // Remove constant features
+                continue;
+            } else {
+                features_idx.push(feature);
+                min_features.push(min_feature);
+                max_features.push(max_feature);
+                if features_idx.len() >= max_features_count {
+                    break;
+                }
             }
         }
+        non_constant_features.extend_from_slice(&features_idx);
+        let extended_split = CEIsoSplit::from_features(
+            &features_idx,
+            &min_features,
+            &max_features,
+            samples,
+            random_state,
+        );
+
+        let split_idx = split_samples(&extended_split, samples);
+
+        if split_idx < min_samples_leaf || (samples.len() - split_idx) < min_samples_leaf {
+            continue;
+        }
+        return Some((
+            vec![0..split_idx, split_idx..samples.len()],
+            extended_split,
+            f64::NAN,
+        ));
     }
-    non_constant_features.extend_from_slice(&features_idx);
-    let extended_split = CEIsoSplit::from_features(
-        &features_idx,
-        &min_features,
-        &max_features,
-        samples,
-        random_state,
-    );
 
-    let split_idx = split_samples(&extended_split, samples);
-
-    return Some((vec![0..split_idx, split_idx..samples.len()], extended_split, f64::NAN));
-    // return None;
+    return None;
 }
 pub fn get_best_split(
     samples: &mut [Sample],

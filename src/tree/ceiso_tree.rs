@@ -83,7 +83,7 @@ pub struct CEIsoTreeConfig {
     pub n_features: usize,
     pub n_intervals: usize,
     pub n_attributes: usize,
-    pub extended_level: usize,
+    pub extended_level: f64,
 }
 
 #[derive(Clone, Debug)]
@@ -160,7 +160,7 @@ impl Tree for CEIsoTree {
             non_constant_features,
             random_state,
             self.config.min_samples_leaf,
-            samples[0].features.len() - self.config.extended_level,
+            samples[0].features.len() * self.config.extended_level as usize,
         )
     }
 

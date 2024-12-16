@@ -23,11 +23,11 @@ mod tests {
     fn test_admep() {
         // Settings for the experiments
         let config = CEIsoForestConfig {
-            n_intervals: IntervalType::LOG10,
+            n_intervals: IntervalType::LOG2,
             n_attributes: 8,
-            extension_level: 20,
+            extension_level: 0.1,
             outlier_config: ForestConfig {
-                n_trees: 100,
+                n_trees: 200,
                 max_depth: None,
                 min_samples_split: 2,
                 min_samples_leaf: 1,
@@ -84,7 +84,7 @@ mod tests {
                 predictions[i].iter().sum::<f64>() / n_repetitions as f64
             );
         }
-        write_csv("admep_L_pk.csv", predictions, None);
+        write_csv("admep_L.csv", predictions, None);
     }
 
     #[test]

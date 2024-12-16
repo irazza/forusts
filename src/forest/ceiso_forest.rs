@@ -13,7 +13,7 @@ use rand::{thread_rng, SeedableRng};
 pub struct CEIsoForestConfig {
     pub n_intervals: IntervalType,
     pub n_attributes: usize,
-    pub extension_level: usize,
+    pub extension_level: f64,
     pub outlier_config: ForestConfig,
 }
 

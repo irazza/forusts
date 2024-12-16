@@ -9,9 +9,15 @@ use crate::{
 };
 use rand::{thread_rng, SeedableRng};
 
+#[derive(Clone, Debug, Copy)]
+pub enum ExtensionLevel {
+    Percentage(f64),
+    ExtraFeatures(usize),
+}
+
 #[derive(Clone)]
 pub struct EIsoForestConfig {
-    pub extension_level: f64,
+    pub extension_level: ExtensionLevel,
     pub outlier_config: ForestConfig,
 }
 

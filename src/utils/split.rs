@@ -2,20 +2,20 @@
 
 use super::statistics::variance;
 use super::structures::Sample;
+use crate::tree::ei_tree::EIsoSplit;
+use crate::tree::fast_gini::FastGini;
+use crate::tree::tree::{SplitParameters, StandardSplit};
+use crate::RandomGenerator;
+use core::f64;
 use hashbrown::HashMap;
 use rand::Rng;
 use rand::{seq::SliceRandom, SeedableRng};
-use core::f64;
 use std::ops::Range;
 use std::{
     cmp::{max, min},
     i32,
     mem::swap,
 };
-use crate::tree::ei_tree::EIsoSplit;
-use crate::tree::fast_gini::FastGini;
-use crate::tree::tree::{SplitParameters, StandardSplit};
-use crate::RandomGenerator;
 
 pub fn train_test_split(
     data: &[Sample],
@@ -145,23 +145,55 @@ pub fn get_random_split(
     return None;
 }
 
-// pub fn get_variance_split(
-//     samples: &mut [Sample],
-//     non_constant_features: &mut Vec<usize>,
-//     random_state: &mut RandomGenerator,
-//     min_samples_leaf: usize,
-// ) -> Option<(Vec<Range<usize>>, StandardSplit, f64)> {}
+pub fn get_variance_split(
+    samples: &mut [Sample],
+    non_constant_features: &mut Vec<usize>,
+    random_state: &mut RandomGenerator,
+    min_samples_leaf: usize,
+) -> Option<(Vec<Range<usize>>, StandardSplit, f64)> {
+    let tries_count = ((samples.len() as f64).sqrt() as usize).max(1);
+
+    let mut best_split = None;
+    let mut best_variance = f64::INFINITY;
+
+    for _ in 0..tries_count {
+        if let Some((intervals, split, impurity)) = get_random_split(
+            samples,
+            non_constant_features,
+            random_state,
+            min_samples_leaf,
+        ) {
+            let values = samples
+                .iter()
+                .map(|s| s.features[split.feature])
+                .collect::<Vec<_>>();
+
+            let left_variance = variance(&values[intervals[0].clone()]);
+            let right_variance = variance(&values[intervals[1].clone()]);
+
+            let tot_score = left_variance + right_variance;
+            if tot_score < best_variance {
+                best_variance = tot_score;
+                best_split = Some((intervals, split, impurity));
+            }
+        } else {
+            break;
+        }
+    }
+
+    best_split
+}
 
 pub fn get_extended_split(
     samples: &mut [Sample],
     non_constant_features: &mut Vec<usize>,
     random_state: &mut RandomGenerator,
     min_samples_leaf: usize,
-    max_features_count: usize,
+    extension_level: usize,
 ) -> Option<(Vec<Range<usize>>, EIsoSplit, f64)> {
-    let mut features_idx = Vec::with_capacity(max_features_count);
-    let mut min_features = Vec::with_capacity(max_features_count);
-    let mut max_features = Vec::with_capacity(max_features_count);
+    let mut features_idx = Vec::with_capacity(extension_level + 1);
+    let mut min_features = Vec::with_capacity(extension_level + 1);
+    let mut max_features = Vec::with_capacity(extension_level + 1);
 
     let tries_count = ((samples.len() as f64).sqrt() as usize).max(1);
     for _ in 0..tries_count {
@@ -194,7 +226,7 @@ pub fn get_extended_split(
                 features_idx.push(feature);
                 min_features.push(min_feature);
                 max_features.push(max_feature);
-                if features_idx.len() >= max_features_count {
+                if features_idx.len() >= (extension_level + 1) {
                     break;
                 }
             }

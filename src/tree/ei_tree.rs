@@ -1,4 +1,5 @@
 use super::{node::Node, tree::SplitParameters};
+use crate::forest::eiso_forest::ExtensionLevel;
 use crate::utils::split::get_extended_split;
 use crate::{
     forest::eiso_forest::EIsoForestConfig, tree::tree::Tree, utils::structures::Sample,
@@ -73,7 +74,7 @@ pub struct EIsoTreeConfig {
     pub max_depth: usize,
     pub min_samples_split: usize,
     pub min_samples_leaf: usize,
-    pub extended_level: f64,
+    pub extended_level: ExtensionLevel,
 }
 
 #[derive(Clone, Debug)]
@@ -89,7 +90,6 @@ impl Tree for EIsoTree {
         Self {
             nodes: Vec::new(),
             config: config.clone(),
-            
         }
     }
 
@@ -127,7 +127,12 @@ impl Tree for EIsoTree {
             non_constant_features,
             random_state,
             self.config.min_samples_leaf,
-            samples[0].features.len() * self.config.extended_level as usize,
+            match self.config.extended_level {
+                ExtensionLevel::Percentage(percentage) => {
+                    (samples[0].features.len() as f64 * percentage) as usize
+                }
+                ExtensionLevel::ExtraFeatures(n_features) => n_features,
+            },
         )
     }
 

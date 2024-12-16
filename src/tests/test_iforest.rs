@@ -4,7 +4,7 @@ mod tests {
     use rand::SeedableRng;
     use std::fs;
 
-    use crate::forest::eiso_forest::{EIsoForest, EIsoForestConfig};
+    use crate::forest::eiso_forest::{EIsoForest, EIsoForestConfig, ExtensionLevel};
     use crate::forest::forest::ForestConfig;
     use crate::utils::csv_io::write_bin;
     use crate::utils::structures::MaxFeatures;
@@ -64,13 +64,13 @@ mod tests {
             );
         }
     }
-    
+
     #[test]
     fn test_hariri() {
-        let config: EIsoForestConfig = EIsoForestConfig {
-            extension_level: 0.0,
+        let mut config: EIsoForestConfig = EIsoForestConfig {
+            extension_level: ExtensionLevel::ExtraFeatures(10),
             outlier_config: ForestConfig {
-                n_trees: 100,
+                n_trees: 200,
                 max_depth: None,
                 min_samples_split: 2,
                 min_samples_leaf: 1,
@@ -95,15 +95,16 @@ mod tests {
 
         for (i, path) in datasets.iter().enumerate() {
             let mut ds_train = read_csv(path.path(), b',', false).unwrap();
+
+            config.extension_level = ExtensionLevel::ExtraFeatures(ds_train[0].features.len() - 1);
+
             let ds_test = ds_train.clone(); // read_csv(path.path(), b',', false).unwrap();
             let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
             for j in 0..n_repetitions {
                 let mut model = EIsoForest::new(&config);
                 model.fit(
                     &mut ds_train,
-                    Some(rand_chacha::ChaCha8Rng::seed_from_u64(
-                        j as u64,
-                    )),
+                    Some(rand_chacha::ChaCha8Rng::seed_from_u64(j as u64)),
                 );
                 let prediction = model.score_samples(&ds_test);
                 predictions[i] += roc_auc_score(&prediction, &y_true);

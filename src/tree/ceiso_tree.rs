@@ -1,4 +1,5 @@
-use super::{node::Node, tree::SplitParameters};
+use super::ei_tree::EIsoSplit;
+use super::node::Node;
 use crate::tree::transform::catch_transform;
 use crate::utils::split::get_extended_split;
 use crate::{
@@ -7,73 +8,11 @@ use crate::{
 };
 use catch22::N_CATCH22;
 use rand::{seq::SliceRandom, Rng};
-use rand_distr::StandardNormal;
 use std::cmp::max;
 
 const MIN_INTERVAL_PERC: f64 = 0.1;
 const MIN_INTERVALS_LEN: usize = 3;
 
-#[derive(Clone, Debug, PartialOrd, PartialEq)]
-pub struct CEIsoSplit {
-    offset: Vec<f64>,
-    weights: Vec<f64>,
-}
-
-impl CEIsoSplit {
-    pub fn from_features(
-        features_idx: &[usize],
-        min_values: &[f64],
-        max_values: &[f64],
-        samples: &[Sample],
-        random_state: &mut RandomGenerator,
-    ) -> Self {
-        let mut offset = vec![0.0; samples[0].features.len()];
-        let mut weights = vec![0.0f64; samples[0].features.len()];
-
-        let mut vector_len: f64 = 0.0;
-        for (&feature_idx, (&min_value, &max_value)) in features_idx
-            .iter()
-            .zip(min_values.iter().zip(max_values.iter()))
-        {
-            offset[feature_idx] = random_state.gen_range(min_value..=max_value);
-            weights[feature_idx] = random_state.sample(StandardNormal);
-            vector_len += weights[feature_idx].powi(2);
-        }
-        vector_len = vector_len.sqrt();
-        weights.iter_mut().for_each(|x| *x /= vector_len);
-
-        CEIsoSplit { offset, weights }
-    }
-}
-
-impl Eq for CEIsoSplit {}
-impl Ord for CEIsoSplit {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap()
-    }
-}
-impl SplitParameters for CEIsoSplit {
-    fn split(&self, sample: &Sample) -> usize {
-        let mut sum = 0.0;
-        for ((&feature, &offset), &weight) in sample
-            .features
-            .iter()
-            .zip(self.offset.iter())
-            .zip(self.weights.iter())
-        {
-            sum += (feature - offset) * weight;
-        }
-        if sum < 0.0 {
-            0
-        } else {
-            1
-        }
-    }
-    fn path_length<T: Tree<SplitParameters = Self>>(tree: &T, x: &Sample) -> f64 {
-        let leaf = tree.predict_leaf(x);
-        leaf.get_depth() as f64 + T::average_path_length(leaf.get_n_samples())
-    }
-}
 
 #[derive(Clone, Debug)]
 pub struct CEIsoTreeConfig {
@@ -88,7 +27,7 @@ pub struct CEIsoTreeConfig {
 
 #[derive(Clone, Debug)]
 pub struct CEIsoTree {
-    nodes: Vec<Node<CEIsoSplit>>,
+    nodes: Vec<Node<EIsoSplit>>,
     config: CEIsoTreeConfig,
     intervals: Vec<(usize, usize)>,
     attributes: Vec<usize>,
@@ -96,7 +35,7 @@ pub struct CEIsoTree {
 impl Tree for CEIsoTree {
     type Config = CEIsoTreeConfig;
     type ForestTreeConfig = CEIsoForestConfig;
-    type SplitParameters = CEIsoSplit;
+    type SplitParameters = EIsoSplit;
     fn new(config: Self::Config, mut random_state: &mut RandomGenerator) -> Self {
         Self {
             nodes: Vec::new(),

@@ -23,11 +23,11 @@ mod tests {
     fn test_admep() {
         // Settings for the experiments
         let config = CEIsoForestConfig {
-            n_intervals: IntervalType::LOG2,
+            n_intervals: IntervalType::LOG10,
             n_attributes: 8,
             extension_level: 0.1,
             outlier_config: ForestConfig {
-                n_trees: 200,
+                n_trees: 100,
                 max_depth: None,
                 min_samples_split: 2,
                 min_samples_leaf: 1,
@@ -37,7 +37,7 @@ mod tests {
                 aggregation: None,
             },
         };
-        let n_repetitions = 10;
+        let n_repetitions = 1;
         let paths = fs::read_dir("../admep/ADMEP/").unwrap();
 
         let mut datasets = Vec::new();
@@ -66,7 +66,7 @@ mod tests {
             )
             .unwrap();
             let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
-            let n_anomalies = y_true.iter().sum::<isize>() as usize;
+            
             for j in 0..n_repetitions {
                 let mut model = CEIsoForest::new(&config);
                 model.fit(
@@ -83,8 +83,9 @@ mod tests {
                 path.file_name().to_string_lossy(),
                 predictions[i].iter().sum::<f64>() / n_repetitions as f64
             );
+            println!("\tn tot: {}, n anom: {}", y_true.len(), y_true.iter().filter(|&&x| x == 1).count());
         }
-        write_csv("admep_L.csv", predictions, None);
+        write_csv("admep_UL.csv", predictions, None);
     }
 
     #[test]
@@ -302,9 +303,10 @@ mod tests {
             "Wine",
         ];
         // let normal_classes = [9, 2, 1, 1, 1, 2, 1, 0, 1, 1, 3, 1, 1, 1, 1, 3, 2, 5, 1, 5, 1, 6, 0, 0, 1, 1, 1, 1];
-        let config = CIsoForestConfig {
+        let config = CEIsoForestConfig {
             n_intervals: IntervalType::LOG10,
             n_attributes: 8,
+            extension_level: 0.1,
             outlier_config: ForestConfig {
                 n_trees: 100,
                 max_depth: None,
@@ -318,7 +320,7 @@ mod tests {
         };
 
         let n_repetitions = 10;
-        let paths = fs::read_dir("../../DATA/ucr_AD/").unwrap();
+        let paths = fs::read_dir("../../DATA/ucr/").unwrap();
 
         let mut datasets = Vec::new();
         for entry in paths {
@@ -350,7 +352,7 @@ mod tests {
 
             let start_time = std::time::Instant::now();
             for j in 0..n_repetitions {
-                let mut model = CIsoForest::new(&config);
+                let mut model = CEIsoForest::new(&config);
                 model.fit(
                     &mut ds_train,
                     Some(rand_chacha::ChaCha8Rng::seed_from_u64(j as u64)),
@@ -359,7 +361,7 @@ mod tests {
                 aucs[i] += roc_auc_score(&prediction, &y_test);
                 write_bin(
                     format!(
-                        "/media/albertoazzari/CISOF/{}/{}_{}.bin",
+                        "/media/DATA/albertoazzari/CISOF/{}/{}_{}.bin",
                         path.file_name().to_string_lossy(),
                         path.file_name().to_string_lossy(),
                         j

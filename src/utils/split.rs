@@ -1,17 +1,18 @@
 #![allow(dead_code)]
 
+use super::statistics::variance;
 use super::structures::Sample;
 use hashbrown::HashMap;
 use rand::Rng;
 use rand::{seq::SliceRandom, SeedableRng};
+use core::f64;
 use std::ops::Range;
 use std::{
     cmp::{max, min},
     i32,
     mem::swap,
 };
-
-use crate::tree::ceiso_tree::CEIsoSplit;
+use crate::tree::ei_tree::EIsoSplit;
 use crate::tree::fast_gini::FastGini;
 use crate::tree::tree::{SplitParameters, StandardSplit};
 use crate::RandomGenerator;
@@ -144,13 +145,20 @@ pub fn get_random_split(
     return None;
 }
 
+// pub fn get_variance_split(
+//     samples: &mut [Sample],
+//     non_constant_features: &mut Vec<usize>,
+//     random_state: &mut RandomGenerator,
+//     min_samples_leaf: usize,
+// ) -> Option<(Vec<Range<usize>>, StandardSplit, f64)> {}
+
 pub fn get_extended_split(
     samples: &mut [Sample],
     non_constant_features: &mut Vec<usize>,
     random_state: &mut RandomGenerator,
     min_samples_leaf: usize,
     max_features_count: usize,
-) -> Option<(Vec<Range<usize>>, CEIsoSplit, f64)> {
+) -> Option<(Vec<Range<usize>>, EIsoSplit, f64)> {
     let mut features_idx = Vec::with_capacity(max_features_count);
     let mut min_features = Vec::with_capacity(max_features_count);
     let mut max_features = Vec::with_capacity(max_features_count);
@@ -192,7 +200,7 @@ pub fn get_extended_split(
             }
         }
         non_constant_features.extend_from_slice(&features_idx);
-        let extended_split = CEIsoSplit::from_features(
+        let extended_split = EIsoSplit::from_features(
             &features_idx,
             &min_features,
             &max_features,

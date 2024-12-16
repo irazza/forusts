@@ -11,3 +11,11 @@ pub fn transpose<T>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
         })
         .collect()
 }
+
+pub fn variance(v: &[f64]) -> f64 {
+    let mean = v.iter().sum::<f64>() / v.len() as f64;
+    v.iter()
+        .map(|&x| (x - mean) * (x - mean))
+        .sum::<f64>()
+        / v.len() as f64
+}

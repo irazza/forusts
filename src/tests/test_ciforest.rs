@@ -4,6 +4,7 @@ mod tests {
     use std::fs;
 
     use crate::forest::ceiso_forest::{CEIsoForest, CEIsoForestConfig};
+    use crate::forest::eiso_forest::ExtensionLevel;
     use crate::metrics::classification::{accuracy_score, precision_at_k, roc_auc_score};
     use crate::tree::transform::CACHE;
     use crate::utils::csv_io::{write_bin, write_csv};
@@ -22,12 +23,11 @@ mod tests {
     #[test]
     fn test_admep() {
         // Settings for the experiments
-        let config = CEIsoForestConfig {
+        let config = CIsoForestConfig {
             n_intervals: IntervalType::LOG10,
             n_attributes: 8,
-            extension_level: 0.1,
             outlier_config: ForestConfig {
-                n_trees: 100,
+                n_trees: 200,
                 max_depth: None,
                 min_samples_split: 2,
                 min_samples_leaf: 1,
@@ -38,7 +38,7 @@ mod tests {
             },
         };
         let n_repetitions = 1;
-        let paths = fs::read_dir("../admep/ADMEP/").unwrap();
+        let paths = fs::read_dir("../../DATA/ADMEP/").unwrap();
 
         let mut datasets = Vec::new();
         for entry in paths {
@@ -68,7 +68,7 @@ mod tests {
             let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
             
             for j in 0..n_repetitions {
-                let mut model = CEIsoForest::new(&config);
+                let mut model = CIsoForest::new(&config);
                 model.fit(
                     &mut ds_train,
                     Some(rand_chacha::ChaCha8Rng::seed_from_u64(
@@ -303,10 +303,10 @@ mod tests {
             "Wine",
         ];
         // let normal_classes = [9, 2, 1, 1, 1, 2, 1, 0, 1, 1, 3, 1, 1, 1, 1, 3, 2, 5, 1, 5, 1, 6, 0, 0, 1, 1, 1, 1];
-        let config = CEIsoForestConfig {
+        let mut config = CEIsoForestConfig {
             n_intervals: IntervalType::LOG10,
             n_attributes: 8,
-            extension_level: 0.1,
+            extension_level: ExtensionLevel::ExtraFeatures(0),
             outlier_config: ForestConfig {
                 n_trees: 100,
                 max_depth: None,
@@ -349,7 +349,7 @@ mod tests {
             )
             .unwrap();
             let y_test = binarize(&ds_test.iter().map(|s| s.target).collect::<Vec<isize>>());
-
+            config.extension_level = ExtensionLevel::ExtraFeatures(ds_train[0].features.len() - 1);
             let start_time = std::time::Instant::now();
             for j in 0..n_repetitions {
                 let mut model = CEIsoForest::new(&config);

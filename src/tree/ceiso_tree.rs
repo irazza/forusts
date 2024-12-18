@@ -1,5 +1,6 @@
 use super::ei_tree::EIsoSplit;
 use super::node::Node;
+use crate::forest::eiso_forest::ExtensionLevel;
 use crate::tree::transform::catch_transform;
 use crate::utils::split::get_extended_split;
 use crate::{
@@ -22,7 +23,7 @@ pub struct CEIsoTreeConfig {
     pub n_features: usize,
     pub n_intervals: usize,
     pub n_attributes: usize,
-    pub extended_level: f64,
+    pub extended_level: ExtensionLevel,
 }
 
 #[derive(Clone, Debug)]
@@ -99,7 +100,12 @@ impl Tree for CEIsoTree {
             non_constant_features,
             random_state,
             self.config.min_samples_leaf,
-            samples[0].features.len() * self.config.extended_level as usize,
+            match self.config.extended_level {
+                ExtensionLevel::Percentage(percentage) => {
+                    (samples[0].features.len() as f64 * percentage) as usize
+                }
+                ExtensionLevel::ExtraFeatures(n_features) => n_features,
+            },
         )
     }
 

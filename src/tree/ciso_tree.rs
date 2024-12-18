@@ -2,7 +2,7 @@ use std::cmp::max;
 
 use super::{node::Node, tree::StandardSplit};
 use crate::tree::transform::catch_transform;
-use crate::utils::split::get_random_split;
+use crate::utils::split::{get_random_split, get_variance_split};
 use crate::{
     forest::ciso_forest::CIsoForestConfig, tree::tree::Tree, utils::structures::Sample,
     RandomGenerator,
@@ -92,7 +92,7 @@ impl Tree for CIsoTree {
         non_constant_features: &mut Vec<usize>,
         random_state: &mut RandomGenerator,
     ) -> Option<(Vec<std::ops::Range<usize>>, Self::SplitParameters, f64)> {
-        get_random_split(
+        get_variance_split(
             samples,
             non_constant_features,
             random_state,

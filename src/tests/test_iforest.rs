@@ -68,7 +68,7 @@ mod tests {
     #[test]
     fn test_hariri() {
         let mut config: EIsoForestConfig = EIsoForestConfig {
-            extension_level: ExtensionLevel::ExtraFeatures(10),
+            extension_level: ExtensionLevel::ExtraFeatures(0),
             outlier_config: ForestConfig {
                 n_trees: 200,
                 max_depth: None,

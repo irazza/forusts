@@ -1,6 +1,6 @@
 use std::cmp::min;
 
-use super::forest::{ForestConfig, SUBSAMPLE_SIZE};
+use super::{eiso_forest::ExtensionLevel, forest::{ForestConfig, SUBSAMPLE_SIZE}};
 use crate::{
     forest::forest::{Forest, OutlierForest},
     tree::ceiso_tree::CEIsoTree,
@@ -13,7 +13,7 @@ use rand::{thread_rng, SeedableRng};
 pub struct CEIsoForestConfig {
     pub n_intervals: IntervalType,
     pub n_attributes: usize,
-    pub extension_level: f64,
+    pub extension_level: ExtensionLevel,
     pub outlier_config: ForestConfig,
 }
 

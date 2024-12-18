@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -9,6 +10,7 @@ pub struct Sample {
 
 #[derive(Clone)]
 pub enum IntervalType {
+    N(usize),
     LOG2,
     LOG10,
     LN,
@@ -17,6 +19,7 @@ pub enum IntervalType {
 impl IntervalType {
     pub fn get_interval(&self, n: usize) -> usize {
         match self {
+            IntervalType::N(n) => *n,
             IntervalType::LOG2 => (n as f64).log2() as usize,
             IntervalType::LOG10 => (n as f64).log10() as usize,
             IntervalType::LN => (n as f64).ln() as usize,

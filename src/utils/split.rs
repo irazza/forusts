@@ -151,7 +151,7 @@ pub fn get_variance_split(
     random_state: &mut RandomGenerator,
     min_samples_leaf: usize,
 ) -> Option<(Vec<Range<usize>>, StandardSplit, f64)> {
-    let tries_count = ((samples.len() as f64).sqrt() as usize).max(1);
+    let tries_count = ((samples[0].features.len() as f64).sqrt() as usize).max(1);
 
     let mut best_split = None;
     let mut best_variance = f64::INFINITY;
@@ -168,19 +168,18 @@ pub fn get_variance_split(
                 .map(|s| s.features[split.feature])
                 .collect::<Vec<_>>();
 
-            let left_variance = variance(&values[intervals[0].clone()]);
-            let right_variance = variance(&values[intervals[1].clone()]);
+            let left_variance = (intervals[0].len() as f64 / samples.len() as f64) * variance(&values[intervals[0].clone()]);
+            let right_variance = (intervals[1].len() as f64 / samples.len() as f64) * variance(&values[intervals[1].clone()]);
 
-            let tot_score = left_variance + right_variance;
-            if tot_score < best_variance {
-                best_variance = tot_score;
+            let children_variance = left_variance + right_variance;
+            if children_variance < best_variance {
+                best_variance = children_variance;
                 best_split = Some((intervals, split, impurity));
             }
         } else {
             break;
         }
     }
-
     best_split
 }
 

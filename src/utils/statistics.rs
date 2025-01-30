@@ -14,8 +14,13 @@ pub fn transpose<T>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
 
 pub fn variance(v: &[f64]) -> f64 {
     let mean = v.iter().sum::<f64>() / v.len() as f64;
-    v.iter()
-        .map(|&x| (x - mean) * (x - mean))
-        .sum::<f64>()
-        / v.len() as f64
+    v.iter().map(|&x| (x - mean) * (x - mean)).sum::<f64>() / v.len() as f64
+}
+
+pub fn quantile(v: &[f64], p: f64) -> (f64, Vec<f64>) {
+    let mut v = v.to_vec();
+    let n = v.len();
+    let k = (n as f64 * p).round() as usize;
+    v.select_nth_unstable_by(k, |a, b| a.partial_cmp(b).unwrap());
+    (v[k], v[..k].to_vec())
 }

@@ -28,14 +28,13 @@ pub fn catch_transform(
     let mut transformed = Vec::with_capacity(data.len());
     for sample in data {
         let mut features = Vec::with_capacity(intervals.len() * attributes.len());
-        let ts = sample.features.clone();//zscore(&sample.features);
         for (start, end) in intervals {
             for attribute in attributes {
                 let key_cache = (sample.features.as_ptr() as usize, *start, *end, *attribute);
                 if let Some(value) = CACHE.get(&key_cache) {
                     features.push(*value);
                 } else {
-                    let mut value = compute(&ts[*start..*end], *attribute);
+                    let mut value = compute(&sample.features[*start..*end], *attribute);
                     if !value.is_finite() {
                         value = 0.0;
                     }

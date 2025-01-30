@@ -6,7 +6,7 @@ mod tests {
 
     use crate::forest::eiso_forest::{EIsoForest, EIsoForestConfig, ExtensionLevel};
     use crate::forest::forest::ForestConfig;
-    use crate::utils::csv_io::write_bin;
+    use crate::utils::csv_io::{write_bin, write_csv};
     use crate::utils::structures::MaxFeatures;
     use crate::{
         forest::{
@@ -141,16 +141,7 @@ mod tests {
 
             let ds_test = ds_train.clone();
 
-            for combiner in [
-                Combiner::PROD,
-                Combiner::SUM,
-                Combiner::TRIMMEDSUM,
-                Combiner::MEDIAN,
-                Combiner::MIN,
-                Combiner::MAX,
-            ]
-            .iter()
-            {
+            for combiner in Combiner::enumerate() {
                 let config = IsolationForestConfig {
                     n_trees: 100,
                     max_depth: None,
@@ -174,13 +165,14 @@ mod tests {
 
                     scores[k] = model.score_samples(&ds_test);
                 }
-                let _ = write_bin(
+                write_csv(
                     format!(
-                        "/media/albertoazzari/STABILITY/{}/{}.bin",
+                        "/media/albertoazzari/STABILITY/{}/{}.csv",
                         combiner,
                         path.path().file_stem().unwrap().to_string_lossy(),
                     ),
                     scores.clone(),
+                    None,
                 );
             }
         }

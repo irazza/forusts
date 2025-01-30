@@ -168,8 +168,10 @@ pub fn get_variance_split(
                 .map(|s| s.features[split.feature])
                 .collect::<Vec<_>>();
 
-            let left_variance = (intervals[0].len() as f64 / samples.len() as f64) * variance(&values[intervals[0].clone()]);
-            let right_variance = (intervals[1].len() as f64 / samples.len() as f64) * variance(&values[intervals[1].clone()]);
+            let left_variance = (intervals[0].len() as f64 / samples.len() as f64)
+                * variance(&values[intervals[0].clone()]);
+            let right_variance = (intervals[1].len() as f64 / samples.len() as f64)
+                * variance(&values[intervals[1].clone()]);
 
             let children_variance = left_variance + right_variance;
             if children_variance < best_variance {

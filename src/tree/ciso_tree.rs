@@ -92,12 +92,18 @@ impl Tree for CIsoTree {
         non_constant_features: &mut Vec<usize>,
         random_state: &mut RandomGenerator,
     ) -> Option<(Vec<std::ops::Range<usize>>, Self::SplitParameters, f64)> {
-        get_variance_split(
+        get_random_split(
             samples,
             non_constant_features,
             random_state,
             self.config.min_samples_leaf,
         )
+        // get_variance_split(
+        //     samples,
+        //     non_constant_features,
+        //     random_state,
+        //     self.config.min_samples_leaf,
+        // )
     }
 
     fn from_config(

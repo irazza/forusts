@@ -14,7 +14,6 @@ use std::cmp::max;
 const MIN_INTERVAL_PERC: f64 = 0.1;
 const MIN_INTERVALS_LEN: usize = 3;
 
-
 #[derive(Clone, Debug)]
 pub struct CEIsoTreeConfig {
     pub max_depth: usize,

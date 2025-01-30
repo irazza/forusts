@@ -66,14 +66,12 @@ mod tests {
             )
             .unwrap();
             let y_true = ds_test.iter().map(|s| s.target).collect::<Vec<_>>();
-            
+
             for j in 0..n_repetitions {
                 let mut model = CIsoForest::new(&config);
                 model.fit(
                     &mut ds_train,
-                    Some(rand_chacha::ChaCha8Rng::seed_from_u64(
-                        j as u64,
-                    )),
+                    Some(rand_chacha::ChaCha8Rng::seed_from_u64(j as u64)),
                 );
                 let prediction = model.score_samples(&ds_test);
                 predictions[i][j] = roc_auc_score(&prediction, &y_true);
@@ -83,7 +81,11 @@ mod tests {
                 path.file_name().to_string_lossy(),
                 predictions[i].iter().sum::<f64>() / n_repetitions as f64
             );
-            println!("\tn tot: {}, n anom: {}", y_true.len(), y_true.iter().filter(|&&x| x == 1).count());
+            println!(
+                "\tn tot: {}, n anom: {}",
+                y_true.len(),
+                y_true.iter().filter(|&&x| x == 1).count()
+            );
         }
         write_csv("admep_UL.csv", predictions, None);
     }

@@ -1,6 +1,9 @@
 use std::cmp::min;
 
-use super::{eiso_forest::ExtensionLevel, forest::{ForestConfig, SUBSAMPLE_SIZE}};
+use super::{
+    eiso_forest::ExtensionLevel,
+    forest::{ForestConfig, SUBSAMPLE_SIZE},
+};
 use crate::{
     forest::forest::{Forest, OutlierForest},
     tree::ceiso_tree::CEIsoTree,

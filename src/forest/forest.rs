@@ -292,7 +292,7 @@ pub trait OutlierForest<T: Tree>: Forest<T> {
             });
         let depths = transpose(depths);
         let mut scores = vec![0.0; data.len()];
-        let combiner = config.aggregation.clone().unwrap_or(Combiner::PROD);
+        let combiner = config.aggregation.clone().unwrap_or(Combiner::new());
         for (i, depth) in depths.iter().enumerate() {
             scores[i] = combiner.combine(depth, average_path_length_max_samples);
         }

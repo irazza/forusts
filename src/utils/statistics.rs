@@ -18,9 +18,13 @@ pub fn variance(v: &[f64]) -> f64 {
 }
 
 pub fn quantile(v: &[f64], p: f64) -> (f64, Vec<f64>) {
+    if p == 1.0 {
+        return (*v.last().unwrap(), v[..v.len() - 1].to_vec());
+    }
     let mut v = v.to_vec();
     let n = v.len();
     let k = (n as f64 * p).round() as usize;
     v.select_nth_unstable_by(k, |a, b| a.partial_cmp(b).unwrap());
     (v[k], v[..k].to_vec())
+
 }

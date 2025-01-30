@@ -140,8 +140,8 @@ mod tests {
             let mut ds_train = read_csv(path.path(), b',', false).unwrap();
 
             let ds_test = ds_train.clone();
-
             for combiner in Combiner::enumerate() {
+                println!("\tCombinar: {}", combiner);
                 let config = IsolationForestConfig {
                     n_trees: 100,
                     max_depth: None,
@@ -159,15 +159,14 @@ mod tests {
                         &mut ds_train,
                         None,
                         // Some(rand_chacha::ChaCha8Rng::seed_from_u64(
-                        //     ((i + 2) * (j + 2) * (k + 2)) as u64,
-                        // )),
+                        //     ((i + 2) * (j + 2) * (k + 2)) as u64)),
                     );
 
                     scores[k] = model.score_samples(&ds_test);
                 }
                 write_csv(
                     format!(
-                        "/media/albertoazzari/STABILITY/{}/{}.csv",
+                        "/media/DATA/albertoazzari/STABILITY/{}/{}.csv",
                         combiner,
                         path.path().file_stem().unwrap().to_string_lossy(),
                     ),

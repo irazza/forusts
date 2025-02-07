@@ -1,7 +1,7 @@
 use csv::ReaderBuilder;
 use std::error::Error;
-use std::fs::File;
-use std::io::{BufReader, Read, Write};
+use std::fs::{File, OpenOptions};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -66,8 +66,8 @@ where
         std::fs::create_dir_all(parent).unwrap();
     }
 
-    let mut f = File::create(path).unwrap();
-    let encoded: Vec<u8> = bincode::serialize(&data).unwrap();
+    let mut f = OpenOptions::new().create(true).append(true).open(path).unwrap();
+    let encoded: Vec<u8> = rmp_serde::to_vec(&data).unwrap();
     f.write_all(&encoded)?;
     f.flush()
 }
@@ -76,9 +76,11 @@ pub fn read_bin<T>(path: impl AsRef<Path>) -> Vec<T>
 where
     T: serde::de::DeserializeOwned,
 {
-    let mut f = File::open(path).unwrap();
-    let mut buf: Vec<u8> = Vec::new();
-    f.read_to_end(&mut buf).unwrap();
-    let decoded: Vec<T> = bincode::deserialize(&buf).expect("Could not deserialize");
+    let mut f = BufReader::new(File::open(path).unwrap());
+    let mut decoded = Vec::new();
+    while f.fill_buf().unwrap().len() > 0 {
+        let line = rmp_serde::from_read::<_, T>(&mut f).expect("Error reading binary file");
+        decoded.push(line);
+    }
     decoded
 }

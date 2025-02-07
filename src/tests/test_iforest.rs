@@ -2,6 +2,7 @@
 mod tests {
 
     use rand::SeedableRng;
+    use core::panic;
     use std::fs;
 
     use crate::forest::eiso_forest::{EIsoForest, EIsoForestConfig, ExtensionLevel};
@@ -140,39 +141,32 @@ mod tests {
             let mut ds_train = read_csv(path.path(), b',', false).unwrap();
 
             let ds_test = ds_train.clone();
-            for combiner in Combiner::enumerate() {
-                println!("\tCombinar: {}", combiner);
-                let config = IsolationForestConfig {
-                    n_trees: 100,
-                    max_depth: None,
-                    min_samples_split: 2,
-                    min_samples_leaf: 1,
-                    max_samples: 1.0,
-                    max_features: MaxFeatures::ALL,
-                    criterion: |_a, _b| 1.0,
-                    aggregation: Some(combiner.clone()),
-                };
-                let mut scores = vec![vec![0.0; ds_test.len()]; n_repetitions];
-                for k in 0..n_repetitions {
-                    let mut model = IsolationForest::new(&config);
-                    model.fit(
-                        &mut ds_train,
-                        None,
-                        // Some(rand_chacha::ChaCha8Rng::seed_from_u64(
-                        //     ((i + 2) * (j + 2) * (k + 2)) as u64)),
-                    );
-
-                    scores[k] = model.score_samples(&ds_test);
-                }
-                write_csv(
-                    format!(
-                        "/media/DATA/albertoazzari/STABILITY/{}/{}.csv",
-                        combiner,
-                        path.path().file_stem().unwrap().to_string_lossy(),
-                    ),
-                    scores.clone(),
-                    None,
+            let n_trees = 100;
+            let config = IsolationForestConfig {
+                n_trees: n_trees,
+                max_depth: None,
+                min_samples_split: 2,
+                min_samples_leaf: 1,
+                max_samples: 1.0,
+                max_features: MaxFeatures::ALL,
+                criterion: |_a, _b| 1.0,
+                aggregation: None,
+            };
+            // let mut scores = vec![vec![vec![0.0; n_trees]; ds_test.len()]; n_repetitions];
+            for k in 0..n_repetitions {
+                let mut model = IsolationForest::new(&config);
+                model.fit(
+                    &mut ds_train,
+                    Some(rand_chacha::ChaCha8Rng::seed_from_u64(k as u64)),
                 );
+                let depths = model.depth_samples(&ds_test);
+                if let Err(e) =  write_bin(format!(
+                    "/media/DATA/albertoazzari/STABILITY/{}_DEPTHS.bin",
+                    path.path().file_stem().unwrap().to_string_lossy(),
+                ),
+                depths,){
+                    println!("Error writing {}: {} ",path.path().file_stem().unwrap().to_string_lossy(), e);
+                }
             }
         }
     }

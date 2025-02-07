@@ -28,3 +28,27 @@ pub fn quantile(v: &[f64], p: f64) -> (f64, Vec<f64>) {
     (v[k], v[..k].to_vec())
 
 }
+
+pub fn quartiles(v: &[f64], q: i32) -> (f64, Vec<f64>) {
+    match q {
+        1 => {
+            let (q1, v) = quantile(v, 0.25);
+            (q1, v)
+        }
+        2 => {
+            let k = (v.len() as f64 * 0.25).round() as usize;
+            let (q2, v) = quantile(v, 0.5);
+            (q2, v[k..].to_vec())
+        }
+        3 => {
+            let k = (v.len() as f64 * 0.5).round() as usize;
+            let (q3, v) = quantile(v, 0.75);
+            (q3, v[k..].to_vec())
+        }
+        4 => {
+            let (q4, v) = quantile(v, 0.75);
+            (q4, v)
+        }
+        _ => panic!("Invalid quartile"),
+    }
+}

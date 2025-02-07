@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::statistics::quantile;
+use super::statistics::quartiles;
 
 const ANOMALY_SCORE: f64 = 2.0;
 const TRIM: f64 = 0.05;
@@ -43,14 +43,14 @@ impl Combiner {
 }
 impl Aggregation for Combiner {
     fn combine(&self, values: &[f64], average_path_length: f64) -> f64 {
-        let (_, values) = quantile(
+        let (_, values) = quartiles(
             values,
             match self.quantile {
-                Some(Quantile::Q1) => 0.25,
-                Some(Quantile::Q2) => 0.5,
-                Some(Quantile::Q3) => 0.75,
-                Some(Quantile::Q4) => 1.0,
-                None => 1.0,
+                Some(Quantile::Q1) => 1,
+                Some(Quantile::Q2) => 2,
+                Some(Quantile::Q3) => 3,
+                Some(Quantile::Q4) => 4,
+                None => 4,
             },
         );
         self.aggregation.combine(&values, average_path_length)

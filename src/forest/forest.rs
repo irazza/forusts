@@ -274,6 +274,25 @@ pub trait OutlierForest<T: Tree>: Forest<T> {
         }
         predictions
     }
+    fn depth_samples(&self, data: &[Sample]) -> Vec<Vec<f64>> {
+        let (config, _) = self.get_forest_config();
+        let average_path_length_max_samples = T::average_path_length(self.get_max_samples());
+        let trees: &Vec<T> = self.get_trees();
+        let mut depths = (0..trees.len())
+            .map(|_| (0..data.len()).map(|_| 0.0).collect::<Vec<_>>())
+            .collect::<Vec<_>>();
+        trees
+            .par_iter()
+            .zip(depths.par_iter_mut())
+            .for_each(|(tree, depth)| {
+                let samples = tree.transform(data);
+                for (j, sample) in samples.iter().enumerate() {
+                    depth[j] = Self::path_length(tree, sample);
+                }
+            });
+        let depths = transpose(depths);
+        depths
+    }
     fn score_samples(&self, data: &[Sample]) -> Vec<f64> {
         let (config, _) = self.get_forest_config();
         let average_path_length_max_samples = T::average_path_length(self.get_max_samples());

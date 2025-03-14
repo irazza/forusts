@@ -161,8 +161,9 @@ mod tests {
                 );
                 let depths = model.depth_samples(&ds_test);
                 if let Err(e) =  write_bin(format!(
-                    "/media/DATA/albertoazzari/STABILITY/{}_DEPTHS.bin",
+                    "/media/DATA/albertoazzari/STABILITY/{}/{}_DEPTHS.bin",
                     path.path().file_stem().unwrap().to_string_lossy(),
+                    k,
                 ),
                 depths,){
                     println!("Error writing {}: {} ",path.path().file_stem().unwrap().to_string_lossy(), e);

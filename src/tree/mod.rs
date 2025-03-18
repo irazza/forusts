@@ -1,11 +1,11 @@
-pub(crate) mod node;
-pub(crate) mod tree;
+pub mod node;
+pub mod tree;
 
 pub mod transform;
 pub mod fast_gini;
 
-pub(crate) mod ceiso_tree;
-pub(crate) mod ei_tree;
+pub mod ceiso_tree;
+pub mod ei_tree;
 pub mod ciso_tree;
 pub mod isolation_tree;
 

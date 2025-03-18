@@ -1,5 +1,5 @@
 use crate::utils::structures::Sample;
-use catch22::{compute, N_CATCH22};
+use catch22::compute;
 use dashmap::DashMap;
 use lazy_static::lazy_static;
 use std::sync::Arc;
@@ -7,7 +7,7 @@ use sys_info;
 
 lazy_static! {
     pub static ref CACHE: DashMap<(usize, usize, usize, usize), f64> = DashMap::new();
-    pub static ref TOT_RAM: usize = sys_info::mem_info().unwrap().total as usize * 1024;
+    static ref TOT_RAM: usize = sys_info::mem_info().unwrap().total as usize * 1024;
 }
 
 fn cache_size(cache: &DashMap<(usize, usize, usize, usize), f64>) -> usize {
@@ -46,23 +46,6 @@ pub fn catch_transform(
                 }
             }
         }
-
-        // for i in 0..N_CATCH22 {
-        //     let key_cache = (sample.features.as_ptr() as usize, 0, ts.len(), i);
-        //     if let Some(value) = CACHE.get(&key_cache) {
-        //         features.push(*value);
-        //     } else {
-        //         let mut value = compute(&ts, i);
-        //         if !value.is_finite() {
-        //             value = 0.0;
-        //         }
-
-        //         if cache_size(&CACHE) < (*TOT_RAM as f64 * 0.8) as usize {
-        //             CACHE.insert(key_cache, value);
-        //         }
-        //         features.push(value);
-        //     }
-        // }
 
         transformed.push(Sample {
             features: Arc::new(features),

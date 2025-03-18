@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use crate::utils::structures::MaxFeatures;
 use crate::{
     tree::{
@@ -20,7 +19,6 @@ use rayon::prelude::*;
 use std::{cmp::max, sync::atomic::AtomicUsize};
 
 pub const SUBSAMPLE_SIZE: usize = 256;
-const ANOMALY_SCORE: f64 = 2.0;
 pub const EGAMMA: f64 = 0.577215664901532860606512090082402431_f64;
 
 #[derive(Clone)]
@@ -29,7 +27,6 @@ pub struct ForestConfig {
     pub max_depth: Option<usize>,
     pub min_samples_split: usize,
     pub min_samples_leaf: usize,
-    pub max_samples: f64,
     pub max_features: MaxFeatures,
     pub criterion: fn(&HashMap<isize, usize>, &[HashMap<isize, usize>]) -> f64,
     pub aggregation: Option<Combiner>,
@@ -275,8 +272,6 @@ pub trait OutlierForest<T: Tree>: Forest<T> {
         predictions
     }
     fn depth_samples(&self, data: &[Sample]) -> Vec<Vec<f64>> {
-        let (config, _) = self.get_forest_config();
-        let average_path_length_max_samples = T::average_path_length(self.get_max_samples());
         let trees: &Vec<T> = self.get_trees();
         let mut depths = (0..trees.len())
             .map(|_| (0..data.len()).map(|_| 0.0).collect::<Vec<_>>())
@@ -322,7 +317,7 @@ pub trait OutlierForest<T: Tree>: Forest<T> {
     }
 }
 
-fn generate_indices(
+pub fn generate_indices(
     n_samples: usize,
     n_population: usize,
     with_replacement: bool,

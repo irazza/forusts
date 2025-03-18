@@ -5,7 +5,7 @@ mod tests {
 
     use crate::forest::ceiso_forest::{CEIsoForest, CEIsoForestConfig};
     use crate::forest::eiso_forest::ExtensionLevel;
-    use crate::metrics::classification::{accuracy_score, precision_at_k, roc_auc_score};
+    use crate::metrics::classification::{accuracy_score, roc_auc_score};
     use crate::tree::transform::CACHE;
     use crate::utils::csv_io::{write_bin, write_csv};
     use crate::utils::split::binarize;
@@ -31,7 +31,6 @@ mod tests {
                 max_depth: None,
                 min_samples_split: 2,
                 min_samples_leaf: 1,
-                max_samples: 1.0,
                 max_features: MaxFeatures::ALL,
                 criterion: |_a, _b| 1.0,
                 aggregation: None,
@@ -101,7 +100,6 @@ mod tests {
                 max_depth: Some(usize::MAX),
                 min_samples_split: 2,
                 min_samples_leaf: 1,
-                max_samples: 1.0,
                 max_features: MaxFeatures::ALL,
                 criterion: |_a, _b| 1.0,
                 aggregation: None,
@@ -214,7 +212,6 @@ mod tests {
                 max_depth: Some(usize::MAX),
                 min_samples_split: 2,
                 min_samples_leaf: 1,
-                max_samples: 1.0,
                 max_features: MaxFeatures::ALL,
                 criterion: |_a, _b| 1.0,
                 aggregation: None,
@@ -314,7 +311,6 @@ mod tests {
                 max_depth: None,
                 min_samples_split: 2,
                 min_samples_leaf: 1,
-                max_samples: 1.0,
                 max_features: MaxFeatures::ALL,
                 criterion: |_a, _b| 1.0,
                 aggregation: None,

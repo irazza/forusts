@@ -1,4 +1,4 @@
-// TODO FIX THIS BECAUSE IT DOES NOT WORK CORRECLTY, NEED TO HANDLE DUPLICATE IN THE DISTANCES
+// TODO FIX THIS BECAUSE IT DOES NOT WORK CORRECLTY, NEED TO HANDLE DUPLICATES IN THE DISTANCES
 fn transpose<T: Copy>(matrix: &[Vec<T>]) -> Vec<Vec<T>> {
     let mut transposed = Vec::new();
     for i in 0..matrix[0].len() {

@@ -25,7 +25,6 @@ mod tests {
             max_depth: None,
             min_samples_split: 2,
             min_samples_leaf: 1,
-            max_samples: 1.0,
             max_features: MaxFeatures::ALL,
             criterion: |_a, _b| 1.0,
             aggregation: None,
@@ -75,7 +74,7 @@ mod tests {
                 max_depth: None,
                 min_samples_split: 2,
                 min_samples_leaf: 1,
-                max_samples: 1.0,
+
                 max_features: MaxFeatures::ALL,
                 criterion: |_a, _b| 1.0,
                 aggregation: None,
@@ -147,7 +146,7 @@ mod tests {
                 max_depth: None,
                 min_samples_split: 2,
                 min_samples_leaf: 1,
-                max_samples: 1.0,
+
                 max_features: MaxFeatures::ALL,
                 criterion: |_a, _b| 1.0,
                 aggregation: None,

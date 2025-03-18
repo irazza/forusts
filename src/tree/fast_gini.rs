@@ -1,16 +1,5 @@
 use hashbrown::HashMap;
 
-// pub fn gini_impurity(node: &HashMap<isize, usize>) -> f64 {
-//     let mut impurity = 1.0;
-//     let total_samples = node.values().sum::<usize>() as f64;
-//     for &count in node.values() {
-//         let p = count as f64 / total_samples;
-//         impurity -= p * p;
-//     }
-
-//     impurity
-// }
-
 #[derive(Clone)]
 pub struct FastGini {
     classes: HashMap<isize, usize>,

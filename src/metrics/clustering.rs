@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use hashbrown::HashMap;
 
 pub fn adjusted_rand_score(y_pred: &[isize], y_true: &[isize]) -> f64 {
@@ -35,12 +34,4 @@ pub fn adjusted_rand_score(y_pred: &[isize], y_true: &[isize]) -> f64 {
 #[inline(always)]
 fn comb2(n: usize) -> usize {
     n * (n - 1) / 2
-}
-
-#[test]
-pub fn test_ari() {
-    let y_true = vec![0, 0, 1, 1];
-    let y_pred = vec![1, 1, 0, 0];
-    let ari = adjusted_rand_score(&y_pred, &y_true);
-    println!("Adjusted Rand Index: {:.2}", ari);
 }

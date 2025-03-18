@@ -1,3 +1,6 @@
+use hashbrown::HashSet;
+use std::hash::Hash;
+
 pub fn transpose<T>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
     assert!(!v.is_empty());
     let len = v[0].len();
@@ -15,6 +18,27 @@ pub fn transpose<T>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
 pub fn variance(v: &[f64]) -> f64 {
     let mean = v.iter().sum::<f64>() / v.len() as f64;
     v.iter().map(|&x| (x - mean) * (x - mean)).sum::<f64>() / v.len() as f64
+}
+
+pub fn class_counts<T: Hash + Eq>(arr: &[T]) -> usize {
+    let mut count = HashSet::new();
+    for x in arr {
+        count.insert(x);
+    }
+    return count.len();
+}
+
+pub fn argsort<T: PartialOrd>(v: &[T]) -> Vec<usize> {
+    let mut idx = (0..v.len()).collect::<Vec<_>>();
+    idx.sort_by(|&a, &b| v[a].partial_cmp(&v[b]).unwrap_or(std::cmp::Ordering::Equal));
+    idx
+}
+
+pub fn unique<T: PartialOrd + Clone>(x: &[T]) -> Vec<T> {
+    let mut unique = x.to_vec();
+    unique.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
+    unique.dedup();
+    unique
 }
 
 pub fn quantile(v: &[f64], p: f64) -> (f64, Vec<f64>) {

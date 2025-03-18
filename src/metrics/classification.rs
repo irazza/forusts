@@ -1,21 +1,5 @@
-#![allow(dead_code)]
-use hashbrown::HashSet;
-use std::hash::Hash;
+use crate::utils::statistics::{argsort, class_counts, unique};
 
-pub fn class_counts<T: Hash + Eq>(arr: &[T]) -> usize {
-    let mut count = HashSet::new();
-    for x in arr {
-        count.insert(x);
-    }
-    return count.len();
-}
-
-pub fn unique<T: PartialOrd + Clone>(x: &[T]) -> Vec<T> {
-    let mut unique = x.to_vec();
-    unique.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
-    unique.dedup();
-    unique
-}
 
 pub fn accuracy_score(y_pred: &[isize], y_true: &[isize]) -> f64 {
     (y_pred
@@ -127,27 +111,16 @@ pub fn matthews_corrcoef(y_pred: &[isize], y_true: &[isize]) -> f64 {
 }
 
 pub fn precision_at_k(y_pred: &[f64], y_true: &[isize], k: usize) -> f64 {
-    let n_samples = y_pred.len();
-    assert!(
-        k <= n_samples && k > 0,
-        "k must be a positive integer less than the number of samples"
-    );
-    assert_eq!(
-        n_samples,
-        y_true.len(),
-        "Input vectors must have the same length"
-    );
-
-    // Sort the predictions in descending order
-    let mut indices: Vec<usize> = (0..n_samples).collect();
-    indices.sort_unstable_by(|a, b| y_pred[*b].partial_cmp(&y_pred[*a]).unwrap());
+    // Sort the predictions
+    let indices = argsort(&y_pred);
+    let indices = &indices[y_pred.len() - k..];
 
     // Initialize variables to store the number of true positives and the precision at k
     let mut n_true_positives = 0;
 
     // Iterate through the top k predictions
-    for i in 0..k {
-        if y_true[indices[i]] == 1 {
+    for i in indices {
+        if y_true[*i] == 1 {
             // Increment the number of true positives when the prediction is correct
             n_true_positives += 1;
         }
@@ -168,8 +141,6 @@ pub fn roc_auc_score(y_pred: &[f64], y_true: &[isize]) -> f64 {
 }
 
 fn auc(x: &[f64], y: &[f64]) -> f64 {
-    // Ensure the input vectors have the same length
-    assert_eq!(x.len(), y.len(), "Input vectors must have the same length");
 
     // Sort the vectors based on x (false positive rates) in ascending order
     let mut sorted_data: Vec<_> = x.iter().zip(y.iter()).collect();
@@ -316,55 +287,5 @@ fn roc_curve(y_pred: &[f64], y_true: &[isize]) -> (Vec<f64>, Vec<f64>, Vec<f64>)
         tprs.push(1.0 - true_positives as f64 / not_zero(true_positives + false_negatives) as f64);
         fprs.push(1.0 - false_positives as f64 / not_zero(true_negatives + false_positives) as f64);
     }
-    (fprs, tprs, thresholds)
-}
-
-pub fn roc_auc_score_c(y_pred: &[f64], y_true: &[isize]) -> f64 {
-    // Calculate ROC curve
-    let (fprs, tprs, _) = roc_curve_c(y_pred, y_true);
-
-    // Calculate AUC from the ROC curve
-    let auc_value = auc(&fprs, &tprs);
-
-    auc_value
-}
-
-fn roc_curve_c(y_pred: &[f64], y_true: &[isize]) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
-    // Ensure the input vectors have the same length
-    assert_eq!(
-        y_pred.len(),
-        y_true.len(),
-        "Input vectors must have the same length"
-    );
-
-    // Ensure that is a binary problem
-    assert_eq!(
-        class_counts(y_true),
-        2,
-        "ROC curve is only defined for binary problems"
-    );
-
-    // Initialize vectors to store true positive rate (sensitivity), false positive rate, and thresholds
-    let mut tprs = Vec::new();
-    let mut fprs = Vec::new();
-    let thresholds = unique(y_pred);
-
-    // Iterate through a range of thresholds
-    for threshold in &thresholds {
-        // Create a binary vector based on the current threshold
-        let y_pred_binary: Vec<usize> = y_pred
-            .iter()
-            .map(|&x| if x >= *threshold { 1 } else { 0 })
-            .collect();
-
-        // Calculate true positive rate and false positive rate using the previously implemented functions
-        let tpr = true_positive_rate(&y_pred_binary, y_true);
-        let fpr = false_positive_rate(&y_pred_binary, y_true);
-
-        // Store TPR, FPR, and threshold for the current iteration
-        tprs.push(tpr);
-        fprs.push(fpr);
-    }
-
     (fprs, tprs, thresholds)
 }

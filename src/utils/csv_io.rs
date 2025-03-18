@@ -77,10 +77,5 @@ where
     T: serde::de::DeserializeOwned,
 {
     let mut f = BufReader::new(File::open(path).unwrap());
-    let mut decoded = Vec::new();
-    while f.fill_buf().unwrap().len() > 0 {
-        let line = rmp_serde::from_read::<_, T>(&mut f).expect("Error reading binary file");
-        decoded.push(line);
-    }
-    decoded
+    rmp_serde::from_read(&mut f).expect("Error reading binary file")
 }

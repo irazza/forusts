@@ -268,12 +268,6 @@ pub fn false_positive_rate(y_pred: &[usize], y_true: &[isize]) -> f64 {
 }
 
 fn roc_curve(y_pred: &[f64], y_true: &[isize]) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
-    // Ensure the input vectors have the same length
-    assert_eq!(
-        y_pred.len(),
-        y_true.len(),
-        "Input vectors must have the same length"
-    );
 
     // Ensure that is a binary problem
     assert_eq!(

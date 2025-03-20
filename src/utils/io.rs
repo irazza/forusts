@@ -58,18 +58,12 @@ where
     writer.flush().unwrap();
 }
 
-pub fn write_bin<T>(path: impl AsRef<Path>, data: Vec<T>) -> Result<(), std::io::Error>
+pub fn write_bin<T>(path: impl AsRef<Path>, data: &Vec<T>)
 where
     T: serde::Serialize,
 {
-    if let Some(parent) = path.as_ref().parent() {
-        std::fs::create_dir_all(parent).unwrap();
-    }
-
-    let mut f = OpenOptions::new().create(true).append(true).open(path).unwrap();
-    let encoded: Vec<u8> = rmp_serde::to_vec(&data).unwrap();
-    f.write_all(&encoded)?;
-    f.flush()
+    let mut f = File::create(path).unwrap();
+    rmp_serde::encode::write(&mut f, data).expect("Error writing binary file");
 }
 
 pub fn read_bin<T>(path: impl AsRef<Path>) -> Vec<T>

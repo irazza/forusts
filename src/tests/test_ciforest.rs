@@ -7,7 +7,7 @@ mod tests {
     use crate::forest::eiso_forest::ExtensionLevel;
     use crate::metrics::classification::{accuracy_score, roc_auc_score};
     use crate::tree::transform::CACHE;
-    use crate::utils::csv_io::{write_bin, write_csv};
+    use crate::utils::io::{write_bin, write_csv};
     use crate::utils::split::binarize;
     use crate::utils::structures::MaxFeatures;
     use crate::{
@@ -17,7 +17,7 @@ mod tests {
             erci_forest::ERCIForest,
             forest::{Forest, ForestConfig, OutlierForest},
         },
-        utils::{csv_io::read_csv, structures::IntervalType},
+        utils::{io::read_csv, structures::IntervalType},
     };
 
     #[test]
@@ -364,9 +364,8 @@ mod tests {
                         path.file_name().to_string_lossy(),
                         j
                     ),
-                    prediction,
-                )
-                .unwrap();
+                    &prediction,
+                );
             }
             println!(
                 "{}: {:.2} in {:.2} seconds",

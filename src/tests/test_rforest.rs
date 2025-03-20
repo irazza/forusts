@@ -11,7 +11,7 @@ mod tests {
             random_forest::{RandomForest, RandomForestConfig},
         },
         metrics::classification::accuracy_score,
-        utils::csv_io::read_csv,
+        utils::io::read_csv,
     };
 
     #[test]

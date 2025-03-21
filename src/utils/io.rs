@@ -62,6 +62,9 @@ pub fn write_bin<T>(path: impl AsRef<Path>, data: &Vec<T>)
 where
     T: serde::Serialize,
 {
+    if let Some(parent) = path.as_ref().parent() {
+        std::fs::create_dir_all(parent).unwrap();
+    }
     let mut f = File::create(path).unwrap();
     rmp_serde::encode::write(&mut f, data).expect("Error writing binary file");
 }

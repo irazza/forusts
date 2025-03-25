@@ -16,6 +16,7 @@ use atomic_float::AtomicF64;
 use hashbrown::HashMap;
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rayon::prelude::*;
+use serde::de;
 use std::{cmp::max, sync::atomic::AtomicUsize};
 
 pub const SUBSAMPLE_SIZE: usize = 256;
@@ -306,10 +307,26 @@ pub trait OutlierForest<T: Tree>: Forest<T> {
             });
         let depths = transpose(depths);
         let mut scores = vec![0.0; data.len()];
-        let combiner = config.aggregation.clone().unwrap_or(Combiner::new());
-        for (i, depth) in depths.iter().enumerate() {
-            scores[i] = combiner.combine(depth, average_path_length_max_samples);
+        if let Some(aggregation) = &config.aggregation {
+            for (i, depth) in depths.iter().enumerate() {
+                scores[i] = aggregation.combine(depth, average_path_length_max_samples);
+            }
+        } else {
+            scores = depths
+                .iter()
+                .map(|depth| {
+                    let mut sum = 0.0;
+                    for d in depth {
+                        sum += d;
+                    }
+                    2.0_f64.powf(-(sum / depth.len() as f64) / average_path_length_max_samples)
+                })
+                .collect();
         }
+        // let combiner = config.aggregation.clone().unwrap_or(Combiner::new());
+        // for (i, depth) in depths.iter().enumerate() {
+        //     scores[i] = combiner.combine(depth, average_path_length_max_samples);
+        // }
         scores
     }
     fn path_length(tree: &T, x: &Sample) -> f64 {

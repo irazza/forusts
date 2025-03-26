@@ -1,5 +1,6 @@
-use crate::utils::statistics::{argsort, class_counts, unique};
+use std::cmp::Ordering;
 
+use crate::utils::statistics::{argsort, class_counts, unique};
 
 pub fn accuracy_score(y_pred: &[isize], y_true: &[isize]) -> f64 {
     (y_pred
@@ -130,6 +131,16 @@ pub fn precision_at_k(y_pred: &[f64], y_true: &[isize], k: usize) -> f64 {
     n_true_positives as f64 / k as f64
 }
 
+pub fn pr_auc_score(y_pred: &[f64], y_true: &[isize]) -> f64 {
+    // Calculate PR curve
+    let (recalls, precisions, _) = pr_curve(y_pred, y_true);
+
+    // Calculate AUC from the PR curve
+    let auc_value = auc(&recalls, &precisions);
+
+    auc_value
+}
+
 pub fn roc_auc_score(y_pred: &[f64], y_true: &[isize]) -> f64 {
     // Calculate ROC curve
     let (fprs, tprs, _) = roc_curve(y_pred, y_true);
@@ -141,7 +152,6 @@ pub fn roc_auc_score(y_pred: &[f64], y_true: &[isize]) -> f64 {
 }
 
 fn auc(x: &[f64], y: &[f64]) -> f64 {
-
     // Sort the vectors based on x (false positive rates) in ascending order
     let mut sorted_data: Vec<_> = x.iter().zip(y.iter()).collect();
     sorted_data.sort_by(|a, b| a.0.partial_cmp(b.0).unwrap());
@@ -239,7 +249,6 @@ pub fn false_positive_rate(y_pred: &[usize], y_true: &[isize]) -> f64 {
 }
 
 fn roc_curve(y_pred: &[f64], y_true: &[isize]) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
-
     // Ensure that is a binary problem
     assert_eq!(
         class_counts(y_true),
@@ -267,6 +276,8 @@ fn roc_curve(y_pred: &[f64], y_true: &[isize]) -> (Vec<f64>, Vec<f64>, Vec<f64>)
 
     let mut index = 0;
 
+    let not_zero = |x: usize| if x == 0 { 1 } else { x };
+
     // Iterate through a range of thresholds
     for threshold in &thresholds {
         // Create a binary vector based on the current threshold
@@ -281,11 +292,78 @@ fn roc_curve(y_pred: &[f64], y_true: &[isize]) -> (Vec<f64>, Vec<f64>, Vec<f64>)
             index += 1;
         }
 
-        let not_zero = |x: usize| if x == 0 { 1 } else { x };
-
         // Store TPR, FPR, and threshold for the current iteration
         tprs.push(1.0 - true_positives as f64 / not_zero(true_positives + false_negatives) as f64);
         fprs.push(1.0 - false_positives as f64 / not_zero(true_negatives + false_positives) as f64);
     }
     (fprs, tprs, thresholds)
 }
+
+fn pr_curve(y_pred: &[f64], y_true: &[isize]) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+    // Ensure that is a binary problem
+    assert_eq!(
+        class_counts(y_true),
+        2,
+        "ROC curve is only defined for binary problems"
+    );
+
+    // Initialize vectors to store true positive rate (sensitivity), false positive rate, and thresholds
+    let mut recalls = Vec::new();
+    recalls.push(1.0);
+    let mut precisions = Vec::new();
+    precisions.push(y_true.iter().filter(|&&x| x == 1).count() as f64 / y_true.len() as f64);
+    let mut thresholds = unique(y_pred);
+
+    println!("{}, {}, {}", &recalls[0], &precisions[0], &thresholds[0]);
+
+    let mut pred_with_true_class = y_pred
+        .iter()
+        .copied()
+        .zip(y_true.iter().copied())
+        .collect::<Vec<_>>();
+    pred_with_true_class.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+
+    let mut true_positives = 0;
+    let mut false_positives = 0;
+
+    let mut false_negatives = pred_with_true_class.iter().filter(|x| x.1 == 1).count();
+    let mut true_negatives = pred_with_true_class.iter().filter(|x| x.1 == 0).count();
+
+    let mut index = 0;
+
+    let not_zero = |x: usize| if x == 0 { 1 } else { x };
+
+    // Iterate through a range of thresholds
+    for threshold in &thresholds {
+        // Create a binary vector based on the current threshold
+        while index < pred_with_true_class.len() && pred_with_true_class[index].0 < *threshold {
+            if pred_with_true_class[index].1 == 1 {
+                true_positives += 1;
+                false_negatives -= 1;
+            } else {
+                false_positives += 1;
+                true_negatives -= 1;
+            }
+            index += 1;
+        }
+
+        // Store TPR, FPR, and threshold for the current iteration
+        let recall = true_positives as f64 / not_zero(true_positives + false_negatives) as f64;
+        let precision = true_positives as f64 / not_zero(true_positives + false_positives) as f64;
+        println!("{}, {}, {}", recall, precision, threshold);
+        recalls.push(true_positives as f64 / not_zero(true_positives + false_negatives) as f64);
+        precisions.push(true_positives as f64 / not_zero(true_positives + false_positives) as f64);
+    }
+    (precisions, recalls, thresholds)
+}
+// 4.000000000000000222e-01
+// 4.444444444444444198e-01
+// 3.750000000000000000e-01
+// 4.285714285714285476e-01
+// 3.333333333333333148e-01
+// 4.000000000000000222e-01
+// 5.000000000000000000e-01
+// 3.333333333333333148e-01
+// 5.000000000000000000e-01
+// 0.000000000000000000e+00
+// 1.000000000000000000e+00

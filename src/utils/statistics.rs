@@ -1,5 +1,5 @@
 use hashbrown::HashSet;
-use std::hash::Hash;
+use std::{f32::consts::E, hash::Hash};
 
 pub fn transpose<T>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
     assert!(!v.is_empty());
@@ -36,7 +36,7 @@ pub fn argsort<T: PartialOrd>(v: &[T]) -> Vec<usize> {
 
 pub fn unique<T: PartialOrd + Clone>(x: &[T]) -> Vec<T> {
     let mut unique = x.to_vec();
-    unique.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
+    unique.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     unique.dedup();
     unique
 }
@@ -50,7 +50,6 @@ pub fn quantile(v: &[f64], p: f64) -> (f64, Vec<f64>) {
     let k = (n as f64 * p).round() as usize;
     v.select_nth_unstable_by(k, |a, b| a.partial_cmp(b).unwrap());
     (v[k], v[..k].to_vec())
-
 }
 
 pub fn quartiles(v: &[f64], q: i32) -> (f64, Vec<f64>) {

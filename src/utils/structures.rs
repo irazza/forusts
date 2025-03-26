@@ -47,3 +47,23 @@ impl crate::utils::structures::MaxFeatures {
         }
     }
 }
+
+#[macro_export]
+macro_rules! assert_eq_with_tol {
+    ($left:expr, $right:expr, $tolerance:expr) => {
+        let left = $left;
+        let right = $right;
+        let tolerance = $tolerance;
+        
+        if (left - right).abs() > tolerance {
+            panic!(
+                "assertion failed: `(left == right)` \
+                \n   left: `{:?}`,\
+                \n  right: `{:?}`,\
+                \n  diff:  `{:?}`,\
+                \n  max tolerance: `{:?}`",
+                left, right, (left - right).abs(), tolerance
+            );
+        }
+    };
+}

@@ -116,12 +116,16 @@ static Y_PRED: LazyLock<Vec<f64>> = LazyLock::new(|| {
 
 #[test]
 fn test_pr_auc_score() {
-    let auc_value = pr_auc_score(&Y_PRED[..10], &Y_TRUE[..10]);
-    assert_eq_with_tol!(auc_value, 0.36433531746031744, f64::EPSILON);
+    let start_time = std::time::Instant::now();
+    let auc_value = pr_auc_score(&Y_PRED, &Y_TRUE);
+    println!("Elapsed time: {:?}", start_time.elapsed());
+    assert_eq_with_tol!(auc_value, 0.5526637552525514, f64::EPSILON);
 }
 
 #[test]
 fn test_roc_auc_score() {
+    let start_time = std::time::Instant::now();
     let auc_value = roc_auc_score(&Y_PRED, &Y_TRUE);
+    println!("Elapsed time: {:?}", start_time.elapsed());
     assert_eq_with_tol!(auc_value, 0.546073717948718, f64::EPSILON);
 }

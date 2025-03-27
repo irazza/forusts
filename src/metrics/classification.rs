@@ -1,4 +1,4 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, ops::Sub};
 
 use crate::utils::statistics::{argsort, class_counts, unique};
 
@@ -134,7 +134,6 @@ pub fn precision_at_k(y_pred: &[f64], y_true: &[isize], k: usize) -> f64 {
 pub fn pr_auc_score(y_pred: &[f64], y_true: &[isize]) -> f64 {
     // Calculate PR curve
     let (recalls, precisions, _) = pr_curve(y_pred, y_true);
-
     // Calculate AUC from the PR curve
     let auc_value = auc(&recalls, &precisions);
 
@@ -249,121 +248,48 @@ pub fn false_positive_rate(y_pred: &[usize], y_true: &[isize]) -> f64 {
 }
 
 fn roc_curve(y_pred: &[f64], y_true: &[isize]) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
-    // Ensure that is a binary problem
-    assert_eq!(
-        class_counts(y_true),
-        2,
-        "ROC curve is only defined for binary problems"
-    );
+    let (fps, tps, thresholds) = tps_fps_curve(y_pred, y_true);
 
-    // Initialize vectors to store true positive rate (sensitivity), false positive rate, and thresholds
-    let mut tprs = Vec::new();
-    let mut fprs = Vec::new();
-    let thresholds = unique(y_pred);
+    let fpr = fps.iter().map(|&x| x as f64 / (*fps.last().unwrap().max(&1)) as f64).collect::<Vec<_>>();
+    let tpr = tps.iter().map(|&x| x as f64 / (*tps.last().unwrap().max(&1)) as f64).collect::<Vec<_>>();
 
-    let mut pred_with_true_class = y_pred
-        .iter()
-        .copied()
-        .zip(y_true.iter().copied())
-        .collect::<Vec<_>>();
-    pred_with_true_class.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-
-    let mut true_positives = 0;
-    let mut false_positives = 0;
-
-    let mut false_negatives = pred_with_true_class.iter().filter(|x| x.1 == 1).count();
-    let mut true_negatives = pred_with_true_class.iter().filter(|x| x.1 == 0).count();
-
-    let mut index = 0;
-
-    let not_zero = |x: usize| if x == 0 { 1 } else { x };
-
-    // Iterate through a range of thresholds
-    for threshold in &thresholds {
-        // Create a binary vector based on the current threshold
-        while index < pred_with_true_class.len() && pred_with_true_class[index].0 < *threshold {
-            if pred_with_true_class[index].1 == 1 {
-                true_positives += 1;
-                false_negatives -= 1;
-            } else {
-                false_positives += 1;
-                true_negatives -= 1;
-            }
-            index += 1;
-        }
-
-        // Store TPR, FPR, and threshold for the current iteration
-        tprs.push(1.0 - true_positives as f64 / not_zero(true_positives + false_negatives) as f64);
-        fprs.push(1.0 - false_positives as f64 / not_zero(true_negatives + false_positives) as f64);
-    }
-    (fprs, tprs, thresholds)
+    (fpr, tpr, thresholds)
 }
 
 fn pr_curve(y_pred: &[f64], y_true: &[isize]) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
-    // Ensure that is a binary problem
-    assert_eq!(
-        class_counts(y_true),
-        2,
-        "ROC curve is only defined for binary problems"
-    );
 
-    // Initialize vectors to store true positive rate (sensitivity), false positive rate, and thresholds
-    let mut recalls = Vec::new();
-    recalls.push(1.0);
-    let mut precisions = Vec::new();
-    precisions.push(y_true.iter().filter(|&&x| x == 1).count() as f64 / y_true.len() as f64);
-    let mut thresholds = unique(y_pred);
+    let (fps, tps, mut thresholds) = tps_fps_curve(y_pred, y_true);
+    let ps = tps.iter().zip(fps.iter()).map(|(tp, fp)| tp + fp).collect::<Vec<_>>();
 
-    println!("{}, {}, {}", &recalls[0], &precisions[0], &thresholds[0]);
+    let mut precisions = tps.iter().zip(ps.iter()).map(|(tp, p)| *tp as f64 / (*p.max(&1)) as f64).collect::<Vec<_>>();
+    let mut recalls = tps.iter().map(|tp| *tp as f64 / (*tps.last().unwrap().max(&1)) as f64).collect::<Vec<_>>();
 
-    let mut pred_with_true_class = y_pred
-        .iter()
-        .copied()
-        .zip(y_true.iter().copied())
-        .collect::<Vec<_>>();
-    pred_with_true_class.sort_unstable_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-
-    let mut true_positives = 0;
-    let mut false_positives = 0;
-
-    let mut false_negatives = pred_with_true_class.iter().filter(|x| x.1 == 1).count();
-    let mut true_negatives = pred_with_true_class.iter().filter(|x| x.1 == 0).count();
-
-    let mut index = 0;
-
-    let not_zero = |x: usize| if x == 0 { 1 } else { x };
-
-    // Iterate through a range of thresholds
-    for threshold in &thresholds {
-        // Create a binary vector based on the current threshold
-        while index < pred_with_true_class.len() && pred_with_true_class[index].0 < *threshold {
-            if pred_with_true_class[index].1 == 1 {
-                true_positives += 1;
-                false_negatives -= 1;
-            } else {
-                false_positives += 1;
-                true_negatives -= 1;
-            }
-            index += 1;
-        }
-
-        // Store TPR, FPR, and threshold for the current iteration
-        let recall = true_positives as f64 / not_zero(true_positives + false_negatives) as f64;
-        let precision = true_positives as f64 / not_zero(true_positives + false_positives) as f64;
-        println!("{}, {}, {}", recall, precision, threshold);
-        recalls.push(true_positives as f64 / not_zero(true_positives + false_negatives) as f64);
-        precisions.push(true_positives as f64 / not_zero(true_positives + false_positives) as f64);
-    }
-    (precisions, recalls, thresholds)
+    recalls.reverse();
+    precisions.reverse();
+    thresholds.reverse();
+    (recalls, precisions, thresholds)
 }
-// 4.000000000000000222e-01
-// 4.444444444444444198e-01
-// 3.750000000000000000e-01
-// 4.285714285714285476e-01
-// 3.333333333333333148e-01
-// 4.000000000000000222e-01
-// 5.000000000000000000e-01
-// 3.333333333333333148e-01
-// 5.000000000000000000e-01
-// 0.000000000000000000e+00
-// 1.000000000000000000e+00
+
+fn tps_fps_curve(y_pred: &[f64], y_true: &[isize]) -> (Vec<usize>, Vec<usize>, Vec<f64>) {
+    
+    let mut desc_score_indices = argsort(y_pred);
+    desc_score_indices.reverse();
+
+    let y_true = desc_score_indices.iter().map(|&i| y_true[i]).collect::<Vec<_>>();
+    let y_pred = desc_score_indices.iter().map(|&i| y_pred[i]).collect::<Vec<_>>();
+
+    let distinct_value_indices = (0..y_pred.len()-1).map(|i| y_pred[i+1].sub(y_pred[i]).round() == 0.0).collect::<Vec<_>>();
+    let mut distinct_value_indices = distinct_value_indices.iter().enumerate().filter(|(_, &x)| x).map(|(i, _)| i).collect::<Vec<_>>();
+    distinct_value_indices.push(y_pred.len()-1);
+
+    let y_true = distinct_value_indices.iter().map(|&i| y_true[i]).collect::<Vec<_>>();
+
+    let tps = y_true.iter().scan(0, |acc, &x| {
+        *acc += x as usize;
+        Some(*acc)
+    }).collect::<Vec<_>>();
+
+    let fps = distinct_value_indices.iter().zip(tps.iter()).map(|(&i, &tp)| 1 + i as usize - tp).collect::<Vec<_>>();
+    let thresholds = distinct_value_indices.iter().map(|&i| y_pred[i]).collect::<Vec<_>>();
+    (fps, tps, thresholds)
+}

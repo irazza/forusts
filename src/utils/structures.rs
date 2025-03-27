@@ -54,7 +54,7 @@ macro_rules! assert_eq_with_tol {
         let left = $left;
         let right = $right;
         let tolerance = $tolerance;
-        
+
         if (left - right).abs() > tolerance {
             panic!(
                 "assertion failed: `(left == right)` \
@@ -62,7 +62,10 @@ macro_rules! assert_eq_with_tol {
                 \n  right: `{:?}`,\
                 \n  diff:  `{:?}`,\
                 \n  max tolerance: `{:?}`",
-                left, right, (left - right).abs(), tolerance
+                left,
+                right,
+                (left - right).abs(),
+                tolerance
             );
         }
     };

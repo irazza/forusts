@@ -1,4 +1,7 @@
-use crate::{assert_eq_with_tol, metrics::classification::{pr_auc_score, roc_auc_score}};
+use crate::{
+    assert_eq_with_tol,
+    metrics::classification::{pr_auc_score, roc_auc_score},
+};
 use std::sync::LazyLock;
 
 static Y_TRUE: LazyLock<Vec<isize>> = LazyLock::new(|| {

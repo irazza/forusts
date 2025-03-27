@@ -250,19 +250,35 @@ pub fn false_positive_rate(y_pred: &[usize], y_true: &[isize]) -> f64 {
 fn roc_curve(y_pred: &[f64], y_true: &[isize]) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
     let (fps, tps, thresholds) = tps_fps_curve(y_pred, y_true);
 
-    let fpr = fps.iter().map(|&x| x as f64 / (*fps.last().unwrap().max(&1)) as f64).collect::<Vec<_>>();
-    let tpr = tps.iter().map(|&x| x as f64 / (*tps.last().unwrap().max(&1)) as f64).collect::<Vec<_>>();
+    let fpr = fps
+        .iter()
+        .map(|&x| x as f64 / (*fps.last().unwrap().max(&1)) as f64)
+        .collect::<Vec<_>>();
+    let tpr = tps
+        .iter()
+        .map(|&x| x as f64 / (*tps.last().unwrap().max(&1)) as f64)
+        .collect::<Vec<_>>();
 
     (fpr, tpr, thresholds)
 }
 
 fn pr_curve(y_pred: &[f64], y_true: &[isize]) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
-
     let (fps, tps, mut thresholds) = tps_fps_curve(y_pred, y_true);
-    let ps = tps.iter().zip(fps.iter()).map(|(tp, fp)| tp + fp).collect::<Vec<_>>();
+    let ps = tps
+        .iter()
+        .zip(fps.iter())
+        .map(|(tp, fp)| tp + fp)
+        .collect::<Vec<_>>();
 
-    let mut precisions = tps.iter().zip(ps.iter()).map(|(tp, p)| *tp as f64 / (*p.max(&1)) as f64).collect::<Vec<_>>();
-    let mut recalls = tps.iter().map(|tp| *tp as f64 / (*tps.last().unwrap().max(&1)) as f64).collect::<Vec<_>>();
+    let mut precisions = tps
+        .iter()
+        .zip(ps.iter())
+        .map(|(tp, p)| *tp as f64 / (*p.max(&1)) as f64)
+        .collect::<Vec<_>>();
+    let mut recalls = tps
+        .iter()
+        .map(|tp| *tp as f64 / (*tps.last().unwrap().max(&1)) as f64)
+        .collect::<Vec<_>>();
 
     recalls.reverse();
     precisions.reverse();
@@ -271,25 +287,50 @@ fn pr_curve(y_pred: &[f64], y_true: &[isize]) -> (Vec<f64>, Vec<f64>, Vec<f64>) 
 }
 
 fn tps_fps_curve(y_pred: &[f64], y_true: &[isize]) -> (Vec<usize>, Vec<usize>, Vec<f64>) {
-    
     let mut desc_score_indices = argsort(y_pred);
     desc_score_indices.reverse();
 
-    let y_true = desc_score_indices.iter().map(|&i| y_true[i]).collect::<Vec<_>>();
-    let y_pred = desc_score_indices.iter().map(|&i| y_pred[i]).collect::<Vec<_>>();
+    let y_true = desc_score_indices
+        .iter()
+        .map(|&i| y_true[i])
+        .collect::<Vec<_>>();
+    let y_pred = desc_score_indices
+        .iter()
+        .map(|&i| y_pred[i])
+        .collect::<Vec<_>>();
 
-    let distinct_value_indices = (0..y_pred.len()-1).map(|i| y_pred[i+1].sub(y_pred[i]).round() == 0.0).collect::<Vec<_>>();
-    let mut distinct_value_indices = distinct_value_indices.iter().enumerate().filter(|(_, &x)| x).map(|(i, _)| i).collect::<Vec<_>>();
-    distinct_value_indices.push(y_pred.len()-1);
+    let distinct_value_indices = (0..y_pred.len() - 1)
+        .map(|i| y_pred[i + 1].sub(y_pred[i]).round() == 0.0)
+        .collect::<Vec<_>>();
+    let mut distinct_value_indices = distinct_value_indices
+        .iter()
+        .enumerate()
+        .filter(|(_, &x)| x)
+        .map(|(i, _)| i)
+        .collect::<Vec<_>>();
+    distinct_value_indices.push(y_pred.len() - 1);
 
-    let y_true = distinct_value_indices.iter().map(|&i| y_true[i]).collect::<Vec<_>>();
+    let y_true = distinct_value_indices
+        .iter()
+        .map(|&i| y_true[i])
+        .collect::<Vec<_>>();
 
-    let tps = y_true.iter().scan(0, |acc, &x| {
-        *acc += x as usize;
-        Some(*acc)
-    }).collect::<Vec<_>>();
+    let tps = y_true
+        .iter()
+        .scan(0, |acc, &x| {
+            *acc += x as usize;
+            Some(*acc)
+        })
+        .collect::<Vec<_>>();
 
-    let fps = distinct_value_indices.iter().zip(tps.iter()).map(|(&i, &tp)| 1 + i as usize - tp).collect::<Vec<_>>();
-    let thresholds = distinct_value_indices.iter().map(|&i| y_pred[i]).collect::<Vec<_>>();
+    let fps = distinct_value_indices
+        .iter()
+        .zip(tps.iter())
+        .map(|(&i, &tp)| 1 + i as usize - tp)
+        .collect::<Vec<_>>();
+    let thresholds = distinct_value_indices
+        .iter()
+        .map(|&i| y_pred[i])
+        .collect::<Vec<_>>();
     (fps, tps, thresholds)
 }

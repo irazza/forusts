@@ -272,7 +272,7 @@ pub trait OutlierForest<T: Tree>: Forest<T> {
         }
         predictions
     }
-    fn depth_samples<'a>(
+    fn depths_iter<'a>(
         &'a self,
         data: &'a [Sample],
     ) -> impl IndexedParallelIterator<Item = Vec<f64>> + 'a
@@ -293,7 +293,7 @@ pub trait OutlierForest<T: Tree>: Forest<T> {
     fn score_samples(&self, data: &[Sample]) -> Vec<f64> {
         let (config, _) = self.get_forest_config();
         let average_path_length_max_samples = T::average_path_length(self.get_max_samples());
-        let depths = self.depth_samples(data);
+        let depths = self.depths_iter(data);
         let scores = if let Some(aggregation) = &config.aggregation {
             depths
                 .map(|depth| aggregation.combine(&depth, average_path_length_max_samples))
@@ -306,10 +306,6 @@ pub trait OutlierForest<T: Tree>: Forest<T> {
                 })
                 .collect()
         };
-        // let combiner = config.aggregation.clone().unwrap_or(Combiner::new());
-        // for (i, depth) in depths.iter().enumerate() {
-        //     scores[i] = combiner.combine(depth, average_path_length_max_samples);
-        // }
         scores
     }
     fn path_length(tree: &T, x: &Sample) -> f64 {

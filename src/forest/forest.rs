@@ -274,38 +274,22 @@ pub trait OutlierForest<T: Tree>: Forest<T> {
     }
     fn depth_samples(&self, data: &[Sample]) -> Vec<Vec<f64>> {
         let trees: &Vec<T> = self.get_trees();
-        let mut depths = (0..trees.len())
-            .map(|_| (0..data.len()).map(|_| 0.0).collect::<Vec<_>>())
-            .collect::<Vec<_>>();
-        trees
-            .par_iter()
-            .zip(depths.par_iter_mut())
-            .for_each(|(tree, depth)| {
-                let samples = tree.transform(data);
-                for (j, sample) in samples.iter().enumerate() {
-                    depth[j] = Self::path_length(tree, sample);
+        let mut depths = vec![vec![0.0; trees.len()]; data.len()];
+        depths
+            .par_iter_mut()
+            .enumerate()
+            .for_each(|(sample_idx, row)| {
+                for (tree_idx, tree) in trees.iter().enumerate() {
+                    let sample = &data[sample_idx];
+                    row[tree_idx] = Self::path_length(tree, sample);
                 }
             });
-        let depths = transpose(depths);
         depths
     }
     fn score_samples(&self, data: &[Sample]) -> Vec<f64> {
         let (config, _) = self.get_forest_config();
         let average_path_length_max_samples = T::average_path_length(self.get_max_samples());
-        let trees: &Vec<T> = self.get_trees();
-        let mut depths = (0..trees.len())
-            .map(|_| (0..data.len()).map(|_| 0.0).collect::<Vec<_>>())
-            .collect::<Vec<_>>();
-        trees
-            .par_iter()
-            .zip(depths.par_iter_mut())
-            .for_each(|(tree, depth)| {
-                let samples = tree.transform(data);
-                for (j, sample) in samples.iter().enumerate() {
-                    depth[j] = Self::path_length(tree, sample);
-                }
-            });
-        let depths = transpose(depths);
+        let depths = self.depth_samples(data);
         let mut scores = vec![0.0; data.len()];
         if let Some(aggregation) = &config.aggregation {
             for (i, depth) in depths.iter().enumerate() {

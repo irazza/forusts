@@ -280,7 +280,7 @@ pub trait OutlierForest<T: Tree>: Forest<T> {
             .enumerate()
             .for_each(|(sample_idx, row)| {
                 for (tree_idx, tree) in trees.iter().enumerate() {
-                    let sample = &data[sample_idx];
+                    let sample = &tree.transform(&[data[sample_idx].clone()])[0];
                     row[tree_idx] = Self::path_length(tree, sample);
                 }
             });

@@ -272,17 +272,17 @@ pub trait OutlierForest<T: Tree>: Forest<T> {
         }
         predictions
     }
-    fn depth_samples(&self, data: &[Sample]) -> Vec<Vec<f64>> {
+    fn depth_samples(&self, data: &[Sample]) -> impl ParallelIterator<Item = Vec<f64>> {
         let trees: &Vec<T> = self.get_trees();
-        let mut depths = vec![vec![0.0; trees.len()]; data.len()];
-        depths
-            .par_iter_mut()
-            .enumerate()
-            .for_each(|(sample_idx, row)| {
+        let depths = (0..data.len())
+            .into_par_iter()
+            .map(|i| {
+                let mut row = vec![0.0; trees.len()];
                 for (tree_idx, tree) in trees.iter().enumerate() {
-                    let sample = &tree.transform(&[data[sample_idx].clone()])[0];
+                    let sample = &tree.transform(&[data[i].clone()])[0];
                     row[tree_idx] = Self::path_length(tree, sample);
                 }
+                row
             });
         depths
     }

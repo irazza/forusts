@@ -4,11 +4,7 @@ use crate::{
         node::Node,
         tree::{SplitParameters, Tree},
     },
-    utils::{
-        aggregation::{Aggregation, Combiner},
-        statistics::transpose,
-        structures::Sample,
-    },
+    utils::{aggregation::Combiner, structures::Sample},
     RandomGenerator,
 };
 use atomic_float::AtomicF64;
@@ -16,7 +12,6 @@ use atomic_float::AtomicF64;
 use hashbrown::HashMap;
 use rand::{seq::SliceRandom, Rng, SeedableRng};
 use rayon::prelude::*;
-use serde::de;
 use std::{cmp::max, sync::atomic::AtomicUsize};
 
 pub const SUBSAMPLE_SIZE: usize = 256;
@@ -294,18 +289,10 @@ pub trait OutlierForest<T: Tree>: Forest<T> {
         let (config, _) = self.get_forest_config();
         let average_path_length_max_samples = T::average_path_length(self.get_max_samples());
         let depths = self.depths_iter(data);
-        let scores = if let Some(aggregation) = &config.aggregation {
-            depths
-                .map(|depth| aggregation.combine(&depth, average_path_length_max_samples))
-                .collect()
-        } else {
-            depths
-                .map(|depth| {
-                    let sum = depth.iter().sum::<f64>();
-                    2.0_f64.powf(-(sum / depth.len() as f64) / average_path_length_max_samples)
-                })
-                .collect()
-        };
+        let combiner = config.aggregation.unwrap_or(Combiner::default());
+        let scores = depths
+            .map(|depth| combiner.compute(&depth, average_path_length_max_samples))
+            .collect();
         scores
     }
     fn path_length(tree: &T, x: &Sample) -> f64 {

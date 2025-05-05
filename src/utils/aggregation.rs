@@ -1,204 +1,144 @@
-use std::fmt;
-
-use super::statistics::quartiles;
-
-const ANOMALY_SCORE: f64 = 2.0;
-const TRIM: f64 = 0.05;
-
-pub trait Aggregation: Clone + Send + Sync {
-    fn combine(&self, values: &[f64], average_path_length: f64) -> f64;
-}
-
-#[derive(Clone)]
-pub struct Combiner {
-    pub aggregation: AggregationFunction,
-    pub quantile: Option<Quantile>,
-}
-impl Combiner {
-    pub fn new() -> Self {
-        Self {
-            aggregation: AggregationFunction::PROD,
-            quantile: None,
-        }
-    }
-    pub fn enumerate() -> impl Iterator<Item = Self> {
-        [
-            AggregationFunction::PROD,
-            AggregationFunction::SUM,
-            AggregationFunction::TRIMMEDSUM,
-            AggregationFunction::MEDIAN,
-            AggregationFunction::MIN,
-            AggregationFunction::MAX,
-        ]
-        .into_iter()
-        .flat_map(|aggregation| {
-            [Quantile::Q1, Quantile::Q2, Quantile::Q3, Quantile::Q4]
-                .into_iter()
-                .map(move |quantile| Self {
-                    aggregation: aggregation.clone(),
-                    quantile: Some(quantile),
-                })
-        })
-    }
-}
-impl Aggregation for Combiner {
-    fn combine(&self, values: &[f64], average_path_length: f64) -> f64 {
-        let (_, values) = quartiles(
-            values,
-            match self.quantile {
-                Some(Quantile::Q1) => 1,
-                Some(Quantile::Q2) => 2,
-                Some(Quantile::Q3) => 3,
-                Some(Quantile::Q4) => 4,
-                None => 4,
-            },
-        );
-        self.aggregation.combine(&values, average_path_length)
-    }
-}
-impl fmt::Display for Combiner {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}{}",
-            match &self.quantile {
-                Some(quantile) => {
-                    format!("{}_", quantile)
-                }
-                None => {
-                    "".to_string()
-                }
-            },
-            self.aggregation,
-        )
-    }
-}
-
-#[derive(Clone)]
-pub enum Quantile {
+#[derive(Clone, Copy)]
+pub enum Quartile {
+    ALL,
     Q1,
     Q2,
     Q3,
     Q4,
+    Q1Q2,
+    Q3Q4,
+    Q2Q3,
+    Q1Q4,
+    Q1Q3,
+    Q2Q4,
 }
-impl fmt::Display for Quantile {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Quantile::Q1 => {
-                    "Q1"
-                }
-                Quantile::Q2 => {
-                    "Q2"
-                }
-                Quantile::Q3 => {
-                    "Q3"
-                }
-                Quantile::Q4 => {
-                    "Q4"
-                }
-            }
-        )
-    }
-}
-#[derive(Clone)]
-pub enum AggregationFunction {
-    PROD,
-    SUM,
-    TRIMMEDSUM,
-    MEDIAN,
-    MIN,
-    MAX,
-}
-impl Aggregation for AggregationFunction {
-    fn combine(&self, values: &[f64], average_path_length: f64) -> f64 {
-        match self {
-            AggregationFunction::PROD => {
-                let mut result = 1.0;
-                for value in values {
-                    result *=
-                        ANOMALY_SCORE.powf(-*value / (average_path_length * values.len() as f64));
-                }
-                result
-            }
-            AggregationFunction::SUM => {
-                let mut result = 0.0;
-                for value in values {
-                    result +=
-                        ANOMALY_SCORE.powf(-*value / (average_path_length * values.len() as f64));
-                }
-                result
-            }
-            AggregationFunction::TRIMMEDSUM => {
-                let mut values = values.to_vec();
-                values.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
-                let n = values.len();
-                let p = (n as f64 * TRIM).round() as usize;
 
-                let mut result = 0.0;
-                for value in values[p..n - p].iter() {
-                    result +=
-                        ANOMALY_SCORE.powf(-*value / (average_path_length * values.len() as f64));
-                }
-                result
+impl Quartile {
+    pub fn iter() -> impl Iterator<Item = Quartile> {
+        [
+            Quartile::ALL,
+            Quartile::Q1,
+            Quartile::Q2,
+            Quartile::Q3,
+            Quartile::Q4,
+            Quartile::Q1Q2,
+            Quartile::Q3Q4,
+            Quartile::Q2Q3,
+            Quartile::Q1Q4,
+            Quartile::Q1Q3,
+            Quartile::Q2Q4,
+        ]
+        .iter()
+        .copied()
+    }
+
+    pub fn len() -> usize {
+        Quartile::iter().count()
+    }
+
+    pub fn compute(self, x: &[f64]) -> Vec<f64> {
+        // WARNING: These are not real quartiles
+        let mut x = x.to_vec();
+        x.sort_by(|a, b| b.partial_cmp(a).unwrap());
+        let q1 = (x.len() as f64 / 4.0) as usize;
+        let q2 = (x.len() as f64 / 2.0) as usize;
+        let q3 = (x.len() as f64 * (3.0 / 4.0)) as usize;
+
+        match self {
+            Quartile::ALL => x.to_vec(),
+            Quartile::Q1 => x[..q1].to_vec(),
+            Quartile::Q2 => x[q1..q2].to_vec(),
+            Quartile::Q3 => x[q2..q3].to_vec(),
+            Quartile::Q4 => x[q3..].to_vec(),
+            Quartile::Q1Q2 => x[..q2].to_vec(),
+            Quartile::Q3Q4 => x[q2..].to_vec(),
+            Quartile::Q2Q3 => x[q1..q3].to_vec(),
+            Quartile::Q1Q4 => {
+                let mut q1q4 = x[..q1].to_vec();
+                q1q4.extend_from_slice(&x[q3..]);
+                q1q4
             }
-            AggregationFunction::MEDIAN => {
-                let mut values = values.to_vec();
-                values.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
-                let mid = values.len() / 2;
-                if values.len() % 2 == 0 {
-                    ANOMALY_SCORE.powf(
-                        -((values[mid - 1] + values[mid]) / 2.0)
-                            / (average_path_length * values.len() as f64),
-                    )
-                } else {
-                    ANOMALY_SCORE.powf(-values[mid] / (average_path_length * values.len() as f64))
-                }
-            }
-            AggregationFunction::MIN => {
-                let value = values
-                    .iter()
-                    .min_by(|a, b| a.partial_cmp(b).unwrap())
-                    .unwrap();
-                ANOMALY_SCORE.powf(-*value / (average_path_length * values.len() as f64))
-            }
-            AggregationFunction::MAX => {
-                let value = values
-                    .iter()
-                    .max_by(|a, b| a.partial_cmp(b).unwrap())
-                    .unwrap();
-                ANOMALY_SCORE.powf(-*value / (average_path_length * values.len() as f64))
-            }
+            Quartile::Q1Q3 => x[..q3].to_vec(),
+            Quartile::Q2Q4 => x[q1..].to_vec(),
         }
     }
 }
-impl fmt::Display for AggregationFunction {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                AggregationFunction::PROD => {
-                    "PROD"
-                }
-                AggregationFunction::SUM => {
-                    "SUM"
-                }
-                AggregationFunction::TRIMMEDSUM => {
-                    "TRIMMEDSUM"
-                }
-                AggregationFunction::MEDIAN => {
-                    "MEDIAN"
-                }
-                AggregationFunction::MIN => {
-                    "MIN"
-                }
-                AggregationFunction::MAX => {
-                    "MAX"
-                }
+
+#[derive(Clone, Copy)]
+pub enum CombinerType {
+    Prod,
+    Sum,
+    TSum,
+    Median,
+    Min,
+    Max,
+}
+impl CombinerType {
+    pub fn iter() -> impl Iterator<Item = CombinerType> {
+        [
+            CombinerType::Prod,
+            CombinerType::Sum,
+            CombinerType::TSum,
+            CombinerType::Median,
+            CombinerType::Min,
+            CombinerType::Max,
+        ]
+        .iter()
+        .copied()
+    }
+
+    pub fn len() -> usize {
+        CombinerType::iter().count()
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct Combiner {
+    pub quartile: Quartile,
+    pub combiner: CombinerType,
+}
+impl Combiner {
+    pub fn default() -> Self {
+        Combiner {
+            quartile: Quartile::ALL,
+            combiner: CombinerType::Prod,
+        }
+    }
+    pub fn compute(self, x: &[f64], average_path_length: f64) -> f64 {
+        let x = self.quartile.compute(x);
+        let value = match self.combiner {
+            CombinerType::Prod => {
+                let prod = x.iter().sum::<f64>() / x.len() as f64;
+                prod
             }
-        )
+            CombinerType::Sum => {
+                let sum = x.iter().sum::<f64>() / x.len() as f64;
+                sum
+            }
+            CombinerType::TSum => {
+                let s = (x.len() as f64 * 0.05) as usize;
+                let e = (x.len() as f64 * 0.95) as usize;
+                let tsum = x[s..e].iter().sum::<f64>() / (x.len() as f64 * 0.9);
+                tsum
+            }
+            CombinerType::Median => {
+                let n = x.len();
+                let median = if n % 2 == 0 {
+                    (x[n / 2 - 1] + x[n / 2]) / 2.0
+                } else {
+                    x[n / 2]
+                };
+                median
+            }
+            CombinerType::Min => {
+                let min = x[0];
+                min
+            }
+            CombinerType::Max => {
+                let max = x[x.len() - 1];
+                max
+            }
+        };
+        2.0f64.powf(-value / average_path_length)
     }
 }

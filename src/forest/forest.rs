@@ -272,41 +272,40 @@ pub trait OutlierForest<T: Tree>: Forest<T> {
         }
         predictions
     }
-    fn depth_samples(&self, data: &[Sample]) -> impl ParallelIterator<Item = Vec<f64>> {
+    fn depth_samples<'a>(
+        &'a self,
+        data: &'a [Sample],
+    ) -> impl IndexedParallelIterator<Item = Vec<f64>> + 'a
+    where
+        T: 'a,
+    {
         let trees: &Vec<T> = self.get_trees();
-        let depths = (0..data.len())
-            .into_par_iter()
-            .map(|i| {
-                let mut row = vec![0.0; trees.len()];
-                for (tree_idx, tree) in trees.iter().enumerate() {
-                    let sample = &tree.transform(&[data[i].clone()])[0];
-                    row[tree_idx] = Self::path_length(tree, sample);
-                }
-                row
-            });
+        let depths = (0..data.len()).into_par_iter().map(|i| {
+            let mut row = vec![0.0; trees.len()];
+            for (tree_idx, tree) in trees.iter().enumerate() {
+                let sample = &tree.transform(&[data[i].clone()])[0];
+                row[tree_idx] = Self::path_length(tree, sample);
+            }
+            row
+        });
         depths
     }
     fn score_samples(&self, data: &[Sample]) -> Vec<f64> {
         let (config, _) = self.get_forest_config();
         let average_path_length_max_samples = T::average_path_length(self.get_max_samples());
         let depths = self.depth_samples(data);
-        let mut scores = vec![0.0; data.len()];
-        if let Some(aggregation) = &config.aggregation {
-            for (i, depth) in depths.iter().enumerate() {
-                scores[i] = aggregation.combine(depth, average_path_length_max_samples);
-            }
+        let scores = if let Some(aggregation) = &config.aggregation {
+            depths
+                .map(|depth| aggregation.combine(&depth, average_path_length_max_samples))
+                .collect()
         } else {
-            scores = depths
-                .iter()
+            depths
                 .map(|depth| {
-                    let mut sum = 0.0;
-                    for d in depth {
-                        sum += d;
-                    }
+                    let sum = depth.iter().sum::<f64>();
                     2.0_f64.powf(-(sum / depth.len() as f64) / average_path_length_max_samples)
                 })
-                .collect();
-        }
+                .collect()
+        };
         // let combiner = config.aggregation.clone().unwrap_or(Combiner::new());
         // for (i, depth) in depths.iter().enumerate() {
         //     scores[i] = combiner.combine(depth, average_path_length_max_samples);

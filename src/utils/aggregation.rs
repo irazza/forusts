@@ -116,17 +116,13 @@ impl Subset {
                     .position(|&count| count == *max_bin_count)
                     .unwrap();
 
-                // Collect values in the most frequent bin
-                let bin_start = min + most_frequent_bin_index as f64 * bin_width;
-                let bin_end = bin_start + bin_width;
                 let v: Vec<f64> = x
                     .clone()
                     .into_iter()
-                    .filter(|&value| value >= bin_start && value < bin_end)
+                    .filter(|&value| ((value - min) / bin_width).floor() as usize == most_frequent_bin_index)
                     .collect();
                 if v.is_empty() {
                     println!("BIN SIZES HISTGRAM {:?}", bins);
-                    println!("Bin start: {}, Bin end: {}", bin_start, bin_end);
                     println!("pos: {}", most_frequent_bin_index);
                     println!("max_bin_count: {}", max_bin_count);
                     println!("x: {:?}", x);

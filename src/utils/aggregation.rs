@@ -127,9 +127,12 @@ impl Subset {
                 println!("x.len(): {}", x.len());
                 println!("x[0]: {}", x[0]);
                 println!("x[x.len() - 1]: {}", x[x.len() - 1]);
-                x.into_iter()
+                let v = x.into_iter()
                     .filter(|&value| value >= bin_start && value < bin_end)
-                    .collect()
+                    .collect();
+                println!("v: {:?}", v);
+                
+                v
             }
         }
     }

@@ -1,4 +1,4 @@
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Subset {
     ALL,
     Q1,
@@ -91,8 +91,6 @@ impl Subset {
                     }
                 };
 
-                println!("MAD: {}", mad);
-                println!("{:?}", x);
                 // Reject outliers: keep only values within k*MAD of median
                 x.into_iter()
                     .filter(|&val| (val - median_value).abs() <= k * mad)
@@ -130,7 +128,7 @@ impl Subset {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum CombinerType {
     Prod,
     Sum,

@@ -91,6 +91,8 @@ impl Subset {
                     }
                 };
 
+                println!("MAD: {}", mad);
+                println!("{:?}", x);
                 // Reject outliers: keep only values within k*MAD of median
                 x.into_iter()
                     .filter(|&val| (val - median_value).abs() <= k * mad)

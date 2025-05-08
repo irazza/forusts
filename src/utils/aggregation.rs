@@ -186,6 +186,7 @@ impl Combiner {
                 tsum
             }
             CombinerType::Median => {
+                println!("{:?}", self.subset);
                 let n = x.len();
                 let median = if n % 2 == 0 {
                     (x[n / 2 - 1] + x[n / 2]) / 2.0

@@ -125,14 +125,12 @@ impl Subset {
                     .filter(|&value| value >= bin_start && value < bin_end)
                     .collect();
                 if v.is_empty() {
+                    println!("BIN SIZES HISTGRAM {:?}", bins);
                     println!("Bin start: {}, Bin end: {}", bin_start, bin_end);
                     println!("pos: {}", most_frequent_bin_index);
                     println!("max_bin_count: {}", max_bin_count);
                     println!("x: {:?}", x);
                     println!("x.len(): {}", x.len());
-                    println!("x[0]: {}", x[0]);
-                    println!("x[x.len() - 1]: {}", x[x.len() - 1]);
-                    println!("v: {:?}", v);
                 }
                 v
             }

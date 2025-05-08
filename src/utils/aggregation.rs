@@ -120,6 +120,13 @@ impl Subset {
                 // Collect values in the most frequent bin
                 let bin_start = min + most_frequent_bin_index as f64 * bin_width;
                 let bin_end = bin_start + bin_width;
+                println!("Bin start: {}, Bin end: {}", bin_start, bin_end);
+                println!("pos: {}", most_frequent_bin_index);
+                println!("max_bin_count: {}", max_bin_count);
+                println!("x: {:?}", x);
+                println!("x.len(): {}", x.len());
+                println!("x[0]: {}", x[0]);
+                println!("x[x.len() - 1]: {}", x[x.len() - 1]);
                 x.into_iter()
                     .filter(|&value| value >= bin_start && value < bin_end)
                     .collect()

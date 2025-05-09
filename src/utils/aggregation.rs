@@ -174,6 +174,9 @@ impl Combiner {
             combiner: CombinerType::Prod,
         }
     }
+    pub fn new(subset: Subset, combiner: CombinerType) -> Self {
+        Combiner { subset, combiner }
+    }
     pub fn compute(self, x: &[f64], average_path_length: f64) -> f64 {
         let x = self.subset.compute(x);
         let value = match self.combiner {

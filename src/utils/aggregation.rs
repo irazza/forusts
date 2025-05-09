@@ -97,8 +97,8 @@ impl Subset {
             }
             Subset::MODE => {
                 let n_bins = 100; // Number of bins
-                let min = *x.first().unwrap();
-                let max = *x.last().unwrap();
+                let min = *x.last().unwrap(); // it is sorted descending
+                let max = *x.first().unwrap();
                 let bin_width = (max - min) / n_bins as f64;
 
                 // Create bins and count frequencies

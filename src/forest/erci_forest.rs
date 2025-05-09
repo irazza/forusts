@@ -5,7 +5,7 @@ use crate::{
     utils::structures::Sample,
     RandomGenerator,
 };
-use rand::{thread_rng, SeedableRng};
+use rand::{rng, SeedableRng};
 
 pub struct ERCIForest {
     trees: Vec<CIsoTree>,
@@ -40,7 +40,7 @@ impl Forest<CIsoTree> for ERCIForest {
     }
     fn fit(&mut self, samples: &mut [Sample], random_state: Option<RandomGenerator>) {
         let mut random_state =
-            random_state.unwrap_or_else(|| RandomGenerator::from_rng(thread_rng()).unwrap());
+            random_state.unwrap_or_else(|| RandomGenerator::from_rng(&mut rng()));
         let max_samples = samples.len();
         self.fit_(&samples, max_samples, true, &mut random_state)
     }

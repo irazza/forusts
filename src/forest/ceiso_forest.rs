@@ -10,7 +10,7 @@ use crate::{
     utils::structures::{IntervalType, Sample},
     RandomGenerator,
 };
-use rand::{thread_rng, SeedableRng};
+use rand::{rng, SeedableRng};
 
 #[derive(Clone)]
 pub struct CEIsoForestConfig {
@@ -53,7 +53,7 @@ impl Forest<CEIsoTree> for CEIsoForest {
     }
     fn fit(&mut self, samples: &mut [Sample], random_state: Option<RandomGenerator>) {
         let mut random_state =
-            random_state.unwrap_or_else(|| RandomGenerator::from_rng(thread_rng()).unwrap());
+            random_state.unwrap_or_else(|| RandomGenerator::from_rng(&mut rng()));
         let max_samples = min(SUBSAMPLE_SIZE, samples.len());
         self.fit_(&samples, max_samples, false, &mut random_state)
     }

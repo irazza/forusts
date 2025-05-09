@@ -29,7 +29,7 @@ impl EIsoSplit {
             .iter()
             .zip(min_values.iter().zip(max_values.iter()))
         {
-            offset[feature_idx] = random_state.gen_range(min_value..=max_value);
+            offset[feature_idx] = random_state.random_range(min_value..=max_value);
             weights[feature_idx] = random_state.sample(StandardNormal);
             vector_len += weights[feature_idx].powi(2);
         }

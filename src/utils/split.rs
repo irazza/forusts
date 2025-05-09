@@ -8,7 +8,7 @@ use crate::tree::tree::{SplitParameters, StandardSplit};
 use crate::RandomGenerator;
 use core::f64;
 use hashbrown::HashMap;
-use rand::Rng;
+use rand::{rng, Rng};
 use rand::{seq::SliceRandom, SeedableRng};
 use std::ops::Range;
 use std::{
@@ -21,14 +21,14 @@ pub fn train_test_split(
     data: &[Sample],
     test_size: f64,
     stratify: bool,
-    random_state: Option<rand_chacha::ChaCha8Rng>,
+    random_state: Option<RandomGenerator>,
 ) -> (Vec<Sample>, Vec<Sample>) {
     if data.len() < 2 && (test_size > 0. && test_size < 0.5) {
         panic!("The dataset is too small to be splitted.");
     }
     let mut indices: Vec<usize> = (0..data.len()).collect();
     let mut random_state =
-        random_state.unwrap_or(rand_chacha::ChaCha8Rng::from_rng(rand::thread_rng()).unwrap());
+        random_state.unwrap_or(RandomGenerator::from_rng(&mut rng()));
     // Shuffle indices
     indices.shuffle(&mut random_state);
 
@@ -124,7 +124,7 @@ pub fn get_random_split(
             // Remove constant features
             continue;
         } else {
-            let threshold = random_state.gen_range(min_feature..max_feature);
+            let threshold = random_state.random_range(min_feature..max_feature);
             let rand_split = StandardSplit { feature, threshold };
 
             let split_idx = split_samples(&rand_split, samples);

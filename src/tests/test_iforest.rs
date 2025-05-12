@@ -6,7 +6,9 @@ mod tests {
 
     use crate::forest::eiso_forest::{EIsoForest, EIsoForestConfig, ExtensionLevel};
     use crate::forest::forest::ForestConfig;
+    use crate::utils::aggregation::{CombinerType, Subset};
     use crate::utils::structures::MaxFeatures;
+    use crate::RandomGenerator;
     use crate::{
         forest::{
             forest::{Forest, OutlierForest},
@@ -25,7 +27,7 @@ mod tests {
             min_samples_leaf: 1,
             max_features: MaxFeatures::ALL,
             criterion: |_a, _b| 1.0,
-            aggregation: None,
+            aggregation: Some(Combiner::new(Subset::ALL, CombinerType::Min)),
         };
         let n_repetitions = 10;
         let paths = fs::read_dir("../../DATA/IF_BENCHMARK").unwrap();
@@ -48,8 +50,8 @@ mod tests {
                 let mut model = IsolationForest::new(&config);
                 model.fit(
                     &mut ds_train,
-                    Some(rand_chacha::ChaCha8Rng::seed_from_u64(
-                        ((i + 2) * (j + 2)) as u64,
+                    Some(RandomGenerator::seed_from_u64(
+                        j as u64,
                     )),
                 );
                 let prediction = model.score_samples(&ds_test);

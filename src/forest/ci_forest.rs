@@ -45,8 +45,10 @@ impl Forest<CITree> for CIForest {
         }
     }
     fn fit(&mut self, samples: &mut [Sample], random_state: Option<RandomGenerator>) {
-        let mut random_state =
-            random_state.unwrap_or_else(|| RandomGenerator::from_rng(&mut rng()));
+        let mut random_state = match random_state {
+            Some(rng) => rng,
+            None => RandomGenerator::from_rng(&mut rand::rng()),
+        };
         let max_samples = samples.len();
         self.fit_(&samples, max_samples, true, &mut random_state)
     }

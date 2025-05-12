@@ -27,8 +27,7 @@ pub fn train_test_split(
         panic!("The dataset is too small to be splitted.");
     }
     let mut indices: Vec<usize> = (0..data.len()).collect();
-    let mut random_state =
-        random_state.unwrap_or(RandomGenerator::from_rng(&mut rng()));
+    let mut random_state = random_state.unwrap_or(RandomGenerator::from_rng(&mut rng()));
     // Shuffle indices
     indices.shuffle(&mut random_state);
 

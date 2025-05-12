@@ -48,8 +48,10 @@ impl Forest<CIsoTree> for CIsoForest {
         }
     }
     fn fit(&mut self, samples: &mut [Sample], random_state: Option<RandomGenerator>) {
-        let mut random_state =
-            random_state.unwrap_or_else(|| RandomGenerator::from_rng(&mut rng()));
+        let mut random_state = match random_state {
+            Some(rng) => rng,
+            None => RandomGenerator::from_rng(&mut rand::rng()),
+        };
         let max_samples = min(SUBSAMPLE_SIZE, samples.len());
         self.fit_(&samples, max_samples, false, &mut random_state)
     }

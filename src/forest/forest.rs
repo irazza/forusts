@@ -47,16 +47,16 @@ pub trait Forest<T: Tree>: Sync + Send {
         let mut trees = Vec::new();
         self.set_max_samples(max_samples);
         let (config, tree_config) = self.get_forest_config();
-        let random_generators = (0..config.n_trees).map(|_| {
-            RandomGenerator::from_rng(&mut random_state)
-        });
+        let random_generators =
+            (0..config.n_trees).map(|_| {
+                RandomGenerator::from_rng(&mut random_state)});
         trees.par_extend(
             (0..config.n_trees)
                 .into_iter()
                 .zip(random_generators)
                 .par_bridge()
                 .map(|(_i, mut random_state)| {
-                    let indices = generate_indices(
+                    let indices = generate_indexes(
                         max_samples,
                         data.len(),
                         with_replacement,
@@ -240,7 +240,6 @@ pub trait ClassificationForest<T: Tree>: Forest<T> {
                 let class = predictions[j][i];
                 *class_counts.entry(class).or_insert(0) += 1;
             }
-
             // Find the class with the maximum count
             let mut max_count = 0;
             let mut majority_class = 0;
@@ -300,21 +299,21 @@ pub trait OutlierForest<T: Tree>: Forest<T> {
     }
 }
 
-pub fn generate_indices(
+pub fn generate_indexes(
     n_samples: usize,
     n_population: usize,
     with_replacement: bool,
     random_state: &mut RandomGenerator,
 ) -> Vec<usize> {
-    let mut indeces = Vec::with_capacity(n_samples);
+    let mut indexes = Vec::with_capacity(n_samples);
     if with_replacement {
         for _ in 0..n_samples {
-            indeces.push(random_state.gen_range(0..n_population));
+            indexes.push(random_state.random_range(0..n_population));
         }
     } else {
         let mut population = (0..n_population).collect::<Vec<usize>>();
         population.shuffle(random_state);
-        indeces.extend(population.iter().take(n_samples).copied());
+        indexes.extend(population.iter().take(n_samples).copied());
     }
-    indeces
+    indexes
 }

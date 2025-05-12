@@ -119,7 +119,9 @@ impl Subset {
                 let v: Vec<f64> = x
                     .clone()
                     .into_iter()
-                    .filter(|&value| ((value - min) / bin_width).floor() as usize == most_frequent_bin_index)
+                    .filter(|&value| {
+                        ((value - min) / bin_width).floor() as usize == most_frequent_bin_index
+                    })
                     .collect();
                 if v.is_empty() {
                     println!("BIN SIZES HISTGRAM {:?}", bins);
@@ -134,7 +136,7 @@ impl Subset {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum CombinerType {
     Prod,
     Sum,
@@ -162,7 +164,7 @@ impl CombinerType {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Combiner {
     pub subset: Subset,
     pub combiner: CombinerType,
@@ -178,41 +180,45 @@ impl Combiner {
         Combiner { subset, combiner }
     }
     pub fn compute(self, x: &[f64], average_path_length: f64) -> f64 {
-        let x = self.subset.compute(x);
-        let value = match self.combiner {
+        let subset = self.subset.compute(x);
+        let scores = if self.combiner == CombinerType::Prod {
+            subset
+        } else {
+            subset.iter().map(|&v| 2.0f64.powf(-v / average_path_length)).collect::<Vec<_>>()
+        };
+        let score = match self.combiner {
             CombinerType::Prod => {
-                let prod = x.iter().product::<f64>() / x.len() as f64;
-                prod
+                let prod = scores.iter().sum::<f64>() / scores.len() as f64;
+                2.0f64.powf(-prod / average_path_length)
             }
             CombinerType::Sum => {
-                let sum = x.iter().sum::<f64>() / x.len() as f64;
+                let sum = scores.iter().sum::<f64>() / scores.len() as f64;
                 sum
             }
             CombinerType::TSum => {
-                let s = (x.len() as f64 * 0.05) as usize;
-                let e = (x.len() as f64 * 0.95) as usize;
-                let tsum = x[s..e].iter().sum::<f64>() / (x.len() as f64 * 0.9);
+                let s = (scores.len() as f64 * 0.05) as usize;
+                let e = (scores.len() as f64 * 0.95) as usize;
+                let tsum = scores[s..e].iter().sum::<f64>() / (scores.len() as f64 * 0.9);
                 tsum
             }
             CombinerType::Median => {
-                // println!("{:?}", self.subset);
-                let n = x.len();
+                let n = scores.len();
                 let median = if n % 2 == 0 {
-                    (x[n / 2 - 1] + x[n / 2]) / 2.0
+                    (scores[n / 2 - 1] + scores[n / 2]) / 2.0
                 } else {
-                    x[n / 2]
+                    scores[n / 2]
                 };
                 median
             }
             CombinerType::Min => {
-                let min = x[0];
+                let min = scores[0];
                 min
             }
             CombinerType::Max => {
-                let max = x[x.len() - 1];
+                let max = scores[scores.len() - 1];
                 max
             }
         };
-        2.0f64.powf(-value / average_path_length)
+        score
     }
 }

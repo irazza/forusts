@@ -58,7 +58,7 @@ where
     writer.flush().unwrap();
 }
 
-pub fn write_bin<T>(path: impl AsRef<Path>, data: &Vec<T>)
+pub fn write_bin<T>(path: impl AsRef<Path>, data: &T)
 where
     T: serde::Serialize,
 {
@@ -69,7 +69,7 @@ where
     rmp_serde::encode::write(&mut f, data).expect("Error writing binary file");
 }
 
-pub fn read_bin<T>(path: impl AsRef<Path>) -> Vec<T>
+pub fn read_bin<T>(path: impl AsRef<Path>) -> T
 where
     T: serde::de::DeserializeOwned,
 {

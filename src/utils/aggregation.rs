@@ -11,34 +11,11 @@ pub enum Subset {
     Q1Q4,
     Q1Q3,
     Q2Q4,
-    X84,
-    MODE,
+    X84(f64),
+    MODE(usize),
 }
 
 impl Subset {
-    pub fn iter() -> impl Iterator<Item = Subset> {
-        [
-            Subset::ALL,
-            Subset::Q1,
-            Subset::Q2,
-            Subset::Q3,
-            Subset::Q4,
-            Subset::Q1Q2,
-            Subset::Q3Q4,
-            Subset::Q2Q3,
-            Subset::Q1Q4,
-            Subset::Q1Q3,
-            Subset::Q2Q4,
-            Subset::X84,
-            Subset::MODE,
-        ]
-        .iter()
-        .copied()
-    }
-
-    pub fn len() -> usize {
-        Subset::iter().count()
-    }
 
     pub fn compute(self, x: &[f64]) -> Vec<f64> {
         // WARNING: These are not real quartiles
@@ -64,9 +41,8 @@ impl Subset {
             }
             Subset::Q1Q3 => x[..q3].to_vec(),
             Subset::Q2Q4 => x[q1..].to_vec(),
-            Subset::X84 => {
+            Subset::X84(k) => {
                 // Implement X84 rule - rejects points more than k*MAD from median
-                let k = 5.2;
                 let median_value = {
                     let mid = x.len() / 2;
                     if x.len() & 1 == 0 {
@@ -91,12 +67,13 @@ impl Subset {
                 };
 
                 // Reject outliers: keep only values within k*MAD of median
-                x.into_iter()
+                let v = x.into_iter()
                     .filter(|&val| (val - median_value).abs() <= k * mad)
-                    .collect()
+                    .collect::<Vec<_>>();
+                println!("DBG v.len() : {}", v.len());
+                v
             }
-            Subset::MODE => {
-                let n_bins = 100; // Number of bins
+            Subset::MODE(n_bins) => {
                 let min = *x.last().unwrap(); // it is sorted descending
                 let max = *x.first().unwrap();
                 let bin_width = (max - min) / n_bins as f64;
@@ -123,13 +100,7 @@ impl Subset {
                         ((value - min) / bin_width).floor() as usize == most_frequent_bin_index
                     })
                     .collect();
-                if v.is_empty() {
-                    println!("BIN SIZES HISTGRAM {:?}", bins);
-                    println!("pos: {}", most_frequent_bin_index);
-                    println!("max_bin_count: {}", max_bin_count);
-                    println!("x: {:?}", x);
-                    println!("x.len(): {}", x.len());
-                }
+                println!("DBG v.len() : {}", v.len());
                 v
             }
         }
@@ -144,24 +115,6 @@ pub enum CombinerType {
     Median,
     Min,
     Max,
-}
-impl CombinerType {
-    pub fn iter() -> impl Iterator<Item = CombinerType> {
-        [
-            CombinerType::Prod,
-            CombinerType::Sum,
-            CombinerType::TSum,
-            CombinerType::Median,
-            CombinerType::Min,
-            CombinerType::Max,
-        ]
-        .iter()
-        .copied()
-    }
-
-    pub fn len() -> usize {
-        CombinerType::iter().count()
-    }
 }
 
 #[derive(Clone, Copy, Debug)]

@@ -70,7 +70,7 @@ impl Subset {
                 let v = x.into_iter()
                     .filter(|&val| (val - median_value).abs() <= k * mad)
                     .collect::<Vec<_>>();
-                println!("DBG v.len() : {}", v.len());
+                // println!("DBG X84 len() : {}", v.len());
                 v
             }
             Subset::MODE(n_bins) => {
@@ -100,7 +100,7 @@ impl Subset {
                         ((value - min) / bin_width).floor() as usize == most_frequent_bin_index
                     })
                     .collect();
-                println!("DBG v.len() : {}", v.len());
+                // println!("DBG MODE len() : {}", v.len());
                 v
             }
         }

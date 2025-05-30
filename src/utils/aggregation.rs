@@ -137,7 +137,7 @@ impl Combiner {
         } else {
             subset
                 .iter()
-                .map(|&v| 2.0f64.powf(-v / average_path_length))
+                .map(|&v| 2.0f64.powf(-v))
                 .collect::<Vec<_>>()
         };
         let score = match self.combiner {
@@ -146,7 +146,7 @@ impl Combiner {
                 2.0f64.powf(-prod / average_path_length)
             }
             CombinerType::Sum => {
-                let sum = scores.iter().sum::<f64>() / scores.len() as f64;
+                let sum = scores.iter().sum::<f64>() / (scores.len() as f64 * average_path_length);
                 sum
             }
             CombinerType::TSum => {

@@ -50,9 +50,7 @@ mod tests {
                 let mut model = IsolationForest::new(&config);
                 model.fit(
                     &mut ds_train,
-                    Some(RandomGenerator::seed_from_u64(
-                        j as u64,
-                    )),
+                    Some(RandomGenerator::seed_from_u64(j as u64)),
                 );
                 let prediction = model.score_samples(&ds_test);
                 predictions[i] += roc_auc_score(&prediction, &y_true);

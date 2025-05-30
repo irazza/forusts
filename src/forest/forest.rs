@@ -48,8 +48,7 @@ pub trait Forest<T: Tree>: Sync + Send {
         self.set_max_samples(max_samples);
         let (config, tree_config) = self.get_forest_config();
         let random_generators =
-            (0..config.n_trees).map(|_| {
-                RandomGenerator::from_rng(&mut random_state)});
+            (0..config.n_trees).map(|_| RandomGenerator::from_rng(&mut random_state));
         trees.par_extend(
             (0..config.n_trees)
                 .into_iter()

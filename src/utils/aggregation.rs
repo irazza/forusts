@@ -16,7 +16,6 @@ pub enum Subset {
 }
 
 impl Subset {
-
     pub fn compute(self, x: &[f64]) -> Vec<f64> {
         // WARNING: These are not real quartiles
         let mut x = x.to_vec();
@@ -67,10 +66,10 @@ impl Subset {
                 };
 
                 // Reject outliers: keep only values within k*MAD of median
-                let v = x.into_iter()
+                let v = x
+                    .into_iter()
                     .filter(|&val| (val - median_value).abs() <= k * mad)
                     .collect::<Vec<_>>();
-                // println!("DBG X84 len() : {}", v.len());
                 v
             }
             Subset::MODE(n_bins) => {
@@ -100,7 +99,6 @@ impl Subset {
                         ((value - min) / bin_width).floor() as usize == most_frequent_bin_index
                     })
                     .collect();
-                // println!("DBG MODE len() : {}", v.len());
                 v
             }
         }
@@ -137,7 +135,10 @@ impl Combiner {
         let scores = if self.combiner == CombinerType::Prod {
             subset
         } else {
-            subset.iter().map(|&v| 2.0f64.powf(-v / average_path_length)).collect::<Vec<_>>()
+            subset
+                .iter()
+                .map(|&v| 2.0f64.powf(-v / average_path_length))
+                .collect::<Vec<_>>()
         };
         let score = match self.combiner {
             CombinerType::Prod => {
@@ -173,5 +174,38 @@ impl Combiner {
             }
         };
         score
+    }
+}
+#[cfg(test)]
+mod tests {
+    const EGAMMA: f64 = 0.577215664901532860606512090082402431_f64;
+    use rand::random;
+
+    use super::*;
+
+    #[test]
+    fn test_subset_compute() {
+        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+        let subset = Subset::Q1;
+        let result = subset.compute(&data);
+        assert_eq!(result, vec![8.0, 7.0, 6.0, 5.0]);
+    }
+
+    #[test]
+    fn test_combiner_compute() {
+        let n = 256;
+        let average_path_length =
+            2.0 * (harmonic_number(n - 1)) - (2.0 * (n as f64 - 1.0) / n as f64);
+        let data = (0..100)
+            .map(|_| random::<f64>() * average_path_length)
+            .collect::<Vec<f64>>();
+        let combiner = Combiner::new(Subset::ALL, CombinerType::Sum);
+        let result = combiner.compute(&data, average_path_length);
+        assert_eq!(result, 10.0);
+    }
+
+    #[inline]
+    fn harmonic_number(n: usize) -> f64 {
+        (n as f64).ln() + EGAMMA
     }
 }

@@ -65,7 +65,7 @@ where
     if let Some(parent) = path.as_ref().parent() {
         std::fs::create_dir_all(parent).unwrap();
     }
-    let mut f =BufWriter::new(File::create(path).unwrap());
+    let mut f = BufWriter::new(File::create(path).unwrap());
     rmp_serde::encode::write(&mut f, data).expect("Error writing binary file");
 }
 

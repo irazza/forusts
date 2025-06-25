@@ -1,5 +1,3 @@
-use crate::neighbors::nearest_neighbor;
-
 #[derive(Clone, Copy, Debug)]
 pub enum Subset {
     ALL,

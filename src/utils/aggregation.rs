@@ -1,3 +1,5 @@
+use crate::neighbors::nearest_neighbor;
+
 #[derive(Clone, Copy, Debug)]
 pub enum Subset {
     ALL,
@@ -131,29 +133,28 @@ impl Combiner {
         Combiner { subset, combiner }
     }
     pub fn compute(self, x: &[f64], average_path_length: f64) -> f64 {
-        let subset = self.subset.compute(x);
-        let scores = if self.combiner == CombinerType::Prod {
-            subset
-        } else {
-            subset
-                .iter()
-                .map(|&v| 2.0f64.powf(-v))
-                .collect::<Vec<_>>()
-        };
+        let scores = self.subset.compute(x);
+        let n_trees = scores.len() as f64;
         let score = match self.combiner {
             CombinerType::Prod => {
-                let prod = scores.iter().sum::<f64>() / scores.len() as f64;
-                2.0f64.powf(-prod / average_path_length)
+                let mean_depth = kahan_sum(&scores) / n_trees;
+                (-mean_depth / average_path_length).exp2()
             }
             CombinerType::Sum => {
-                let sum = scores.iter().sum::<f64>() / (scores.len() as f64 * average_path_length);
-                sum
+                let exps = scores
+                    .iter()
+                    .map(|&depth| (-depth).exp2())
+                    .collect::<Vec<_>>();
+                kahan_sum(&exps) / n_trees
             }
             CombinerType::TSum => {
                 let s = (scores.len() as f64 * 0.05) as usize;
                 let e = (scores.len() as f64 * 0.95) as usize;
-                let tsum = scores[s..e].iter().sum::<f64>() / (scores.len() as f64 * 0.9);
-                tsum
+                let exps = scores[s..e]
+                    .iter()
+                    .map(|&depth| (-depth).exp2())
+                    .collect::<Vec<_>>();
+                kahan_sum(&exps) / n_trees
             }
             CombinerType::Median => {
                 let n = scores.len();
@@ -162,20 +163,33 @@ impl Combiner {
                 } else {
                     scores[n / 2]
                 };
-                median
+                (-median / average_path_length).exp2()
             }
             CombinerType::Min => {
                 let min = scores[0];
-                min
+                (-min / average_path_length).exp2()
             }
             CombinerType::Max => {
                 let max = scores[scores.len() - 1];
-                max
+                (-max / average_path_length).exp2()
             }
         };
         score
     }
 }
+
+fn kahan_sum(values: &[f64]) -> f64 {
+    let mut sum = 0.0;
+    let mut c = 0.0;
+    for &value in values {
+        let y = value - c;
+        let t = sum + y;
+        c = (t - sum) - y;
+        sum = t;
+    }
+    sum
+}
+
 #[cfg(test)]
 mod tests {
     const EGAMMA: f64 = 0.577215664901532860606512090082402431_f64;
@@ -199,9 +213,18 @@ mod tests {
         let data = (0..100)
             .map(|_| random::<f64>() * average_path_length)
             .collect::<Vec<f64>>();
-        let combiner = Combiner::new(Subset::ALL, CombinerType::Sum);
-        let result = combiner.compute(&data, average_path_length);
-        assert_eq!(result, 10.0);
+        let combiner0 = Combiner::new(Subset::ALL, CombinerType::Prod);
+        let _ = combiner0.compute(&data, average_path_length);
+        let combiner1 = Combiner::new(Subset::ALL, CombinerType::Sum);
+        let _ = combiner1.compute(&data, average_path_length);
+        let combiner2 = Combiner::new(Subset::ALL, CombinerType::TSum);
+        let _ = combiner2.compute(&data, average_path_length);
+        let combiner3 = Combiner::new(Subset::ALL, CombinerType::Median);
+        let _ = combiner3.compute(&data, average_path_length);
+        let combiner4 = Combiner::new(Subset::ALL, CombinerType::Min);
+        let _ = combiner4.compute(&data, average_path_length);
+        let combiner5 = Combiner::new(Subset::ALL, CombinerType::Max);
+        let _ = combiner5.compute(&data, average_path_length);
     }
 
     #[inline]

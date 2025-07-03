@@ -18,8 +18,11 @@ pub enum Subset {
 impl Subset {
     pub fn compute(self, x: &[f64]) -> Vec<f64> {
         // WARNING: These are not real quartiles
-        let mut x = x.to_vec();
-        x.sort_by(|a, b| b.partial_cmp(a).unwrap());
+        // Panic if the array is not sorted in descending order
+        assert!(x.windows(2).all(|w| w[0] >= w[1]), "Array must be sorted in descending order");
+
+        // let mut x = x.to_vec();
+        // x.sort_by(|a, b| b.partial_cmp(a).unwrap());
         let q1 = (x.len() as f64 / 4.0) as usize;
         let q2 = (x.len() as f64 / 2.0) as usize;
         let q3 = (x.len() as f64 * (3.0 / 4.0)) as usize;
@@ -67,8 +70,9 @@ impl Subset {
 
                 // Reject outliers: keep only values within k*MAD of median
                 let v = x
-                    .into_iter()
+                    .iter()
                     .filter(|&val| (val - median_value).abs() <= k * mad)
+                    .copied()
                     .collect::<Vec<_>>();
                 v
             }
@@ -79,7 +83,7 @@ impl Subset {
 
                 // Create bins and count frequencies
                 let mut bins = vec![0; n_bins];
-                for &value in &x {
+                for value in x {
                     let bin_index = ((value - min) / bin_width).floor() as usize;
                     let bin_index = bin_index.min(n_bins - 1); // Ensure index is within bounds
                     bins[bin_index] += 1;
@@ -92,13 +96,13 @@ impl Subset {
                     .position(|&count| count == *max_bin_count)
                     .unwrap();
 
-                let v: Vec<f64> = x
-                    .clone()
-                    .into_iter()
+                let v = x
+                    .iter()
                     .filter(|&value| {
                         ((value - min) / bin_width).floor() as usize == most_frequent_bin_index
                     })
-                    .collect();
+                    .copied()
+                    .collect::<Vec<_>>();
                 v
             }
         }

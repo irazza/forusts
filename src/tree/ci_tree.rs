@@ -40,8 +40,8 @@ impl Tree for CITree {
             intervals: {
                 let mut intervals = Vec::with_capacity(config.n_intervals);
                 for _ in 0..config.n_intervals {
-                    let start = random_state.gen_range(0..=config.n_features - MIN_INTERVALS_LEN);
-                    let end = random_state.gen_range(start + MIN_INTERVALS_LEN..=config.n_features);
+                    let start = random_state.random_range(0..=config.n_features - MIN_INTERVALS_LEN);
+                    let end = random_state.random_range(start + MIN_INTERVALS_LEN..=config.n_features);
                     intervals.push((start, end));
                 }
                 intervals

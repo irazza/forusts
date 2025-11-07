@@ -7,7 +7,7 @@ use crate::{
     utils::structures::Sample,
     RandomGenerator,
 };
-use rand::{rng, SeedableRng};
+use rand::SeedableRng;
 
 #[derive(Clone, Debug, Copy)]
 pub enum ExtensionLevel {

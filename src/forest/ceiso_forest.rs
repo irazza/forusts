@@ -10,7 +10,7 @@ use crate::{
     utils::structures::{IntervalType, Sample},
     RandomGenerator,
 };
-use rand::{rng, SeedableRng};
+use rand::SeedableRng;
 
 #[derive(Clone)]
 pub struct CEIsoForestConfig {

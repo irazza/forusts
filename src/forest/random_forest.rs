@@ -4,7 +4,7 @@ use crate::{
     utils::structures::Sample,
     RandomGenerator,
 };
-use rand::{rng, SeedableRng};
+use rand::SeedableRng;
 
 pub type RandomForestConfig = ForestConfig;
 

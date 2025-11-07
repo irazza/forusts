@@ -47,8 +47,8 @@ impl Tree for CEIsoTree {
                     MIN_INTERVALS_LEN,
                 );
                 for _ in 0..config.n_intervals {
-                    let start = random_state.gen_range(0..=config.n_features - min_interval_len);
-                    let end = random_state.gen_range(start + min_interval_len..=config.n_features);
+                    let start = random_state.random_range(0..=config.n_features - min_interval_len);
+                    let end = random_state.random_range(start + min_interval_len..=config.n_features);
                     intervals.push((start, end));
                 }
                 intervals

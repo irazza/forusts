@@ -1,5 +1,5 @@
 use hashbrown::HashSet;
-use std::{f32::consts::E, hash::Hash};
+use std::hash::Hash;
 
 pub fn transpose<T>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
     assert!(!v.is_empty());

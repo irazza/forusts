@@ -1,6 +1,6 @@
-use std::{cmp::Ordering, ops::Sub};
+use std::ops::Sub;
 
-use crate::utils::statistics::{argsort, class_counts, unique};
+use crate::utils::statistics::{argsort, class_counts};
 
 pub fn accuracy_score(y_pred: &[isize], y_true: &[isize]) -> f64 {
     (y_pred

@@ -1,7 +1,7 @@
 use csv::ReaderBuilder;
 use std::error::Error;
-use std::fs::{File, OpenOptions};
-use std::io::{BufRead, BufReader, BufWriter, Read, Write};
+use std::fs::File;
+use std::io::{BufReader, BufWriter};
 use std::path::Path;
 use std::sync::Arc;
 

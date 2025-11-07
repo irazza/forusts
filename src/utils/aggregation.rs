@@ -1,4 +1,4 @@
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Subset {
     ALL,
     Q1,
@@ -17,6 +17,9 @@ pub enum Subset {
 
 impl Subset {
     pub fn compute(self, x: &[f64]) -> Vec<f64> {
+        if self == Self::ALL {
+            return x.to_vec();
+        }
         // WARNING: These are not real quartiles
         // Panic if the array is not sorted in descending order
         assert!(x.windows(2).all(|w| w[0] >= w[1]), "Array must be sorted in descending order");

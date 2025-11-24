@@ -2,7 +2,7 @@ use std::cmp::max;
 
 use super::{node::Node, tree::StandardSplit};
 use crate::tree::transform::catch_transform;
-use crate::utils::split::get_random_split;
+use crate::utils::split::{get_random_split, get_variance_split};
 use crate::{
     forest::ciso_forest::CIsoForestConfig, tree::tree::Tree, utils::structures::Sample,
     RandomGenerator,

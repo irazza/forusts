@@ -15,7 +15,7 @@ serde_json = "1.0.108"
 serde = { version = "1.0.193", features = ["serde_derive", "rc"] }
 serde_derive = "1.0.193"
 lazy_static = "1.4.0"
-catch22 = { git = "https://github.com/albertoazzari/catch22_rs.git", version = "0.1.0" }
+catch22 = { path = "../catch22_rs" }
 atomic_float = "1.1.0"
 dashmap = "6.1.0"
 kodama = "0.3.0"

@@ -272,16 +272,43 @@ pub trait OutlierForest<T: Tree>: Forest<T> {
     where
         T: 'a,
     {
-        let trees: &Vec<T> = self.get_trees();
-        let depths = (0..data.len()).into_par_iter().map(|i| {
-            let mut row = vec![0.0; trees.len()];
-            for (tree_idx, tree) in trees.iter().enumerate() {
-                let sample = &tree.transform(&[data[i].clone()])[0];
-                row[tree_idx] = Self::path_length(tree, sample);
-            }
-            row
-        });
-        depths
+        // let trees: &Vec<T> = self.get_trees();
+        // let depths = (0..data.len()).into_par_iter().map(|i| {
+        //     let mut row = vec![0.0; trees.len()];
+        //     for (tree_idx, tree) in trees.iter().enumerate() {
+        //         let sample = &tree.transform(&[data[i].clone()])[0];
+        //         row[tree_idx] = Self::path_length(tree, sample);
+        //     }
+        //     row
+        // });
+        // depths
+        let trees = self.get_trees();
+        let n_samples = data.len();
+
+        // Produce a Vec<Vec<f64>> where outer Vec = trees, inner Vec = depths per sample
+        let per_tree_results: Vec<Vec<f64>> = trees
+            .par_iter()
+            .map(|tree| {
+                // 1. Transform all samples once per tree
+                let transformed = tree.transform(data);
+
+                // 2. Compute path length per transformed sample
+                transformed
+                    .iter()
+                    .map(|s| Self::path_length(tree, s))
+                    .collect::<Vec<f64>>()
+            })
+            .collect();
+
+        // Now invert from [tree][sample] → [sample][tree]
+        (0..n_samples)
+            .into_par_iter()
+            .map(move |i| {
+                per_tree_results
+                    .iter()
+                    .map(|tree_column| tree_column[i])
+                    .collect::<Vec<f64>>()
+            })
     }
     fn score_samples(&self, data: &[Sample]) -> Vec<f64> {
         let (config, _) = self.get_forest_config();

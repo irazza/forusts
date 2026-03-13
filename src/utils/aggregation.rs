@@ -138,28 +138,24 @@ impl Combiner {
         Combiner { subset, combiner }
     }
     pub fn compute(self, x: &[f64], average_path_length: f64) -> f64 {
-        let scores = self.subset.compute(x);
+        let owned_scores;
+        let scores = if self.subset == Subset::ALL {
+            x
+        } else {
+            owned_scores = self.subset.compute(x);
+            &owned_scores
+        };
         let n_trees = scores.len() as f64;
         let score = match self.combiner {
             CombinerType::Prod => {
                 let mean_depth = kahan_sum(&scores) / n_trees;
                 (-mean_depth / average_path_length).exp2()
             }
-            CombinerType::Sum => {
-                let exps = scores
-                    .iter()
-                    .map(|&depth| (-depth).exp2())
-                    .collect::<Vec<_>>();
-                kahan_sum(&exps) / n_trees
-            }
+            CombinerType::Sum => kahan_sum_exp2_neg(scores) / n_trees,
             CombinerType::TSum => {
                 let s = (scores.len() as f64 * 0.05) as usize;
                 let e = (scores.len() as f64 * 0.95) as usize;
-                let exps = scores[s..e]
-                    .iter()
-                    .map(|&depth| (-depth).exp2())
-                    .collect::<Vec<_>>();
-                kahan_sum(&exps) / n_trees
+                kahan_sum_exp2_neg(&scores[s..e]) / n_trees
             }
             CombinerType::Median => {
                 let n = scores.len();
@@ -188,6 +184,18 @@ fn kahan_sum(values: &[f64]) -> f64 {
     let mut c = 0.0;
     for &value in values {
         let y = value - c;
+        let t = sum + y;
+        c = (t - sum) - y;
+        sum = t;
+    }
+    sum
+}
+
+fn kahan_sum_exp2_neg(values: &[f64]) -> f64 {
+    let mut sum = 0.0;
+    let mut c = 0.0;
+    for &value in values {
+        let y = (-value).exp2() - c;
         let t = sum + y;
         c = (t - sum) - y;
         sum = t;

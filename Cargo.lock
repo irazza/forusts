@@ -47,7 +47,7 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 [[package]]
 name = "catch22"
 version = "0.1.0"
-source = "git+https://github.com/albertoazzari/catch22_rs.git#fe360033abb8e5ad95c52c00ce450d5f66038f17"
+source = "git+https://github.com/irazza/catch22_rs.git#9576887029c7b41429284cba4aeda3a61f9ff4be"
 dependencies = [
  "rustfft",
 ]

@@ -2,7 +2,7 @@ use std::cmp::max;
 
 use super::{node::Node, tree::StandardSplit};
 use crate::tree::transform::catch_transform;
-use crate::utils::split::{get_random_split, get_variance_split};
+use crate::utils::split::get_random_split;
 use crate::{
     forest::ciso_forest::CIsoForestConfig, tree::tree::Tree, utils::structures::Sample,
     RandomGenerator,
@@ -11,7 +11,7 @@ use catch22::N_CATCH22;
 use rand::{seq::SliceRandom, Rng};
 
 const MIN_INTERVAL_PERC: f64 = 0.1;
-const MIN_INTERVALS_LEN: usize = 3;
+const MIN_INTERVALS_LEN: usize = 4;
 
 #[derive(Clone, Debug)]
 pub struct CIsoTreeConfig {
@@ -43,7 +43,8 @@ impl Tree for CIsoTree {
                 let min_interval_len = max(
                     (config.n_features as f64 * MIN_INTERVAL_PERC).ceil() as usize,
                     MIN_INTERVALS_LEN,
-                );
+                )
+                .min(config.n_features);
                 for _ in 0..config.n_intervals {
                     let start = random_state.random_range(0..=config.n_features - min_interval_len);
                     let end = random_state.random_range(start + min_interval_len..=config.n_features);

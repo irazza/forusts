@@ -8,8 +8,8 @@ use crate::tree::tree::{SplitParameters, StandardSplit};
 use crate::RandomGenerator;
 use core::f64;
 use hashbrown::HashMap;
-use rand::{rng, Rng};
-use rand::{seq::SliceRandom, SeedableRng};
+use rand::Rng;
+use rand::seq::SliceRandom;
 use std::ops::Range;
 use std::{
     cmp::{max, min},
@@ -27,7 +27,7 @@ pub fn train_test_split(
         panic!("The dataset is too small to be splitted.");
     }
     let mut indices: Vec<usize> = (0..data.len()).collect();
-    let mut random_state = random_state.unwrap_or(RandomGenerator::from_rng(&mut rng()));
+    let mut random_state = random_state.unwrap_or_else(crate::default_random_generator);
     // Shuffle indices
     indices.shuffle(&mut random_state);
 
@@ -104,20 +104,19 @@ pub fn get_random_split(
     non_constant_features.shuffle(random_state);
 
     while let Some(feature) = non_constant_features.pop() {
-        let thresholds = samples
-            .iter()
-            .map(|f| f.features[feature])
-            .collect::<Vec<_>>();
-
-        let min_feature = *thresholds
-            .iter()
-            .min_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap();
-
-        let max_feature = *thresholds
-            .iter()
-            .max_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap();
+        let mut iter = samples.iter();
+        let first = iter.next().unwrap().features[feature];
+        let mut min_feature = first;
+        let mut max_feature = first;
+        for sample in iter {
+            let value = sample.features[feature];
+            if value < min_feature {
+                min_feature = value;
+            }
+            if value > max_feature {
+                max_feature = value;
+            }
+        }
 
         if max_feature - min_feature <= f64::EPSILON {
             // Remove constant features
@@ -204,20 +203,19 @@ pub fn get_extended_split(
         max_features.clear();
 
         while let Some(feature) = non_constant_features.pop() {
-            let thresholds = samples
-                .iter()
-                .map(|f| f.features[feature])
-                .collect::<Vec<_>>();
-
-            let min_feature = *thresholds
-                .iter()
-                .min_by(|a, b| a.partial_cmp(b).unwrap())
-                .unwrap();
-
-            let max_feature = *thresholds
-                .iter()
-                .max_by(|a, b| a.partial_cmp(b).unwrap())
-                .unwrap();
+            let mut iter = samples.iter();
+            let first = iter.next().unwrap().features[feature];
+            let mut min_feature = first;
+            let mut max_feature = first;
+            for sample in iter {
+                let value = sample.features[feature];
+                if value < min_feature {
+                    min_feature = value;
+                }
+                if value > max_feature {
+                    max_feature = value;
+                }
+            }
 
             if max_feature - min_feature <= f64::EPSILON {
                 // Remove constant features
@@ -329,7 +327,6 @@ pub fn get_best_split(
                 left_count += 1;
                 split_index += 1;
             }
-
             if split_index < min_samples_leaf || (samples.len() - split_index) < min_samples_leaf {
                 continue;
             }

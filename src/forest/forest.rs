@@ -44,38 +44,32 @@ pub trait Forest<T: Tree>: Sync + Send {
         with_replacement: bool,
         mut random_state: &mut RandomGenerator,
     ) {
-        let mut trees = Vec::new();
         self.set_max_samples(max_samples);
         let (config, tree_config) = self.get_forest_config();
-        let random_generators =
-            (0..config.n_trees).map(|_| RandomGenerator::from_rng(&mut random_state));
-        trees.par_extend(
-            (0..config.n_trees)
-                .into_iter()
-                .zip(random_generators)
-                .par_bridge()
-                .map(|(_i, mut random_state)| {
-                    let indices = generate_indexes(
-                        max_samples,
-                        data.len(),
-                        with_replacement,
-                        &mut random_state,
-                    );
-                    let samples = indices
-                        .iter()
-                        .map(|idx| data[*idx].clone())
-                        .collect::<Vec<Sample>>();
-                    let mut tree = T::from_config(
-                        &tree_config,
-                        max_samples,
-                        samples[0].features.len(),
-                        &mut random_state,
-                    );
-                    let samples = tree.transform(&samples);
-                    tree.fit(&samples, &mut random_state);
-                    tree
-                }),
-        );
+        let n_features = data[0].features.len();
+        let random_generators: Vec<_> = (0..config.n_trees)
+            .map(|_| RandomGenerator::from_rng(&mut random_state))
+            .collect();
+        let trees: Vec<T> = random_generators
+            .into_par_iter()
+            .map(|mut random_state| {
+                let indices = generate_indexes(
+                    max_samples,
+                    data.len(),
+                    with_replacement,
+                    &mut random_state,
+                );
+                let samples = indices
+                    .iter()
+                    .map(|idx| data[*idx].clone())
+                    .collect::<Vec<Sample>>();
+                let mut tree =
+                    T::from_config(&tree_config, max_samples, n_features, &mut random_state);
+                let samples = tree.transform(&samples);
+                tree.fit(&samples, &mut random_state);
+                tree
+            })
+            .collect();
         *self.get_trees_mut() = trees;
     }
     fn predict(&self, data: &[Sample]) -> Vec<isize>;
@@ -88,21 +82,17 @@ pub trait Forest<T: Tree>: Sync + Send {
         let trees: &Vec<T> = self.get_trees();
         trees.par_iter().for_each(|tree| {
             let ds_a = tree.transform(ds_a);
-
             let ds_a_leaves = ds_a
                 .iter()
                 .map(|x| tree.predict_leaf(x))
                 .collect::<Vec<_>>();
-
-            let ds_b_leaves = if let Some(ds_b) = ds_b {
-                let ds_b = tree.transform(ds_b);
-
+            let ds_b = ds_b.map(|ds_b| tree.transform(ds_b));
+            let ds_b_leaves = ds_b.as_ref().map(|ds_b| {
                 ds_b.iter()
                     .map(|x| tree.predict_leaf(x))
                     .collect::<Vec<_>>()
-            } else {
-                ds_a_leaves.clone()
-            };
+            });
+            let ds_b_leaves = ds_b_leaves.as_deref().unwrap_or(&ds_a_leaves);
 
             for (i, &ds_a_node) in ds_a_leaves.iter().enumerate() {
                 for (j, &ds_b_node) in ds_b_leaves.iter().enumerate() {
@@ -133,23 +123,22 @@ pub trait Forest<T: Tree>: Sync + Send {
         let trees: &Vec<T> = self.get_trees();
         trees.par_iter().for_each(|tree| {
             let ds_a = tree.transform(ds_a);
-
             let ds_a_leaves = ds_a
                 .iter()
                 .map(|x| tree.predict_leaf(x))
                 .collect::<Vec<_>>();
-
-            let ds_b_leaves = if let Some(ds_b) = ds_b {
-                let ds_b = tree.transform(ds_b);
-
+            let ds_b = ds_b.map(|ds_b| tree.transform(ds_b));
+            let ds_b_leaves = ds_b.as_ref().map(|ds_b| {
                 ds_b.iter()
                     .map(|x| tree.predict_leaf(x))
                     .collect::<Vec<_>>()
-            } else {
-                ds_a_leaves.clone()
-            };
+            });
+            let ds_b_leaves = ds_b_leaves.as_deref().unwrap_or(&ds_a_leaves);
+            let mut ancestor_cache = HashMap::with_capacity(ds_a_leaves.len());
             for (i, &ds_a_node) in ds_a_leaves.iter().enumerate() {
-                let distances = tree.compute_ancestor(ds_a_node);
+                let distances = ancestor_cache
+                    .entry(ds_a_node as *const Node<_>)
+                    .or_insert_with(|| tree.compute_ancestor(ds_a_node));
 
                 for (j, &ds_b_node) in ds_b_leaves.iter().enumerate() {
                     let value = distances[&(ds_b_node as *const Node<_>)].get_depth() as f64
@@ -179,19 +168,29 @@ pub trait Forest<T: Tree>: Sync + Send {
         let trees: &Vec<T> = self.get_trees();
         trees.par_iter().for_each(|tree| {
             let ds_a = tree.transform(ds_a);
-            let ds_b = ds_b
-                .map(|ds_b| tree.transform(ds_b))
-                .unwrap_or_else(|| ds_a.clone());
+            let ds_b = ds_b.map(|ds_b| tree.transform(ds_b));
+            let ds_b = ds_b.as_deref().unwrap_or(&ds_a);
+            let ds_a_splits = ds_a.iter().map(|sample| tree.get_splits(sample)).collect::<Vec<_>>();
+            let ds_b_splits = if ds_b.len() == ds_a.len() && ds_b.as_ptr() == ds_a.as_ptr() {
+                None
+            } else {
+                Some(
+                    ds_b.iter()
+                        .map(|sample| tree.get_splits(sample))
+                        .collect::<Vec<_>>(),
+                )
+            };
 
             let mut union = Vec::new();
             for (i, sample_test) in ds_a.iter().enumerate() {
-                let ds_a_splits = tree.get_splits(sample_test);
                 for (j, sample_train) in ds_b.iter().enumerate() {
+                    let path_b = ds_b_splits
+                        .as_ref()
+                        .map(|paths| &paths[j])
+                        .unwrap_or(&ds_a_splits[j]);
                     union.clear();
-                    union.extend(ds_a_splits.iter().copied());
-                    union.extend(tree.get_splits(sample_train).into_iter());
-                    union.sort_unstable();
-                    union.dedup();
+                    extend_unique_refs(&mut union, &ds_a_splits[i]);
+                    extend_unique_refs(&mut union, path_b);
                     let agree = union
                         .iter()
                         .filter(|s| s.split(sample_test) == s.split(sample_train))
@@ -253,6 +252,14 @@ pub trait ClassificationForest<T: Tree>: Forest<T> {
         }
 
         final_predictions
+    }
+}
+
+fn extend_unique_refs<'a, S: PartialEq>(union: &mut Vec<&'a S>, values: &[&'a S]) {
+    for &value in values {
+        if !union.contains(&value) {
+            union.push(value);
+        }
     }
 }
 

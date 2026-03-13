@@ -34,10 +34,11 @@ pub fn catch_transform(
                 if let Some(value) = CACHE.get(&key_cache) {
                     features.push(*value);
                 } else {
-                    let mut value = compute(&sample.features[*start..*end], *attribute);
-                    if !value.is_finite() {
-                        value = 0.0;
-                    }
+                    // Invalid intervals or non-finite inputs are mapped to the existing zero fallback.
+                    let value = compute(&sample.features[*start..*end], *attribute)
+                        .ok()
+                        .filter(|value| value.is_finite())
+                        .unwrap_or(0.0);
 
                     if cache_size(&CACHE) < (*TOT_RAM as f64 * 0.8) as usize {
                         CACHE.insert(key_cache, value);

@@ -28,9 +28,9 @@ pub fn read_csv(
             features: Arc::new(
                 record
                     .features
-                    .to_vec()
                     .iter()
-                    .map(|v| if v.is_nan() { 0.0 } else { *v })
+                    .copied()
+                    .map(|v| if v.is_nan() { 0.0 } else { v })
                     .collect(),
             ),
         };

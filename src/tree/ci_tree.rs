@@ -8,7 +8,7 @@ use catch22::N_CATCH22;
 use hashbrown::HashMap;
 use rand::seq::SliceRandom;
 use rand::Rng;
-const MIN_INTERVALS_LEN: usize = 3;
+const MIN_INTERVALS_LEN: usize = 4;
 
 #[derive(Clone, Debug)]
 pub struct CITreeConfig {
@@ -39,9 +39,10 @@ impl Tree for CITree {
             config: config.clone(),
             intervals: {
                 let mut intervals = Vec::with_capacity(config.n_intervals);
+                let min_interval_len = config.n_features.min(MIN_INTERVALS_LEN);
                 for _ in 0..config.n_intervals {
-                    let start = random_state.random_range(0..=config.n_features - MIN_INTERVALS_LEN);
-                    let end = random_state.random_range(start + MIN_INTERVALS_LEN..=config.n_features);
+                    let start = random_state.random_range(0..=config.n_features - min_interval_len);
+                    let end = random_state.random_range(start + min_interval_len..=config.n_features);
                     intervals.push((start, end));
                 }
                 intervals

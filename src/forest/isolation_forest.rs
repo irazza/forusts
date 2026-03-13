@@ -2,12 +2,12 @@ use std::cmp::min;
 
 use super::forest::{ForestConfig, SUBSAMPLE_SIZE};
 use crate::{
+    default_random_generator,
     forest::forest::{Forest, OutlierForest},
     tree::isolation_tree::IsolationTree,
     utils::structures::Sample,
     RandomGenerator,
 };
-use rand::SeedableRng;
 
 pub type IsolationForestConfig = ForestConfig;
 
@@ -43,10 +43,7 @@ impl Forest<IsolationTree> for IsolationForest {
         }
     }
     fn fit(&mut self, samples: &mut [Sample], random_state: Option<RandomGenerator>) {
-        let mut random_state = match random_state {
-            Some(rng) => rng,
-            None => RandomGenerator::from_rng(&mut rand::rng()),
-        };
+        let mut random_state = random_state.unwrap_or_else(default_random_generator);
         let max_samples = min(SUBSAMPLE_SIZE, samples.len());
         self.fit_(&samples, max_samples, false, &mut random_state)
     }

@@ -263,7 +263,6 @@ pub fn get_best_split(
     let mut current_feature_count = 0;
     let mut max_gain = f64::NEG_INFINITY;
     let mut best_split = None;
-    let mut best_split_index = 0;
 
     let mut parent_impurity =
         FastGini::from_classes_count(samples.iter().fold(HashMap::new(), |mut acc, x| {
@@ -276,25 +275,19 @@ pub fn get_best_split(
             return true;
         }
 
-        let min_feature = samples
-            .iter()
-            .min_by(|a, b| {
-                a.features[feature]
-                    .partial_cmp(&b.features[feature])
-                    .unwrap()
-            })
-            .unwrap()
-            .features[feature];
-
-        let max_feature = samples
-            .iter()
-            .max_by(|a, b| {
-                a.features[feature]
-                    .partial_cmp(&b.features[feature])
-                    .unwrap()
-            })
-            .unwrap()
-            .features[feature];
+        let mut iter = samples.iter();
+        let first = iter.next().unwrap().features[feature];
+        let mut min_feature = first;
+        let mut max_feature = first;
+        for sample in iter {
+            let value = sample.features[feature];
+            if value < min_feature {
+                min_feature = value;
+            }
+            if value > max_feature {
+                max_feature = value;
+            }
+        }
 
         if max_feature - min_feature <= f64::EPSILON {
             // Remove constant features
@@ -306,27 +299,29 @@ pub fn get_best_split(
                 .partial_cmp(&b.features[feature])
                 .unwrap()
         });
-        let mut thresholds = samples
-            .iter()
-            .map(|f| f.features[feature])
-            .collect::<Vec<_>>();
-        thresholds.dedup();
 
         let mut split_index = 0;
         let mut children_count = [FastGini::new(), parent_impurity.clone()];
         let mut left_count = 0;
         let mut right_count = samples.len();
 
-        for threshold in thresholds.windows(2).map(|x| (x[0] + x[1]) / 2.0) {
-            let current_split = StandardSplit { feature, threshold };
-
-            while split_index < samples.len() && current_split.split(&samples[split_index]) == 1 {
+        for i in 1..samples.len() {
+            while split_index < i {
                 children_count[1].change_element(samples[split_index].target, -1);
                 right_count -= 1;
                 children_count[0].change_element(samples[split_index].target, 1);
                 left_count += 1;
                 split_index += 1;
             }
+
+            let left_value = samples[i - 1].features[feature];
+            let right_value = samples[i].features[feature];
+            if right_value - left_value <= f64::EPSILON {
+                continue;
+            }
+
+            let threshold = (left_value + right_value) / 2.0;
+            let current_split = StandardSplit { feature, threshold };
             if split_index < min_samples_leaf || (samples.len() - split_index) < min_samples_leaf {
                 continue;
             }
@@ -339,7 +334,6 @@ pub fn get_best_split(
             if current_gain > max_gain {
                 max_gain = current_gain;
                 best_split = Some((current_split, max_gain));
-                best_split_index = split_index;
             }
         }
         current_feature_count += 1;

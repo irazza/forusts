@@ -6,11 +6,12 @@ mod tests {
     use rand::SeedableRng;
     use rand_distr::StandardNormal;
 
+    use crate::forest::ci_forest::{CIForest, CIForestConfig};
     use crate::forest::forest::{Forest, OutlierForest};
     use crate::forest::isolation_forest::{IsolationForest, IsolationForestConfig};
     use crate::forest::random_forest::{RandomForest, RandomForestConfig};
     use crate::utils::split::train_test_split;
-    use crate::utils::structures::{MaxFeatures, Sample};
+    use crate::utils::structures::{IntervalType, MaxFeatures, Sample};
     use crate::RandomGenerator;
 
     fn make_samples(n_samples: usize, n_features: usize, seed: u64) -> Vec<Sample> {
@@ -92,5 +93,32 @@ mod tests {
 
         assert_eq!(split_a.0, split_b.0);
         assert_eq!(split_a.1, split_b.1);
+    }
+
+    #[test]
+    fn pairwise_ratiorf_handles_different_input_lengths() {
+        let config = CIForestConfig {
+            n_intervals: IntervalType::LOG2,
+            n_attributes: 4,
+            classification_config: crate::forest::forest::ForestConfig {
+                n_trees: 16,
+                max_depth: Some(6),
+                min_samples_split: 2,
+                min_samples_leaf: 1,
+                max_features: MaxFeatures::SQRT,
+                criterion: |_a, _b| 1.0,
+                aggregation: None,
+            },
+        };
+
+        let mut train = make_samples(96, 12, 41);
+        let probe = make_samples(37, 12, 43);
+
+        let mut model = CIForest::new(&config);
+        model.fit(&mut train, Some(RandomGenerator::seed_from_u64(47)));
+
+        let distances = model.pairwise_ratiorf(&probe, Some(&train));
+        assert_eq!(distances.len(), probe.len());
+        assert!(distances.iter().all(|row| row.len() == train.len()));
     }
 }

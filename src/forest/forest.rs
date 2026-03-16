@@ -184,10 +184,11 @@ pub trait Forest<T: Tree>: Sync + Send {
             let mut union = Vec::new();
             for (i, sample_test) in ds_a.iter().enumerate() {
                 for (j, sample_train) in ds_b.iter().enumerate() {
-                    let path_b = ds_b_splits
-                        .as_ref()
-                        .map(|paths| &paths[j])
-                        .unwrap_or(&ds_a_splits[j]);
+                    let path_b = if let Some(paths) = ds_b_splits.as_ref() {
+                        &paths[j]
+                    } else {
+                        &ds_a_splits[j]
+                    };
                     union.clear();
                     extend_unique_refs(&mut union, &ds_a_splits[i]);
                     extend_unique_refs(&mut union, path_b);

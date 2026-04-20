@@ -11,56 +11,65 @@ pub enum Subset {
     Q1Q4,
     Q1Q3,
     Q2Q4,
+    TRIM(f64),
     X84(f64),
     MODE(usize),
 }
 
 impl Subset {
     pub fn compute(self, x: &[f64]) -> Vec<f64> {
-        if self == Self::ALL {
+        if self == Self::ALL || x.is_empty() {
             return x.to_vec();
         }
-        // WARNING: These are not real quartiles
-        // Panic if the array is not sorted in descending order
-        assert!(x.windows(2).all(|w| w[0] >= w[1]), "Array must be sorted in descending order");
+        // Keep aggregation robust to caller ordering: all subset rules operate on
+        // path lengths sorted in descending order.
+        let mut sorted = x.to_vec();
+        sorted.sort_by(|a, b| b.total_cmp(a));
 
-        // let mut x = x.to_vec();
-        // x.sort_by(|a, b| b.partial_cmp(a).unwrap());
-        let q1 = (x.len() as f64 / 4.0) as usize;
-        let q2 = (x.len() as f64 / 2.0) as usize;
-        let q3 = (x.len() as f64 * (3.0 / 4.0)) as usize;
+        // WARNING: These are not exact quartiles for small arrays.
+        let q1 = (sorted.len() as f64 / 4.0) as usize;
+        let q2 = (sorted.len() as f64 / 2.0) as usize;
+        let q3 = (sorted.len() as f64 * (3.0 / 4.0)) as usize;
 
         match self {
             Subset::ALL => x.to_vec(),
-            Subset::Q1 => x[..q1].to_vec(),
-            Subset::Q2 => x[q1..q2].to_vec(),
-            Subset::Q3 => x[q2..q3].to_vec(),
-            Subset::Q4 => x[q3..].to_vec(),
-            Subset::Q1Q2 => x[..q2].to_vec(),
-            Subset::Q3Q4 => x[q2..].to_vec(),
-            Subset::Q2Q3 => x[q1..q3].to_vec(),
+            Subset::Q1 => sorted[..q1].to_vec(),
+            Subset::Q2 => sorted[q1..q2].to_vec(),
+            Subset::Q3 => sorted[q2..q3].to_vec(),
+            Subset::Q4 => sorted[q3..].to_vec(),
+            Subset::Q1Q2 => sorted[..q2].to_vec(),
+            Subset::Q3Q4 => sorted[q2..].to_vec(),
+            Subset::Q2Q3 => sorted[q1..q3].to_vec(),
             Subset::Q1Q4 => {
-                let mut q1q4 = x[..q1].to_vec();
-                q1q4.extend_from_slice(&x[q3..]);
+                let mut q1q4 = sorted[..q1].to_vec();
+                q1q4.extend_from_slice(&sorted[q3..]);
                 q1q4
             }
-            Subset::Q1Q3 => x[..q3].to_vec(),
-            Subset::Q2Q4 => x[q1..].to_vec(),
+            Subset::Q1Q3 => sorted[..q3].to_vec(),
+            Subset::Q2Q4 => sorted[q1..].to_vec(),
+            Subset::TRIM(trim_fraction) => {
+                // Drop an equal proportion of extreme short/long path lengths.
+                let alpha = trim_fraction.clamp(0.0, 0.49);
+                let max_tail = (sorted.len().saturating_sub(1)) / 2;
+                let tail = ((sorted.len() as f64) * alpha).floor() as usize;
+                let tail = tail.min(max_tail);
+                sorted[tail..(sorted.len() - tail)].to_vec()
+            }
             Subset::X84(k) => {
                 // Implement X84 rule - rejects points more than k*MAD from median
                 let median_value = {
-                    let mid = x.len() / 2;
-                    if x.len() & 1 == 0 {
-                        (x[mid - 1] + x[mid]) / 2.0
+                    let mid = sorted.len() / 2;
+                    if sorted.len() & 1 == 0 {
+                        (sorted[mid - 1] + sorted[mid]) / 2.0
                     } else {
-                        x[mid]
+                        sorted[mid]
                     }
                 };
 
                 // Calculate median absolute deviation (MAD)
                 let mut deviations: Vec<f64> =
-                    x.iter().map(|&val| (val - median_value).abs()).collect();
-                deviations.sort_by(|a, b| a.partial_cmp(b).unwrap());
+                    sorted.iter().map(|&val| (val - median_value).abs()).collect();
+                deviations.sort_by(|a, b| a.total_cmp(b));
 
                 let mad = {
                     let mid = deviations.len() / 2;
@@ -72,7 +81,7 @@ impl Subset {
                 };
 
                 // Reject outliers: keep only values within k*MAD of median
-                let v = x
+                let v = sorted
                     .iter()
                     .filter(|&val| (val - median_value).abs() <= k * mad)
                     .copied()
@@ -80,13 +89,16 @@ impl Subset {
                 v
             }
             Subset::MODE(n_bins) => {
-                let min = *x.last().unwrap(); // it is sorted descending
-                let max = *x.first().unwrap();
+                let min = *sorted.last().unwrap(); // it is sorted descending
+                let max = *sorted.first().unwrap();
                 let bin_width = (max - min) / n_bins as f64;
+                if bin_width == 0.0 {
+                    return sorted;
+                }
 
                 // Create bins and count frequencies
                 let mut bins = vec![0; n_bins];
-                for value in x {
+                for value in &sorted {
                     let bin_index = ((value - min) / bin_width).floor() as usize;
                     let bin_index = bin_index.min(n_bins - 1); // Ensure index is within bounds
                     bins[bin_index] += 1;
@@ -99,7 +111,7 @@ impl Subset {
                     .position(|&count| count == *max_bin_count)
                     .unwrap();
 
-                let v = x
+                let v = sorted
                     .iter()
                     .filter(|&value| {
                         ((value - min) / bin_width).floor() as usize == most_frequent_bin_index
@@ -215,7 +227,15 @@ mod tests {
         let data = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
         let subset = Subset::Q1;
         let result = subset.compute(&data);
-        assert_eq!(result, vec![8.0, 7.0, 6.0, 5.0]);
+        assert_eq!(result, vec![8.0, 7.0]);
+    }
+
+    #[test]
+    fn test_subset_trim_compute() {
+        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+        let subset = Subset::TRIM(0.25);
+        let result = subset.compute(&data);
+        assert_eq!(result, vec![6.0, 5.0, 4.0, 3.0]);
     }
 
     #[test]
@@ -238,6 +258,8 @@ mod tests {
         let _ = combiner4.compute(&data, average_path_length);
         let combiner5 = Combiner::new(Subset::ALL, CombinerType::Max);
         let _ = combiner5.compute(&data, average_path_length);
+        let combiner6 = Combiner::new(Subset::TRIM(0.1), CombinerType::Prod);
+        let _ = combiner6.compute(&data, average_path_length);
     }
 
     #[inline]

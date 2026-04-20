@@ -56,6 +56,11 @@ impl Subset {
                 sorted[tail..(sorted.len() - tail)].to_vec()
             }
             Subset::X84(k) => {
+                // Invalid thresholds should not drop all values unexpectedly.
+                if !k.is_finite() || k <= 0.0 {
+                    return sorted;
+                }
+
                 // Implement X84 rule - rejects points more than k*MAD from median
                 let median_value = {
                     let mid = sorted.len() / 2;
@@ -80,10 +85,13 @@ impl Subset {
                     }
                 };
 
+                // Canonical Gaussian-consistent MAD scaling used with X84.
+                let scaled_mad = 1.4826_f64 * mad;
+
                 // Reject outliers: keep only values within k*MAD of median
                 let v = sorted
                     .iter()
-                    .filter(|&val| (val - median_value).abs() <= k * mad)
+                    .filter(|&val| (val - median_value).abs() <= k * scaled_mad)
                     .copied()
                     .collect::<Vec<_>>();
                 v
@@ -150,12 +158,16 @@ impl Combiner {
         Combiner { subset, combiner }
     }
     pub fn compute(self, x: &[f64], average_path_length: f64) -> f64 {
-        let owned_scores;
+        let mut owned_scores = Vec::new();
         let scores = if self.subset == Subset::ALL {
             x
         } else {
             owned_scores = self.subset.compute(x);
-            &owned_scores
+            if owned_scores.is_empty() {
+                x
+            } else {
+                &owned_scores
+            }
         };
         let n_trees = scores.len() as f64;
         let score = match self.combiner {
@@ -236,6 +248,29 @@ mod tests {
         let subset = Subset::TRIM(0.25);
         let result = subset.compute(&data);
         assert_eq!(result, vec![6.0, 5.0, 4.0, 3.0]);
+    }
+
+    #[test]
+    fn test_subset_x84_rejects_extreme_outlier() {
+        let data = vec![10.0, 10.0, 10.0, 10.0, 100.0];
+        let subset = Subset::X84(3.0);
+        let result = subset.compute(&data);
+        assert_eq!(result, vec![10.0, 10.0, 10.0, 10.0]);
+    }
+
+    #[test]
+    fn test_subset_x84_invalid_k_falls_back_to_sorted_all() {
+        let data = vec![1.0, 9.0, 3.0, 7.0];
+        assert_eq!(Subset::X84(-1.0).compute(&data), vec![9.0, 7.0, 3.0, 1.0]);
+        assert_eq!(Subset::X84(f64::NAN).compute(&data), vec![9.0, 7.0, 3.0, 1.0]);
+    }
+
+    #[test]
+    fn test_combiner_x84_invalid_k_does_not_empty_scores() {
+        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let combiner = Combiner::new(Subset::X84(-1.0), CombinerType::Median);
+        let score = combiner.compute(&data, 2.0);
+        assert!(score.is_finite());
     }
 
     #[test]

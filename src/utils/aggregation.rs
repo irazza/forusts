@@ -158,16 +158,15 @@ impl Combiner {
         Combiner { subset, combiner }
     }
     pub fn compute(self, x: &[f64], average_path_length: f64) -> f64 {
-        let mut owned_scores = Vec::new();
-        let scores = if self.subset == Subset::ALL {
-            x
+        let owned_scores = if self.subset == Subset::ALL {
+            None
         } else {
-            owned_scores = self.subset.compute(x);
-            if owned_scores.is_empty() {
-                x
-            } else {
-                &owned_scores
-            }
+            Some(self.subset.compute(x))
+        };
+
+        let scores = match owned_scores.as_deref() {
+            Some(scores) if !scores.is_empty() => scores,
+            _ => x,
         };
         let n_trees = scores.len() as f64;
         let score = match self.combiner {
